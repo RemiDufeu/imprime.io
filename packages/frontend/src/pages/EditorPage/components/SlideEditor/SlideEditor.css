@@ -1,0 +1,92 @@
+/* Shared styles for Toolbar and ZoomBar */
+.toolbar-container, .zoombar-container{
+    display: inline-flex;
+    align-items: center;
+    background: var(--ant-color-bg-container);
+    box-shadow: var(--ant-box-shadow);
+    border-radius: var(--ant-border-radius);
+    border: var(--ant-line-width) var(--ant-line-type) var(--ant-color-border);
+    gap: 4px;
+    box-sizing: border-box;
+}
+
+.toolbar-container .btn:hover, .zoombar-container .btn:hover {
+    color: var(--ant-color-primary) !important;
+    background-color: transparent !important;
+}
+
+.editor-container {
+    flex: 1;
+    position: relative;
+    margin-left: var(--space-s);
+    display: flex;
+    overflow: hidden;
+    min-width: 0;
+}
+
+.zoombar-container {
+    position: absolute;
+    bottom: var(--space-s);
+    right: var(--space-s);
+    z-index: 10;
+}
+
+.editor-top-actions {
+    position: absolute;
+    width: 100%;
+    top: var(--space-s);
+    display: flex;
+    gap: var(--space-m);
+    z-index: 10;
+}
+
+.context-toolbar {
+    padding: 0 var(--space-s);
+}
+
+.canva-container {
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    overflow: auto;
+    position: relative;
+    min-width: 0;
+    display: grid;
+    place-content: safe center;
+}
+
+.canva-container > div {
+    box-sizing: border-box;
+    padding: var(--space-xl);
+}
+
+/* Context toolbar specific styles */
+.toolbar-container .toolbar-section {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.toolbar-section {
+    padding: 0 var(--space-s);
+}
+
+.toolbar-container .toolbar-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.toolbar-container .toolbar-label {
+    font-size: 13px;
+    color: var(--ant-color-text-secondary);
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.toolbar-container .toolbar-divider {
+    width: 1px;
+    height: 24px;
+    background-color: var(--ant-color-border);
+    margin: 0 4px;
+}

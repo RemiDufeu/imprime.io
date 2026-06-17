@@ -1,0 +1,23 @@
+:root {
+    --space-xs: 4px;
+    --space-s: 8px;
+    --space-m: 16px;
+    --space-l: 24px;
+    --space-xl: 48px;
+    --space-xxl: 96px;
+    --space-xxxl: 128px;
+
+    --font-display: "Courier Prime", "Courier New", monospace;
+}
+
+h1, h2, h3, h4, h5, h6,
+.ant-typography h1, .ant-typography h2, .ant-typography h3,
+.ant-typography h4, .ant-typography h5, .ant-typography h6,
+h1.ant-typography, h2.ant-typography, h3.ant-typography,
+h4.ant-typography, h5.ant-typography, h6.ant-typography {
+    font-family: var(--font-display);
+    letter-spacing: -0.5px;
+}
+
+@media (prefers-color-scheme: light) {
+}

@@ -1,0 +1,25 @@
+{
+  "name": "@imprime/sdk",
+  "version": "1.0.0",
+  "description": "TypeScript SDK for Imprime API - Create and manage presentations programmatically",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "keywords": [
+    "imprime",
+    "presentation",
+    "sdk",
+    "api-client"
+  ],
+  "dependencies": {
+    "@imprime/common": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "@types/node": "^22.10.5"
+  }
+}

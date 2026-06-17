@@ -1,0 +1,18 @@
+.layering-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background-color: var(--ant-color-bg-container);
+  border: 1px solid var(--ant-color-border);
+  border-radius: var(--ant-border-radius);
+  box-shadow: var(--ant-box-shadow);
+  z-index: 1000;
+}
+
+.tools-container {
+  position: fixed;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  pointer-events: auto;
+}

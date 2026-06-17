@@ -1,0 +1,14 @@
+.layout {
+    min-height: 100vh;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-s);
+}
+
+/* Aligner le contenu du header */
+.layout .ant-layout-header {
+    display: flex;
+    align-items: center;
+    line-height: normal;
+}

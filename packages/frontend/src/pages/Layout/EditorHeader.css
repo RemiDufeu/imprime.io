@@ -1,0 +1,19 @@
+.header-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-m);
+  height: 100%;
+  width: 100%;
+}
+
+.inputBtn {
+  width: 300px;
+  box-shadow: var(--ant-box-shadow);
+}
+
+.gap-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-m);
+}

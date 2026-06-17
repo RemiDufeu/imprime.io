@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: imprime-app
+    restart: unless-stopped
+    ports:
+      - "3023:3023"
+    environment:
+      - NODE_ENV=production
+      - PORT=3023
+      - MONGODB_URI=${MONGODB_URI}
+      - CORS_ORIGIN=*
+

@@ -1,0 +1,1 @@
+export { AntdProvider } from './AntdProvider'

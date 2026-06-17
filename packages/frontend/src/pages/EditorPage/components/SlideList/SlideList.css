@@ -1,0 +1,111 @@
+.slide-list-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  margin: 0 var(--space-s);
+  box-sizing: border-box;
+  flex-shrink: 0;
+  box-sizing: content-box;
+}
+
+.slide-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: end;
+  padding: 0 var(--space-s);
+  margin: var(--space-s);
+  margin-bottom: 0;
+}
+
+.slide-list-title {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--ant-color-text);
+}
+
+.slide-list-content {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  padding: 0 var(--space-s) var(--space-s);
+}
+
+.slide-preview-wrapper {
+  padding: var(--space-s);
+  box-sizing: border-box;
+}
+
+.slide-preview-shadow {
+  box-shadow: var(--ant-box-shadow);
+}
+
+.slide-thumbnail {
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 2px solid transparent;
+  border-radius: var(--space-s);
+  position: relative;
+  box-sizing: border-box;
+}
+
+.slide-thumbnail:hover {
+  border: 2px solid var(--ant-color-border);
+}
+
+.slide-thumbnail-active {
+  border: 2px solid var(--ant-color-primary) !important;
+}
+
+.slide-thumbnail-dragging {
+  opacity: 0.5;
+  transform: scale(0.95);
+}
+
+.slide-thumbnail-number {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  background-color: rgba(0, 0, 0, 0.6);
+  color: white;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  z-index: 1;
+}
+
+.insert-slide {
+  height: 3px;
+  margin: 4px 0;
+  background-color: transparent;
+  transition: all 0.2s ease;
+}
+
+.insert-slide-wrapper {
+  padding: 4px 0;
+}
+
+.insert-slide.active {
+  background-color: var(--ant-color-primary);
+  height: 4px;
+  box-shadow: 0 0 4px var(--ant-color-primary);
+}
+
+.slide-thumbnail-delete {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  background-color: rgba(255, 255, 255, 0.9) !important;
+  z-index: 1;
+}
+
+.slide-thumbnail:hover .slide-thumbnail-delete {
+  opacity: 1;
+}
+
+.slide-thumbnail-delete:hover {
+  background-color: rgba(255, 77, 79, 0.1) !important;
+}

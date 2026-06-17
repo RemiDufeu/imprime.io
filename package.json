@@ -1,0 +1,36 @@
+{
+  "name": "imprime-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:frontend": "npm run dev --workspace=@imprime/frontend",
+    "dev:backend": "npm run dev --workspace=@imprime/backend",
+    "dev:sdk": "npm run dev --workspace=@imprime/sdk",
+    "dev": "concurrently --raw \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "build:common": "npm run build --workspace=@imprime/common",
+    "build:sdk": "npm run build --workspace=@imprime/sdk",
+    "build:frontend": "npm run build --workspace=@imprime/frontend",
+    "build:backend": "npm run build --workspace=@imprime/backend",
+    "build": "npm run build:common && npm run build:sdk && npm run build:backend && npm run build:frontend",
+    "lint": "npm run lint --workspaces",
+    "clean": "rm -rf packages/*/node_modules packages/*/dist node_modules",
+    "docker:build": "docker build -t imprime-app .",
+    "docker:run": "docker run -p 3001:3001 --env-file .env.production imprime-app",
+    "docker:compose:up": "docker-compose up -d",
+    "docker:compose:down": "docker-compose down",
+    "docker:compose:logs": "docker-compose logs -f app"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "dependencies": {
+    "slate": "^0.120.0",
+    "slate-dom": "^0.119.0",
+    "slate-react": "^0.120.0",
+    "zustand": "^5.0.9"
+  }
+}
