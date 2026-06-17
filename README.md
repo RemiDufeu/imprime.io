@@ -42,7 +42,8 @@ https://imprime.io/api/export/{{presentationId}}/pdf
 ![alt text](./doc/api.png)
 
 ### MCP
-Imprime is MCP-ready. Plug it into your AI agents or chat interfaces and let them generate PDFs on your behalf — no glue code required.
+Imprime is MCP-ready. Plug it into your AI agents or chat interfaces and let them generate PDFs on your behalf.
+
 ![MCP](./doc/mcp.png)
 
 # Roadmap
