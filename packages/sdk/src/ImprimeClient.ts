@@ -15,6 +15,11 @@ import type {
 export interface ImprimeClientOptions {
   baseUrl?: string
   timeout?: number
+  /**
+   * Clé d'API pour l'accès programmatique (envoyée dans l'en-tête `x-api-key`).
+   * Dans le navigateur, laissez vide : l'authentification passe par le cookie de session.
+   */
+  apiKey?: string
 }
 
 /**
@@ -41,10 +46,17 @@ export interface ImprimeClientOptions {
 export class ImprimeClient {
   private baseUrl: string
   private timeout: number
+  private apiKey?: string
 
   constructor(options: ImprimeClientOptions = {}) {
     this.baseUrl = options.baseUrl || 'http://localhost:3001/api'
     this.timeout = options.timeout || 30000
+    this.apiKey = options.apiKey
+  }
+
+  /** En-têtes d'authentification (clé d'API si fournie). */
+  private authHeaders(): Record<string, string> {
+    return this.apiKey ? { 'x-api-key': this.apiKey } : {}
   }
 
   /**
@@ -63,8 +75,10 @@ export class ImprimeClient {
       const response = await fetch(url, {
         ...options,
         signal: controller.signal,
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
+          ...this.authHeaders(),
           ...options.headers,
         },
       })
@@ -434,8 +448,10 @@ export class ImprimeClient {
       const response = await fetch(url, {
         method: 'POST',
         signal: controller.signal,
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
+          ...this.authHeaders(),
         },
         body: JSON.stringify({ ...variableValues }),
       })

@@ -30,7 +30,7 @@ const outputSchema = {
   expiresInSeconds: z.number().describe('Lifetime of the download URL'),
 }
 
-export function registerExportPresentation(server: McpServer): void {
+export function registerExportPresentation(server: McpServer, ownerId: string): void {
   // Known regression in @modelcontextprotocol/sdk ≥1.23 (Zod v4 support):
   // registerTool's generic inference triggers TS2589 when both inputSchema
   // and outputSchema are provided. Recheck this directive after SDK upgrades.
@@ -47,7 +47,7 @@ export function registerExportPresentation(server: McpServer): void {
     },
     async ({ presentationId, variableValues }) => {
       try {
-        const presentation = await presentationService.getById(presentationId)
+        const presentation = await presentationService.getById(presentationId, ownerId)
         const pdfBuffer = await exportService.exportToPDF(presentation, {
           variableValues: variableValues ?? {},
         })

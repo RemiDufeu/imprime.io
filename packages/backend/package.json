@@ -12,12 +12,15 @@
     "lint": "eslint src --ext .ts"
   },
   "dependencies": {
+    "@better-auth/api-key": "^1.6.23",
+    "@imprime/common": "*",
     "@modelcontextprotocol/sdk": "^1.0.4",
     "@react-pdf/renderer": "^4.3.2",
-    "@imprime/common": "*",
+    "better-auth": "^1.6.23",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^5.2.1",
+    "mongodb": "^6.20.0",
     "mongoose": "^8.9.5",
     "zod": "^3.23.8"
   },

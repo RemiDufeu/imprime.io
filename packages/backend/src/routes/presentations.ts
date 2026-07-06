@@ -5,29 +5,29 @@ import { presentationService } from '../services/index.js'
 const router = Router()
 
 router.get('/', async (req, res) => {
-  const presentations = await presentationService.list()
+  const presentations = await presentationService.list(req.user!.id)
   res.json(presentations)
 })
 
 router.get('/:id', async (req, res) => {
-  const presentation = await presentationService.getById(req.params.id)
+  const presentation = await presentationService.getById(req.params.id, req.user!.id)
   res.json(presentation)
 })
 
 router.post('/', async (req, res) => {
   const data: PresentationDTO.Create = req.body
-  const presentation = await presentationService.create(data)
+  const presentation = await presentationService.create(data, req.user!.id)
   res.status(201).json(presentation)
 })
 
 router.put('/:id', async (req, res) => {
   const data: PresentationDTO.Update = req.body
-  const presentation = await presentationService.update(req.params.id, data)
+  const presentation = await presentationService.update(req.params.id, data, req.user!.id)
   res.json(presentation)
 })
 
 router.delete('/:id', async (req, res) => {
-  await presentationService.delete(req.params.id)
+  await presentationService.delete(req.params.id, req.user!.id)
   res.json({ message: 'Presentation deleted successfully' })
 })
 

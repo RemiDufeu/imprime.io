@@ -26,18 +26,29 @@ function collectImageIds(shapes: Shape[]): string[] {
 export class PresentationService {
   constructor(private imageService: ImageService) {}
 
-  public async list(): Promise<PresentationSummary[]> {
-    const presentations = await PresentationModel.find().sort({ updatedAt: -1 })
+  public async list(ownerId: string): Promise<PresentationSummary[]> {
+    const presentations = await PresentationModel.find({ ownerId }).sort({ updatedAt: -1 })
     return presentations.map(presentationToSummaryDTO)
   }
 
-  public async getById(id: string): Promise<Presentation> {
+  /**
+   * Vérifie que la présentation existe ET appartient à `ownerId`.
+   * Lève `NotFoundError` sinon (ne divulgue pas l'existence à un tiers).
+   */
+  public async assertOwner(id: string, ownerId: string): Promise<void> {
+    const presentation = await PresentationModel.findById(id)
+    if (!presentation || presentation.ownerId !== ownerId) {
+      throw new NotFoundError('Presentation not found', 'PRESENTATION_NOT_FOUND')
+    }
+  }
+
+  public async getById(id: string, ownerId: string): Promise<Presentation> {
     const [presentation, slides, variables] = await Promise.all([
       PresentationModel.findById(id),
       SlideModel.find({ presentationId: toObjectId(id) }).sort({ order: 1 }),
       VariableDataModel.find({ presentationId: toObjectId(id) }),
     ])
-    if (!presentation) {
+    if (!presentation || presentation.ownerId !== ownerId) {
       throw new NotFoundError('Presentation not found', 'PRESENTATION_NOT_FOUND')
     }
     return {
@@ -47,15 +58,15 @@ export class PresentationService {
     }
   }
 
-  public async create(data: PresentationDTO.Create): Promise<Presentation> {
-    const presentation = await PresentationModel.create(presentationCreateToModel(data))
+  public async create(data: PresentationDTO.Create, ownerId: string): Promise<Presentation> {
+    const presentation = await PresentationModel.create({ ...presentationCreateToModel(data), ownerId })
     await SlideModel.create(slideCreateToModel(presentation._id, 0))
-    return await this.getById(presentation._id.toString())
+    return await this.getById(presentation._id.toString(), ownerId)
   }
 
-  public async update(id: string, data: PresentationDTO.Update): Promise<Presentation> {
+  public async update(id: string, data: PresentationDTO.Update, ownerId: string): Promise<Presentation> {
     const presentation = await PresentationModel.findById(id)
-    if (!presentation) {
+    if (!presentation || presentation.ownerId !== ownerId) {
       throw new NotFoundError('Presentation not found', 'PRESENTATION_NOT_FOUND')
     }
 
@@ -75,12 +86,12 @@ export class PresentationService {
       ))
     }
 
-    return await this.getById(id)
+    return await this.getById(id, ownerId)
   }
 
-  public async delete(id: string): Promise<void> {
+  public async delete(id: string, ownerId: string): Promise<void> {
     const presentation = await PresentationModel.findById(id)
-    if (!presentation) {
+    if (!presentation || presentation.ownerId !== ownerId) {
       throw new NotFoundError('Presentation not found', 'PRESENTATION_NOT_FOUND')
     }
 

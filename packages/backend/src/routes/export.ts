@@ -17,7 +17,7 @@ function setPdfDownloadHeaders(res: Response, buffer: Buffer, filename: string):
 }
 
 router.post('/:id/pdf', async (req, res) => {
-  const presentation = await presentationService.getById(req.params.id)
+  const presentation = await presentationService.getById(req.params.id, req.user!.id)
   const payload: ExportDTO.PdfRequest = { variableValues: req.body || {} }
 
   const startTime = Date.now()
