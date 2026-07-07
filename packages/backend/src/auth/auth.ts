@@ -2,6 +2,7 @@ import '../loadEnv.js'
 import { betterAuth } from 'better-auth'
 import { mongodbAdapter } from 'better-auth/adapters/mongodb'
 import { apiKey } from '@better-auth/api-key'
+import type { EnabledAuthProviders } from '@imprime/common'
 import { authDb, authMongoClient } from '../config/authDb.js'
 
 interface ProviderCreds {
@@ -21,6 +22,13 @@ const microsoft = microsoftBase
   ? { ...microsoftBase, tenantId: process.env.MICROSOFT_TENANT_ID || 'common' }
   : undefined
 
+export const enabledAuthProviders: EnabledAuthProviders = {
+  emailPassword: true,
+  google: Boolean(google),
+  github: Boolean(github),
+  microsoft: Boolean(microsoft),
+}
+
 /**
  * Instance Better Auth (commune aux deux éditions).
  *
@@ -32,6 +40,10 @@ export const auth = betterAuth({
   secret: process.env.BETTER_AUTH_SECRET,
   trustedOrigins: [process.env.CORS_ORIGIN || 'http://localhost:5173'],
   database: mongodbAdapter(authDb, { client: authMongoClient }),
+  emailAndPassword: {
+    enabled: true,
+    requireEmailVerification: false,
+  },
   socialProviders: {
     ...(google ? { google } : {}),
     ...(github ? { github } : {}),

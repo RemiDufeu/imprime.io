@@ -10,6 +10,7 @@ import type {
   ImageDTO,
   PresentationDTO,
   VariableDTO,
+  EnabledAuthProviders,
 } from '@imprime/common'
 
 export interface ImprimeClientOptions {
@@ -97,6 +98,18 @@ export class ImprimeClient {
     } finally {
       clearTimeout(timeoutId)
     }
+  }
+
+  // ============================================
+  // Auth Operations
+  // ============================================
+
+  /**
+   * Retourne les providers d'authentification activés côté serveur
+   * (email/password + réseaux sociaux configurés).
+   */
+  async getAuthProviders(): Promise<EnabledAuthProviders> {
+    return this.request<EnabledAuthProviders>('/auth-providers')
   }
 
   // ============================================

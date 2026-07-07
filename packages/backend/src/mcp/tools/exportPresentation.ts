@@ -10,7 +10,7 @@ function getApiBaseUrl(): string {
   const url = process.env.VITE_API_URL
   if (!url || !/^https?:\/\//i.test(url)) {
     throw new Error(
-      'VITE_API_URL must be set to an absolute http(s) URL (e.g. https://imrime.io/api) to enable MCP PDF downloads'
+      'VITE_API_URL must be set to an absolute http(s) URL (e.g. https://imrime.io) to enable MCP PDF downloads'
     )
   }
   return url.replace(/\/$/, '')

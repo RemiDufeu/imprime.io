@@ -6,3 +6,14 @@ export interface AuthUser {
   id: string
   email?: string
 }
+
+/**
+ * Providers d'authentification activés côté serveur, exposés à l'UI pour
+ * n'afficher que les options réellement disponibles.
+ */
+export interface EnabledAuthProviders {
+  emailPassword: boolean
+  google: boolean
+  github: boolean
+  microsoft: boolean
+}

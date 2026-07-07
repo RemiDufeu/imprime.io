@@ -7,7 +7,7 @@ import { toNodeHandler } from 'better-auth/node'
 import type { Server as HttpServer } from 'http'
 import { connectDatabase } from './config/database.js'
 import { connectAuthDb, closeAuthDb } from './config/authDb.js'
-import { auth } from './auth/auth.js'
+import { auth, enabledAuthProviders } from './auth/auth.js'
 import { requireAuth } from './middleware/requireAuth.js'
 import presentationsRouter from './routes/presentations.js'
 import slideRouter from './routes/slides.js'
@@ -43,6 +43,11 @@ app.use((req, res, next) => {
 // Health check (public)
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
+})
+
+// Providers d'auth activés (public, utilisé par la page de connexion)
+app.get('/api/auth-providers', (_req, res) => {
+  res.json(enabledAuthProviders)
 })
 
 // Routes API protégées (session cookie ou clé d'API)
