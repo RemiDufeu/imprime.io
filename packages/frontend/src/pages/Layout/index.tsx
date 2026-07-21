@@ -14,7 +14,7 @@ export default function Layout() {
   return (
     <AntLayout className='layout'>
       <Header>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div className='inner-header'>
           {CurrentHeader}
           <UserMenu />
         </div>

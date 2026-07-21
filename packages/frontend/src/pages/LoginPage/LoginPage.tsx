@@ -33,7 +33,7 @@ export default function LoginPage() {
     try {
       await signIn.social({ provider, callbackURL: '/' })
     } catch {
-      message.error(`Connexion via ${provider} impossible`)
+      message.error(`Sign-in with ${provider} failed`)
       setSocialLoading(null)
     }
   }
@@ -46,7 +46,7 @@ export default function LoginPage() {
       callbackURL: '/',
     })
     if (error) {
-      message.error(error.message || 'Identifiants invalides')
+      message.error(error.message || 'Invalid credentials')
       setEmailLoading(false)
     }
   }
@@ -60,7 +60,7 @@ export default function LoginPage() {
       callbackURL: '/',
     })
     if (error) {
-      message.error(error.message || 'Inscription impossible')
+      message.error(error.message || 'Sign-up failed')
       setEmailLoading(false)
     }
   }
@@ -84,7 +84,7 @@ export default function LoginPage() {
             items={[
               {
                 key: 'signin',
-                label: 'Connexion',
+                label: 'Sign in',
                 children: (
                   <Form<SignInValues>
                     layout="vertical"
@@ -94,26 +94,26 @@ export default function LoginPage() {
                     <Form.Item
                       name="email"
                       label="Email"
-                      rules={[{ required: true, type: 'email', message: 'Email invalide' }]}
+                      rules={[{ required: true, type: 'email', message: 'Invalid email' }]}
                     >
                       <Input size="large" autoComplete="email" />
                     </Form.Item>
                     <Form.Item
                       name="password"
-                      label="Mot de passe"
-                      rules={[{ required: true, min: 8, message: '8 caractères minimum' }]}
+                      label="Password"
+                      rules={[{ required: true, min: 8, message: 'At least 8 characters' }]}
                     >
                       <Input.Password size="large" autoComplete="current-password" />
                     </Form.Item>
                     <Button type="primary" htmlType="submit" block size="large" loading={emailLoading}>
-                      Se connecter
+                      Sign in
                     </Button>
                   </Form>
                 ),
               },
               {
                 key: 'signup',
-                label: 'Inscription',
+                label: 'Sign up',
                 children: (
                   <Form<SignUpValues>
                     layout="vertical"
@@ -122,27 +122,27 @@ export default function LoginPage() {
                   >
                     <Form.Item
                       name="name"
-                      label="Nom"
-                      rules={[{ required: true, message: 'Nom requis' }]}
+                      label="Name"
+                      rules={[{ required: true, message: 'Name required' }]}
                     >
                       <Input size="large" autoComplete="name" />
                     </Form.Item>
                     <Form.Item
                       name="email"
                       label="Email"
-                      rules={[{ required: true, type: 'email', message: 'Email invalide' }]}
+                      rules={[{ required: true, type: 'email', message: 'Invalid email' }]}
                     >
                       <Input size="large" autoComplete="email" />
                     </Form.Item>
                     <Form.Item
                       name="password"
-                      label="Mot de passe"
-                      rules={[{ required: true, min: 8, message: '8 caractères minimum' }]}
+                      label="Password"
+                      rules={[{ required: true, min: 8, message: 'At least 8 characters' }]}
                     >
                       <Input.Password size="large" autoComplete="new-password" />
                     </Form.Item>
                     <Button type="primary" htmlType="submit" block size="large" loading={emailLoading}>
-                      Créer un compte
+                      Create account
                     </Button>
                   </Form>
                 ),
@@ -151,7 +151,7 @@ export default function LoginPage() {
           />
         )}
 
-        {providers.emailPassword && hasSocial && <Divider plain>ou</Divider>}
+        {providers.emailPassword && hasSocial && <Divider plain>or</Divider>}
 
         {hasSocial && (
           <Space direction="vertical" style={{ width: '100%' }} size="middle">
@@ -163,7 +163,7 @@ export default function LoginPage() {
                 loading={socialLoading === 'google'}
                 onClick={() => handleSocialSignIn('google')}
               >
-                Continuer avec Google
+                Continue with Google
               </Button>
             )}
             {providers.microsoft && (
@@ -174,7 +174,7 @@ export default function LoginPage() {
                 loading={socialLoading === 'microsoft'}
                 onClick={() => handleSocialSignIn('microsoft')}
               >
-                Continuer avec Microsoft
+                Continue with Microsoft
               </Button>
             )}
             {providers.github && (
@@ -185,7 +185,7 @@ export default function LoginPage() {
                 loading={socialLoading === 'github'}
                 onClick={() => handleSocialSignIn('github')}
               >
-                Continuer avec GitHub
+                Continue with GitHub
               </Button>
             )}
           </Space>

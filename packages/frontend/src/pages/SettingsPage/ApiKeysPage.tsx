@@ -19,13 +19,13 @@ export default function ApiKeysPage() {
   const [creating, setCreating] = useState(false)
   const [newKeyName, setNewKeyName] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
-  // Clé en clair, affichée une seule fois juste après création.
+  // Plaintext key, shown only once right after creation.
   const [revealedKey, setRevealedKey] = useState<string | null>(null)
 
   async function loadKeys() {
     setLoading(true)
     const { data, error } = await authClient.apiKey.list()
-    if (error) message.error("Impossible de charger les clés d'API")
+    if (error) message.error('Failed to load API keys')
     else setKeys((data?.apiKeys ?? []) as unknown as ApiKeyItem[])
     setLoading(false)
   }
@@ -39,7 +39,7 @@ export default function ApiKeysPage() {
     const { data, error } = await authClient.apiKey.create({ name: newKeyName || undefined })
     setCreating(false)
     if (error || !data) {
-      message.error("Création de la clé impossible")
+      message.error('Failed to create API key')
       return
     }
     setRevealedKey(data.key)
@@ -50,9 +50,9 @@ export default function ApiKeysPage() {
 
   async function handleDelete(keyId: string) {
     const { error } = await authClient.apiKey.delete({ keyId })
-    if (error) message.error('Révocation impossible')
+    if (error) message.error('Failed to revoke key')
     else {
-      message.success('Clé révoquée')
+      message.success('Key revoked')
       void loadKeys()
     }
   }
@@ -60,16 +60,16 @@ export default function ApiKeysPage() {
   return (
     <RegularPageContainer>
       <Card
-        title="Clés d'API"
+        title="API Keys"
         extra={
           <Button type="primary" icon={<PlusOutlined />} onClick={() => setModalOpen(true)}>
-            Nouvelle clé
+            New key
           </Button>
         }
       >
         <Typography.Paragraph type="secondary">
-          Utilisez une clé d'API pour accéder à l'API en dehors du navigateur
-          (en-tête <code>x-api-key</code>).
+          Use an API key to access the API outside the browser
+          (<code>x-api-key</code> header).
         </Typography.Paragraph>
 
         {revealedKey && (
@@ -77,7 +77,7 @@ export default function ApiKeysPage() {
             style={{ marginBottom: 16 }}
             type="success"
             showIcon
-            message="Copiez votre clé maintenant — elle ne sera plus affichée"
+            message="Copy your key now — it won't be shown again"
             description={
               <Space>
                 <Typography.Text code copyable={{ icon: <CopyOutlined /> }}>
@@ -93,24 +93,24 @@ export default function ApiKeysPage() {
         <List
           loading={loading}
           dataSource={keys}
-          locale={{ emptyText: 'Aucune clé' }}
+          locale={{ emptyText: 'No keys' }}
           renderItem={(key) => (
             <List.Item
               actions={[
                 <Popconfirm
                   key="del"
-                  title="Révoquer cette clé ?"
+                  title="Revoke this key?"
                   onConfirm={() => handleDelete(key.id)}
-                  okText="Révoquer"
-                  cancelText="Annuler"
+                  okText="Revoke"
+                  cancelText="Cancel"
                 >
                   <Button danger type="text" icon={<DeleteOutlined />} />
                 </Popconfirm>,
               ]}
             >
               <List.Item.Meta
-                title={key.name || '(sans nom)'}
-                description={`${key.start ?? '••••'}…  ·  créée le ${new Date(key.createdAt).toLocaleDateString()}`}
+                title={key.name || '(unnamed)'}
+                description={`${key.start ?? '••••'}…  ·  created ${new Date(key.createdAt).toLocaleDateString()}`}
               />
             </List.Item>
           )}
@@ -118,16 +118,16 @@ export default function ApiKeysPage() {
       </Card>
 
       <Modal
-        title="Nouvelle clé d'API"
+        title="New API key"
         open={modalOpen}
         onOk={handleCreate}
         confirmLoading={creating}
         onCancel={() => setModalOpen(false)}
-        okText="Créer"
-        cancelText="Annuler"
+        okText="Create"
+        cancelText="Cancel"
       >
         <Input
-          placeholder="Nom (optionnel, ex. « CLI perso »)"
+          placeholder="Name (optional, e.g. “Personal CLI”)"
           value={newKeyName}
           onChange={(e) => setNewKeyName(e.target.value)}
           onPressEnter={handleCreate}
