@@ -34,14 +34,15 @@ function buildAuth(mailer: MailerService) {
     ? { ...microsoftBase, tenantId: process.env.MICROSOFT_TENANT_ID || 'common' }
     : undefined
 
+  const requireEmailVerification = process.env.REQUIRE_EMAIL_VERIFICATION === 'true'
+
   const enabledProviders: EnabledAuthProviders = {
     emailPassword: true,
     google: Boolean(google),
     github: Boolean(github),
     microsoft: Boolean(microsoft),
+    requireEmailVerification,
   }
-
-  const requireEmailVerification = process.env.REQUIRE_EMAIL_VERIFICATION === 'true'
 
   if (requireEmailVerification && !mailer.isConfigured) {
     throw new Error(
