@@ -84,6 +84,13 @@ function buildAuth(mailer: MailerService) {
       apiKey(),
       mcp({
         loginPage: '/login',
+        oidcConfig: {
+          loginPage: '/login',
+          // Only triggered when the OAuth client sends `prompt=consent` in the
+          // authorize request. Standard OIDC — Claude and other well-behaved
+          // clients may request it to force re-authorization.
+          consentPage: '/oauth/consent',
+        },
       }),
     ],
   })
