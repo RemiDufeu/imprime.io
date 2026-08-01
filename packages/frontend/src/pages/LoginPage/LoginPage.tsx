@@ -61,57 +61,97 @@ export default function LoginPage() {
     else window.location.assign(postLoginTarget)
   }
 
-  // Raw fetch bypasses better-auth's React client, which was observed to keep
-  // the promise pending until the tab regained focus (session refetch trigger).
-  // We only need the Set-Cookie side effect, so a plain POST is enough.
-  async function rawAuthPost(
+  // Race the auth request against a polling fallback. Some OAuth-flow browser
+  // contexts freeze pending fetch promises (observed with Claude connectors) —
+  // in that case we detect the session cookie via /get-session and navigate
+  // without waiting for the original fetch to resolve.
+  async function signInAndNavigate(
     path: 'sign-in/email' | 'sign-up/email',
     body: Record<string, unknown>,
-  ): Promise<{ ok: true } | { ok: false; message: string }> {
-    const res = await fetch(`/api/auth/${path}`, {
+    onError: (msg: string) => void,
+  ): Promise<void> {
+    let done = false
+    const finish = () => {
+      if (done) return
+      done = true
+      goToPostLogin()
+    }
+
+    const request = fetch(`/api/auth/${path}`, {
       method: 'POST',
       credentials: 'include',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
     })
-    if (res.ok) return { ok: true }
-    let msg = `Request failed (${res.status})`
-    try {
-      const data = (await res.json()) as { message?: string; error?: { message?: string } }
-      msg = data.message ?? data.error?.message ?? msg
-    } catch {
-      // ignore
+
+    // Poll session while the request is in flight. Cookie shows up as soon as
+    // the server processes the login, even if the response is stalled client-
+    // side.
+    const pollInterval = 300
+    const maxAttempts = 30
+    for (let i = 0; i < maxAttempts && !done; i++) {
+      await new Promise((r) => setTimeout(r, pollInterval))
+      if (done) return
+      try {
+        const res = await fetch('/api/auth/get-session', {
+          credentials: 'include',
+          cache: 'no-store',
+        })
+        if (res.ok) {
+          const data = (await res.json()) as { user?: unknown } | null
+          if (data?.user) {
+            finish()
+            return
+          }
+        }
+      } catch {
+        // keep polling
+      }
     }
-    return { ok: false, message: msg }
+
+    // Poll timed out — inspect the original request as a last resort.
+    if (done) return
+    try {
+      const res = await request
+      if (res.ok) {
+        finish()
+        return
+      }
+      let msg = `Request failed (${res.status})`
+      try {
+        const data = (await res.json()) as { message?: string; error?: { message?: string } }
+        msg = data.message ?? data.error?.message ?? msg
+      } catch {
+        // ignore
+      }
+      onError(msg)
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Network error')
+    }
   }
 
   async function handleEmailSignIn(values: SignInValues) {
     setEmailLoading(true)
-    const result = await rawAuthPost('sign-in/email', {
-      email: values.email,
-      password: values.password,
-    })
-    if (!result.ok) {
-      message.error(result.message || 'Invalid credentials')
-      setEmailLoading(false)
-      return
-    }
-    goToPostLogin()
+    await signInAndNavigate(
+      'sign-in/email',
+      { email: values.email, password: values.password },
+      (msg) => {
+        message.error(msg || 'Invalid credentials')
+        setEmailLoading(false)
+      },
+    )
   }
 
   async function handleEmailSignUp(values: SignUpValues) {
     setEmailLoading(true)
-    const result = await rawAuthPost('sign-up/email', {
-      email: values.email,
-      password: values.password,
-      name: values.name,
-    })
-    if (!result.ok) {
-      message.error(result.message || 'Sign-up failed')
-      setEmailLoading(false)
-      return
-    }
-    goToPostLogin()
+    await signInAndNavigate(
+      'sign-up/email',
+      { email: values.email, password: values.password, name: values.name },
+      (msg) => {
+        message.error(msg || 'Sign-up failed')
+        setEmailLoading(false)
+      },
+    )
   }
 
   if (isPending || !providers) return <SpinnerFullScreen />
