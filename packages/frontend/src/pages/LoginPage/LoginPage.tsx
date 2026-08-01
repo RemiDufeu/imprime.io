@@ -42,7 +42,7 @@ export default function LoginPage() {
       .getAuthProviders()
       .then(setProviders)
       .catch(() =>
-        setProviders({ emailPassword: true, google: false, github: false, microsoft: false }),
+        setProviders({ emailPassword: true, google: false, github: false, microsoft: false, requireEmailVerification: false }),
       )
   }, [])
 
@@ -82,6 +82,10 @@ export default function LoginPage() {
     if (error) {
       message.error(error.message || 'Sign-up failed')
       setEmailLoading(false)
+      return
+    }
+    if (providers?.requireEmailVerification) {
+      window.location.assign(`/verify-email?email=${encodeURIComponent(values.email)}`)
       return
     }
     goToPostLogin()

@@ -15,4 +15,5 @@ export interface EnabledAuthProviders {
   google: boolean
   github: boolean
   microsoft: boolean
+  requireEmailVerification: boolean
 }
