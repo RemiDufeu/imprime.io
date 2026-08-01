@@ -54,7 +54,7 @@ export function registerExportPresentation(server: McpServer, ownerId: string): 
 
         const filename = `${presentation.title || 'presentation'}.pdf`
         const token = putPdf(pdfBuffer, filename)
-        const downloadUrl = `${getApiBaseUrl()}/export/download/${token}`
+        const downloadUrl = `${getApiBaseUrl()}/api/export/download/${token}`
 
         const structured = {
           downloadUrl,
