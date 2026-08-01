@@ -15,7 +15,7 @@ import { ImprimeClient } from '@imprime/sdk'
 
 // Initialize the client
 const client = new ImprimeClient({
-  baseUrl: 'http://localhost:3001/api'
+  baseUrl: 'http://localhost:3023/api'
 })
 
 // Create a presentation

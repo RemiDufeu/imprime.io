@@ -30,7 +30,7 @@ export interface ImprimeClientOptions {
  *
  * @example
  * ```typescript
- * const client = new ImprimeClient({ baseUrl: 'http://localhost:3001/api' })
+ * const client = new ImprimeClient({ baseUrl: 'http://localhost:3023/api' })
  *
  * // Create a presentation
  * const presentation = await client.createPresentation('My Presentation')

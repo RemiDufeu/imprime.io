@@ -8,9 +8,9 @@ import { toolError, errorMessage } from './errors.js'
 const DOWNLOAD_TTL_SECONDS = 600
 
 function getApiBaseUrl(): string {
-  const url = process.env.VITE_API_URL
+  const url = process.env.PUBLIC_APP_URL
   if (!url || !/^https?:\/\//i.test(url)) {
-    throw new Error('VITE_API_URL must be set to an absolute http(s) URL')
+    throw new Error('PUBLIC_APP_URL must be set to an absolute http(s) URL')
   }
   return url.replace(/\/$/, '')
 }
