@@ -1,5 +1,6 @@
 import { betterAuth } from 'better-auth'
 import { mongodbAdapter } from 'better-auth/adapters/mongodb'
+import { mcp } from 'better-auth/plugins'
 import { apiKey } from '@better-auth/api-key'
 import type { EnabledAuthProviders } from '@imprime/common'
 import { authDb, authMongoClient } from '../config/authDb.js'
@@ -79,7 +80,12 @@ function buildAuth(mailer: MailerService) {
       ...(github ? { github } : {}),
       ...(microsoft ? { microsoft } : {}),
     },
-    plugins: [apiKey()],
+    plugins: [
+      apiKey(),
+      mcp({
+        loginPage: '/login',
+      }),
+    ],
   })
 
   return { instance, enabledProviders }
@@ -101,5 +107,12 @@ export class AuthService {
     if (!key) return null
     const result = await this.instance.api.verifyApiKey({ body: { key } })
     return result?.valid && result.key ? result.key.referenceId : null
+  }
+
+  public async resolveMcpBearerOwner(bearerToken: string): Promise<string | null> {
+    if (!bearerToken) return null
+    const headers = new Headers({ authorization: `Bearer ${bearerToken}` })
+    const session = await this.instance.api.getMcpSession({ headers })
+    return session?.userId ?? null
   }
 }

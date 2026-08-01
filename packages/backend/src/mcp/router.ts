@@ -68,14 +68,29 @@ export function createMcpRouter(): McpRouter {
       return
     }
 
-    // Resolve the owner ID from the API key header
+    // Resolve owner: OAuth Bearer (MCP web connectors) or x-api-key (CLI/SDK)
+    const authHeader = req.headers.authorization
     const apiKeyHeader = req.headers['x-api-key']
-    const ownerId =
-      typeof apiKeyHeader === 'string' ? await authService.resolveApiKeyOwner(apiKeyHeader) : null
+    let ownerId: string | null = null
+    if (typeof authHeader === 'string' && authHeader.toLowerCase().startsWith('bearer ')) {
+      ownerId = await authService.resolveMcpBearerOwner(authHeader.slice(7).trim())
+    } else if (typeof apiKeyHeader === 'string') {
+      ownerId = await authService.resolveApiKeyOwner(apiKeyHeader)
+    }
     if (!ownerId) {
+      // RFC 9728: point clients to the protected-resource metadata so they can
+      // discover the authorization server.
+      const base = process.env.PUBLIC_APP_URL ?? ''
+      res.setHeader(
+        'WWW-Authenticate',
+        `Bearer resource_metadata="${base}/.well-known/oauth-protected-resource"`,
+      )
       res.status(401).json({
         jsonrpc: '2.0',
-        error: { code: -32001, message: 'Unauthorized: valid x-api-key header required' },
+        error: {
+          code: -32001,
+          message: 'Unauthorized: OAuth Bearer token or x-api-key header required',
+        },
         id: null,
       })
       return

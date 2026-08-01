@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Navigate } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { Navigate, useSearchParams } from 'react-router-dom'
 import { Button, Card, Divider, Form, Input, Space, Tabs, Typography, message } from 'antd'
 import { GithubOutlined, GoogleOutlined, WindowsOutlined } from '@ant-design/icons'
 import type { EnabledAuthProviders } from '@imprime/sdk'
@@ -18,6 +18,19 @@ export default function LoginPage() {
   const [socialLoading, setSocialLoading] = useState<SocialProvider | null>(null)
   const [emailLoading, setEmailLoading] = useState(false)
   const [providers, setProviders] = useState<EnabledAuthProviders | null>(null)
+  const [params] = useSearchParams()
+
+  // Where to land after a successful login:
+  // - explicit `redirect` param takes priority (used to resume OAuth flows)
+  // - `consent_code` means Better Auth's MCP plugin bounced the user here mid-flow
+  // - otherwise the home page
+  const postLoginTarget = useMemo(() => {
+    const redirect = params.get('redirect')
+    if (redirect) return redirect
+    const consentCode = params.get('consent_code')
+    if (consentCode) return `/oauth/consent?consent_code=${encodeURIComponent(consentCode)}`
+    return '/'
+  }, [params])
 
   useEffect(() => {
     imprimeClient
@@ -31,7 +44,7 @@ export default function LoginPage() {
   async function handleSocialSignIn(provider: SocialProvider) {
     setSocialLoading(provider)
     try {
-      await signIn.social({ provider, callbackURL: '/' })
+      await signIn.social({ provider, callbackURL: postLoginTarget })
     } catch {
       message.error(`Sign-in with ${provider} failed`)
       setSocialLoading(null)
@@ -43,7 +56,7 @@ export default function LoginPage() {
     const { error } = await signIn.email({
       email: values.email,
       password: values.password,
-      callbackURL: '/',
+      callbackURL: postLoginTarget,
     })
     if (error) {
       message.error(error.message || 'Invalid credentials')
@@ -57,7 +70,7 @@ export default function LoginPage() {
       email: values.email,
       password: values.password,
       name: values.name,
-      callbackURL: '/',
+      callbackURL: postLoginTarget,
     })
     if (error) {
       message.error(error.message || 'Sign-up failed')
@@ -66,7 +79,7 @@ export default function LoginPage() {
   }
 
   if (isPending || !providers) return <SpinnerFullScreen />
-  if (data) return <Navigate to="/" replace />
+  if (data) return <Navigate to={postLoginTarget} replace />
 
   const hasSocial = providers.google || providers.microsoft || providers.github
 

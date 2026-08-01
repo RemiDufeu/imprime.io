@@ -4,6 +4,7 @@ import cors from 'cors'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { toNodeHandler } from 'better-auth/node'
+import { oAuthDiscoveryMetadata, oAuthProtectedResourceMetadata } from 'better-auth/plugins'
 import type { Server as HttpServer } from 'http'
 import { connectDatabase } from './config/database.js'
 import { connectAuthDb, closeAuthDb } from './config/authDb.js'
@@ -32,6 +33,23 @@ const expressMiddleware = CORS_ORIGIN === '*'
 app.use(expressMiddleware)
 
 app.all('/api/auth/*splat', toNodeHandler(authService.instance))
+
+// OAuth 2.0 discovery endpoints — MUST be at root per RFC 8414 / RFC 9728 so
+// MCP clients (Claude web connector) can discover the authorization server.
+const discovery = oAuthDiscoveryMetadata(authService.instance)
+const protectedResource = oAuthProtectedResourceMetadata(authService.instance)
+const adaptWebHandler =
+  (handler: (req: globalThis.Request) => Promise<globalThis.Response>) =>
+  async (req: express.Request, res: express.Response) => {
+    const url = `${req.protocol}://${req.get('host')}${req.originalUrl}`
+    const webRes = await handler(new globalThis.Request(url, { method: req.method }))
+    res.status(webRes.status)
+    webRes.headers.forEach((v, k) => res.setHeader(k, v))
+    res.send(await webRes.text())
+  }
+app.get('/.well-known/oauth-authorization-server', adaptWebHandler(discovery))
+app.get('/.well-known/oauth-protected-resource', adaptWebHandler(protectedResource))
+
 app.use(express.json({ limit: '10mb' }))
 
 // Request logging
