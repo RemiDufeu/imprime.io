@@ -61,97 +61,62 @@ export default function LoginPage() {
     else window.location.assign(postLoginTarget)
   }
 
-  // Race the auth request against a polling fallback. Some OAuth-flow browser
-  // contexts freeze pending fetch promises (observed with Claude connectors) —
-  // in that case we detect the session cookie via /get-session and navigate
-  // without waiting for the original fetch to resolve.
-  async function signInAndNavigate(
+  // When an OAuth authorize flow is pending, Better Auth's /sign-in/email
+  // returns a 302 to the (cross-origin) OAuth callback. Following it with
+  // `credentials: 'include'` triggers a CORS error that freezes the promise.
+  // `redirect: 'manual'` makes the browser stop at the 302 — we then navigate
+  // ourselves to /api/auth/mcp/authorize which resolves the flow server-side.
+  async function rawAuthPost(
     path: 'sign-in/email' | 'sign-up/email',
     body: Record<string, unknown>,
-    onError: (msg: string) => void,
-  ): Promise<void> {
-    let done = false
-    const finish = () => {
-      if (done) return
-      done = true
-      goToPostLogin()
-    }
-
-    const request = fetch(`/api/auth/${path}`, {
+  ): Promise<{ ok: true } | { ok: false; message: string }> {
+    const res = await fetch(`/api/auth/${path}`, {
       method: 'POST',
       credentials: 'include',
+      redirect: 'manual',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
     })
-
-    // Poll session while the request is in flight. Cookie shows up as soon as
-    // the server processes the login, even if the response is stalled client-
-    // side.
-    const pollInterval = 300
-    const maxAttempts = 30
-    for (let i = 0; i < maxAttempts && !done; i++) {
-      await new Promise((r) => setTimeout(r, pollInterval))
-      if (done) return
-      try {
-        const res = await fetch('/api/auth/get-session', {
-          credentials: 'include',
-          cache: 'no-store',
-        })
-        if (res.ok) {
-          const data = (await res.json()) as { user?: unknown } | null
-          if (data?.user) {
-            finish()
-            return
-          }
-        }
-      } catch {
-        // keep polling
-      }
-    }
-
-    // Poll timed out — inspect the original request as a last resort.
-    if (done) return
+    // opaqueredirect (type='opaqueredirect', status=0) means the server issued
+    // a 3xx — sign-in succeeded, cookie is set, browser just refused to follow.
+    if (res.type === 'opaqueredirect' || res.ok) return { ok: true }
+    let msg = `Request failed (${res.status})`
     try {
-      const res = await request
-      if (res.ok) {
-        finish()
-        return
-      }
-      let msg = `Request failed (${res.status})`
-      try {
-        const data = (await res.json()) as { message?: string; error?: { message?: string } }
-        msg = data.message ?? data.error?.message ?? msg
-      } catch {
-        // ignore
-      }
-      onError(msg)
-    } catch (err) {
-      onError(err instanceof Error ? err.message : 'Network error')
+      const data = (await res.json()) as { message?: string; error?: { message?: string } }
+      msg = data.message ?? data.error?.message ?? msg
+    } catch {
+      // ignore
     }
+    return { ok: false, message: msg }
   }
 
   async function handleEmailSignIn(values: SignInValues) {
     setEmailLoading(true)
-    await signInAndNavigate(
-      'sign-in/email',
-      { email: values.email, password: values.password },
-      (msg) => {
-        message.error(msg || 'Invalid credentials')
-        setEmailLoading(false)
-      },
-    )
+    const result = await rawAuthPost('sign-in/email', {
+      email: values.email,
+      password: values.password,
+    })
+    if (!result.ok) {
+      message.error(result.message || 'Invalid credentials')
+      setEmailLoading(false)
+      return
+    }
+    goToPostLogin()
   }
 
   async function handleEmailSignUp(values: SignUpValues) {
     setEmailLoading(true)
-    await signInAndNavigate(
-      'sign-up/email',
-      { email: values.email, password: values.password, name: values.name },
-      (msg) => {
-        message.error(msg || 'Sign-up failed')
-        setEmailLoading(false)
-      },
-    )
+    const result = await rawAuthPost('sign-up/email', {
+      email: values.email,
+      password: values.password,
+      name: values.name,
+    })
+    if (!result.ok) {
+      message.error(result.message || 'Sign-up failed')
+      setEmailLoading(false)
+      return
+    }
+    goToPostLogin()
   }
 
   if (isPending || !providers) return <SpinnerFullScreen />
