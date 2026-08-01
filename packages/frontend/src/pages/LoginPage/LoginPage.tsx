@@ -20,17 +20,22 @@ export default function LoginPage() {
   const [providers, setProviders] = useState<EnabledAuthProviders | null>(null)
   const [params] = useSearchParams()
 
-  // Where to land after a successful login:
-  // - explicit `redirect` param takes priority (used to resume OAuth flows)
-  // - `consent_code` means Better Auth's MCP plugin bounced the user here mid-flow
-  // - otherwise the home page
+  // Where to land after a successful login. Better Auth's MCP plugin bounces
+  // unauthenticated users here with the full set of OAuth query params
+  // (client_id, redirect_uri, response_type, code_challenge, state, ...). To
+  // resume the flow we send them back to /api/auth/mcp/authorize with the same
+  // query. Otherwise honour an explicit `redirect` param, else home page.
   const postLoginTarget = useMemo(() => {
-    const redirect = params.get('redirect')
-    if (redirect) return redirect
-    const consentCode = params.get('consent_code')
-    if (consentCode) return `/oauth/consent?consent_code=${encodeURIComponent(consentCode)}`
-    return '/'
+    if (params.get('client_id') && params.get('response_type')) {
+      return `/api/auth/mcp/authorize?${params.toString()}`
+    }
+    return params.get('redirect') ?? '/'
   }, [params])
+
+  // OAuth resume URLs point at the backend, so a full navigation is required
+  // to let the server process the flow. Same for consent redirects returned by
+  // Better Auth. Internal targets can use SPA navigation.
+  const isExternalTarget = postLoginTarget.startsWith('/api/')
 
   useEffect(() => {
     imprimeClient
@@ -51,6 +56,11 @@ export default function LoginPage() {
     }
   }
 
+  function goToPostLogin() {
+    if (isExternalTarget) window.location.href = postLoginTarget
+    else window.location.assign(postLoginTarget)
+  }
+
   async function handleEmailSignIn(values: SignInValues) {
     setEmailLoading(true)
     const { error } = await signIn.email({
@@ -61,7 +71,9 @@ export default function LoginPage() {
     if (error) {
       message.error(error.message || 'Invalid credentials')
       setEmailLoading(false)
+      return
     }
+    goToPostLogin()
   }
 
   async function handleEmailSignUp(values: SignUpValues) {
@@ -75,11 +87,19 @@ export default function LoginPage() {
     if (error) {
       message.error(error.message || 'Sign-up failed')
       setEmailLoading(false)
+      return
     }
+    goToPostLogin()
   }
 
   if (isPending || !providers) return <SpinnerFullScreen />
-  if (data) return <Navigate to={postLoginTarget} replace />
+  if (data) {
+    if (isExternalTarget) {
+      window.location.replace(postLoginTarget)
+      return <SpinnerFullScreen />
+    }
+    return <Navigate to={postLoginTarget} replace />
+  }
 
   const hasSocial = providers.google || providers.microsoft || providers.github
 
