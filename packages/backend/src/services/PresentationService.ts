@@ -26,8 +26,8 @@ function collectImageIds(shapes: Shape[]): string[] {
 export class PresentationService {
   constructor(private imageService: ImageService) {}
 
-  public async list(): Promise<PresentationSummary[]> {
-    const presentations = await PresentationModel.find().sort({ updatedAt: -1 })
+  public async list(ownerId: string): Promise<PresentationSummary[]> {
+    const presentations = await PresentationModel.find({ ownerId }).sort({ updatedAt: -1 })
     return presentations.map(presentationToSummaryDTO)
   }
 
@@ -47,8 +47,8 @@ export class PresentationService {
     }
   }
 
-  public async create(data: PresentationDTO.Create): Promise<Presentation> {
-    const presentation = await PresentationModel.create(presentationCreateToModel(data))
+  public async create(data: PresentationDTO.Create, ownerId: string): Promise<Presentation> {
+    const presentation = await PresentationModel.create({ ...presentationCreateToModel(data), ownerId })
     await SlideModel.create(slideCreateToModel(presentation._id, 0))
     return await this.getById(presentation._id.toString())
   }

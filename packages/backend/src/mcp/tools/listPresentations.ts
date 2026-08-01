@@ -2,7 +2,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { presentationService } from '../../services/index.js'
 import { toolError, errorMessage } from './errors.js'
 
-export function registerListPresentations(server: McpServer): void {
+export function registerListPresentations(server: McpServer, ownerId: string): void {
   server.registerTool(
     'list_presentations',
     {
@@ -11,7 +11,7 @@ export function registerListPresentations(server: McpServer): void {
     },
     async () => {
       try {
-        const presentations = await presentationService.list()
+        const presentations = await presentationService.list(ownerId)
         return {
           content: [{ type: 'text', text: JSON.stringify(presentations, null, 2) }],
         }

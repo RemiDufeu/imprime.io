@@ -39,6 +39,6 @@ COPY --from=builder /app/packages/common/dist ./packages/common/dist
 COPY --from=builder /app/packages/frontend/dist ./packages/frontend/dist
 COPY --from=builder /app/packages/common/src/assets/fonts ./packages/common/src/assets/fonts
 
-EXPOSE 3001
+EXPOSE 3023
 
 CMD ["npm", "run", "start", "--workspace=@imprime/backend"]

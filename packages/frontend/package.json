@@ -14,8 +14,10 @@
   "dependencies": {
     "@ant-design/icons": "^6.1.0",
     "@ant-design/v5-patch-for-react-19": "^1.0.3",
+    "@better-auth/api-key": "^1.6.25",
     "@imprime/sdk": "*",
     "antd": "^5.27.4",
+    "better-auth": "^1.6.25",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-router-dom": "^7.9.5",

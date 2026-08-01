@@ -1,11 +1,10 @@
 import { ImprimeClient } from '@imprime/sdk'
 import type { Presentation, PresentationSummary, Shape, ImageDTO, VariableDTO } from '@imprime/sdk'
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
+import { API_BASE } from '../config'
 
 // Create a single SDK client instance
 const client = new ImprimeClient({
-  baseUrl: API_BASE_URL,
+  baseUrl: API_BASE,
 })
 
 /**

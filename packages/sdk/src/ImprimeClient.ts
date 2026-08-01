@@ -10,11 +10,17 @@ import type {
   ImageDTO,
   PresentationDTO,
   VariableDTO,
+  EnabledAuthProviders,
 } from '@imprime/common'
 
 export interface ImprimeClientOptions {
   baseUrl?: string
   timeout?: number
+  /**
+   * Clé d'API pour l'accès programmatique (envoyée dans l'en-tête `x-api-key`).
+   * Dans le navigateur, laissez vide : l'authentification passe par le cookie de session.
+   */
+  apiKey?: string
 }
 
 /**
@@ -24,7 +30,7 @@ export interface ImprimeClientOptions {
  *
  * @example
  * ```typescript
- * const client = new ImprimeClient({ baseUrl: 'http://localhost:3001/api' })
+ * const client = new ImprimeClient({ baseUrl: 'http://localhost:3023/api' })
  *
  * // Create a presentation
  * const presentation = await client.createPresentation('My Presentation')
@@ -41,10 +47,17 @@ export interface ImprimeClientOptions {
 export class ImprimeClient {
   private baseUrl: string
   private timeout: number
+  private apiKey?: string
 
   constructor(options: ImprimeClientOptions = {}) {
-    this.baseUrl = options.baseUrl || 'http://localhost:3001/api'
+    this.baseUrl = options.baseUrl!
     this.timeout = options.timeout || 30000
+    this.apiKey = options.apiKey
+  }
+
+  /** En-têtes d'authentification (clé d'API si fournie). */
+  private authHeaders(): Record<string, string> {
+    return this.apiKey ? { 'x-api-key': this.apiKey } : {}
   }
 
   /**
@@ -63,8 +76,10 @@ export class ImprimeClient {
       const response = await fetch(url, {
         ...options,
         signal: controller.signal,
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
+          ...this.authHeaders(),
           ...options.headers,
         },
       })
@@ -83,6 +98,18 @@ export class ImprimeClient {
     } finally {
       clearTimeout(timeoutId)
     }
+  }
+
+  // ============================================
+  // Auth Operations
+  // ============================================
+
+  /**
+   * Retourne les providers d'authentification activés côté serveur
+   * (email/password + réseaux sociaux configurés).
+   */
+  async getAuthProviders(): Promise<EnabledAuthProviders> {
+    return this.request<EnabledAuthProviders>('/auth-providers')
   }
 
   // ============================================
@@ -434,8 +461,10 @@ export class ImprimeClient {
       const response = await fetch(url, {
         method: 'POST',
         signal: controller.signal,
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
+          ...this.authHeaders(),
         },
         body: JSON.stringify({ ...variableValues }),
       })

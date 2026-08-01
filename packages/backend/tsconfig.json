@@ -5,7 +5,7 @@
     "lib": ["ES2022"],
     "moduleResolution": "node16",
     "resolveJsonModule": true,
-    "declaration": true,
+    "declaration": false,
     "outDir": "./dist",
     "rootDir": "./src",
     "esModuleInterop": true,

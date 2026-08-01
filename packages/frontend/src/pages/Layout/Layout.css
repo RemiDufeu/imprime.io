@@ -12,3 +12,11 @@
     align-items: center;
     line-height: normal;
 }
+
+.inner-header {
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    display: flex;
+    gap: var(--space-m);
+}
