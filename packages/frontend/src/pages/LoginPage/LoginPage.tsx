@@ -3,7 +3,7 @@ import { Navigate, useSearchParams } from 'react-router-dom'
 import { Button, Card, Divider, Form, Input, Space, Tabs, Typography, message } from 'antd'
 import { GithubOutlined, GoogleOutlined, WindowsOutlined } from '@ant-design/icons'
 import type { EnabledAuthProviders } from '@imprime/sdk'
-import { signIn, useSession } from '../../auth/authClient'
+import { signIn, signUp, useSession } from '../../auth/authClient'
 import { imprimeClient } from '../../api/api'
 import FullScreen from '../../components/Layout/FullScreen/FullScreen'
 import SpinnerFullScreen from '../../components/Feedback/SpinnerFullScreen'
@@ -61,43 +61,11 @@ export default function LoginPage() {
     else window.location.assign(postLoginTarget)
   }
 
-  // When an OAuth authorize flow is pending, Better Auth's /sign-in/email
-  // returns a 302 to the (cross-origin) OAuth callback. Following it with
-  // `credentials: 'include'` triggers a CORS error that freezes the promise.
-  // `redirect: 'manual'` makes the browser stop at the 302 — we then navigate
-  // ourselves to /api/auth/mcp/authorize which resolves the flow server-side.
-  async function rawAuthPost(
-    path: 'sign-in/email' | 'sign-up/email',
-    body: Record<string, unknown>,
-  ): Promise<{ ok: true } | { ok: false; message: string }> {
-    const res = await fetch(`/api/auth/${path}`, {
-      method: 'POST',
-      credentials: 'include',
-      redirect: 'manual',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(body),
-    })
-    // opaqueredirect (type='opaqueredirect', status=0) means the server issued
-    // a 3xx — sign-in succeeded, cookie is set, browser just refused to follow.
-    if (res.type === 'opaqueredirect' || res.ok) return { ok: true }
-    let msg = `Request failed (${res.status})`
-    try {
-      const data = (await res.json()) as { message?: string; error?: { message?: string } }
-      msg = data.message ?? data.error?.message ?? msg
-    } catch {
-      // ignore
-    }
-    return { ok: false, message: msg }
-  }
-
   async function handleEmailSignIn(values: SignInValues) {
     setEmailLoading(true)
-    const result = await rawAuthPost('sign-in/email', {
-      email: values.email,
-      password: values.password,
-    })
-    if (!result.ok) {
-      message.error(result.message || 'Invalid credentials')
+    const { error } = await signIn.email({ email: values.email, password: values.password })
+    if (error) {
+      message.error(error.message || 'Invalid credentials')
       setEmailLoading(false)
       return
     }
@@ -106,13 +74,13 @@ export default function LoginPage() {
 
   async function handleEmailSignUp(values: SignUpValues) {
     setEmailLoading(true)
-    const result = await rawAuthPost('sign-up/email', {
+    const { error } = await signUp.email({
       email: values.email,
       password: values.password,
       name: values.name,
     })
-    if (!result.ok) {
-      message.error(result.message || 'Sign-up failed')
+    if (error) {
+      message.error(error.message || 'Sign-up failed')
       setEmailLoading(false)
       return
     }
