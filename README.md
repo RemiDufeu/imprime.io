@@ -39,20 +39,35 @@ Then fire a POST request to the endpoint below, with a JSON body matching your p
 https://imprime.io/api/export/{{presentationId}}/pdf
 ```
 
+Authenticate the call by passing an API key generated from **Settings → API Keys** in the `x-api-key` header.
+
 ![alt text](./doc/api.png)
 
 ### MCP
-Imprime is MCP-ready. Plug it into your AI agents or chat interfaces and let them generate PDFs on your behalf.
+Imprime exposes an MCP server at `https://imprime.io/api/mcp` (Streamable HTTP transport). Two authentication modes are supported depending on the client:
+
+- **OAuth 2.1 (Bearer token)** — for interactive clients like the Claude web connector. Add a custom connector pointing at `https://imprime.io/api/mcp`; the OAuth flow (discovery, login, consent, token exchange) is handled automatically by Better Auth's MCP plugin.
+- **API key** — for headless clients like Claude Code, Claude Desktop, the Imprime SDK, or any script. Pass your key in the `x-api-key` header:
+
+```json
+{
+  "mcpServers": {
+    "imprime": {
+      "type": "http",
+      "url": "https://imprime.io/api/mcp",
+      "headers": { "x-api-key": "<your-api-key>" }
+    }
+  }
+}
+```
+
+Both paths land on the same server and expose the same tools — plug Imprime into your AI agents or chat interfaces and let them generate PDFs on your behalf.
 
 ![MCP](./doc/mcp.png)
 
 # Roadmap
 
 Imprime is currently under active development. Here are the main planned updates:
-
-## Authentication & API
-- User authentication system (login, account management)
-- Generation and management of **API tokens** to enable the integration of Imprime into your pipelines, scripts and third-party applications
 
 ## Block enhancements
 - **Conditional logic** blocks (`if / else`) to dynamically display sections based on the data provided
