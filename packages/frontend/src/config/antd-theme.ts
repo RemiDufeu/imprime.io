@@ -9,7 +9,7 @@ export const antdTheme: ThemeConfig = {
     colorPrimaryBg: '#e0e7ff',
     colorPrimaryBgHover: '#c7d2fe',
     colorPrimaryBorder: '#a5b4fc',
-    colorSuccess: '#13815dff',
+    colorSuccess: '#3db86a',
     colorWarning: '#f59e0b',
     colorError: '#ef4444',
     colorInfo: '#3b82f6',

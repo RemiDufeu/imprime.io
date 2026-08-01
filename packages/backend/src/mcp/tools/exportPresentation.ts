@@ -2,16 +2,15 @@ import { z } from 'zod/v3'
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { presentationService, exportService } from '../../services/index.js'
 import { putPdf } from '../../services/pdfDownloadStore.js'
+import { assertOwnsPresentation } from '../../middleware/requireOwnsPresentation.js'
 import { toolError, errorMessage } from './errors.js'
 
 const DOWNLOAD_TTL_SECONDS = 600
 
 function getApiBaseUrl(): string {
-  const url = process.env.VITE_API_URL
+  const url = process.env.PUBLIC_APP_URL
   if (!url || !/^https?:\/\//i.test(url)) {
-    throw new Error(
-      'VITE_API_URL must be set to an absolute http(s) URL (e.g. https://imrime.io/api) to enable MCP PDF downloads'
-    )
+    throw new Error('PUBLIC_APP_URL must be set to an absolute http(s) URL')
   }
   return url.replace(/\/$/, '')
 }
@@ -30,7 +29,7 @@ const outputSchema = {
   expiresInSeconds: z.number().describe('Lifetime of the download URL'),
 }
 
-export function registerExportPresentation(server: McpServer): void {
+export function registerExportPresentation(server: McpServer, ownerId: string): void {
   // Known regression in @modelcontextprotocol/sdk ≥1.23 (Zod v4 support):
   // registerTool's generic inference triggers TS2589 when both inputSchema
   // and outputSchema are provided. Recheck this directive after SDK upgrades.
@@ -47,6 +46,7 @@ export function registerExportPresentation(server: McpServer): void {
     },
     async ({ presentationId, variableValues }) => {
       try {
+        await assertOwnsPresentation(presentationId, ownerId)
         const presentation = await presentationService.getById(presentationId)
         const pdfBuffer = await exportService.exportToPDF(presentation, {
           variableValues: variableValues ?? {},

@@ -4,5 +4,6 @@
  */
 
 export * from './types.js'
+export * from './auth.js'
 export * from './rendering/index.js'
 export * from './fonts.js'

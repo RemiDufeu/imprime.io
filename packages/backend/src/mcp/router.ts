@@ -4,6 +4,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js'
 import { registerTools } from './tools/index.js'
+import { authService } from '../services/index.js'
 
 interface SessionMeta {
   transport: StreamableHTTPServerTransport
@@ -67,6 +68,19 @@ export function createMcpRouter(): McpRouter {
       return
     }
 
+    // Resolve the owner ID from the API key header
+    const apiKeyHeader = req.headers['x-api-key']
+    const ownerId =
+      typeof apiKeyHeader === 'string' ? await authService.resolveApiKeyOwner(apiKeyHeader) : null
+    if (!ownerId) {
+      res.status(401).json({
+        jsonrpc: '2.0',
+        error: { code: -32001, message: 'Unauthorized: valid x-api-key header required' },
+        id: null,
+      })
+      return
+    }
+
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: () => randomUUID(),
       onsessioninitialized: (id) => {
@@ -79,7 +93,7 @@ export function createMcpRouter(): McpRouter {
     }
 
     const mcp = new McpServer({ name: 'imprime-mcp', version: '1.0.0' })
-    registerTools(mcp)
+    registerTools(mcp, ownerId)
     await mcp.connect(transport)
 
     await transport.handleRequest(req, res, req.body)

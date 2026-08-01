@@ -1,23 +1,24 @@
+import './loadEnv.js'
 import express from 'express'
 import cors from 'cors'
-import dotenv from 'dotenv'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { toNodeHandler } from 'better-auth/node'
+import type { Server as HttpServer } from 'http'
 import { connectDatabase } from './config/database.js'
+import { connectAuthDb, closeAuthDb } from './config/authDb.js'
+import { authService } from './services/index.js'
+import { requireAuth } from './middleware/requireAuth.js'
 import presentationsRouter from './routes/presentations.js'
 import slideRouter from './routes/slides.js'
 import variablesRouter from './routes/variables.js'
 import exportRouter from './routes/export.js'
 import imagesRouter from './routes/images.js'
 import { createMcpRouter } from './mcp/router.js'
-import type { Server as HttpServer } from 'http'
 import { errorHandler } from './middleware/errorHandler.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
-
-// Load environment variables from root .env file
-dotenv.config({ path: path.resolve(__dirname, '../../../.env') })
 
 const app = express()
 const PORT = process.env.PORT || 3001
@@ -27,8 +28,10 @@ const expressMiddleware = CORS_ORIGIN === '*'
   ? cors({ origin: '*', credentials: false })
   : cors({ origin: CORS_ORIGIN, credentials: true })
 
-// Middleware
+// CORS First
 app.use(expressMiddleware)
+
+app.all('/api/auth/*splat', toNodeHandler(authService.instance))
 app.use(express.json({ limit: '10mb' }))
 
 // Request logging
@@ -37,31 +40,34 @@ app.use((req, res, next) => {
   next()
 })
 
-// API Routes
-app.use('/api/presentations', presentationsRouter)
-app.use('/api/presentations', slideRouter)
-app.use('/api/presentations', variablesRouter)
-app.use('/api/export', exportRouter)
-app.use('/api/images', imagesRouter)
-const mcp = createMcpRouter()
-app.use('/api/mcp', mcp.router)
-
-// Health check
+// Health check (public)
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
 
-// Error handling middleware (must be after all routes)
+// Enabled auth providers (public, consumed by the login page)
+app.get('/api/auth-providers', (_req, res) => {
+  res.json(authService.enabledProviders)
+})
+
+// Protected API routes (session cookie or API key)
+app.use('/api/presentations', requireAuth, presentationsRouter)
+app.use('/api/presentations', requireAuth, slideRouter)
+app.use('/api/presentations', requireAuth, variablesRouter)
+app.use('/api/export', requireAuth, exportRouter)
+app.use('/api/images', requireAuth, imagesRouter)
+
+// MCP (owns its own sessions, outside the requireAuth pipeline for now)
+const mcp = createMcpRouter()
+app.use('/api/mcp', mcp.router)
+
+// Error handling middleware (after all routes)
 app.use(errorHandler)
 
 // Serve static files from frontend build in production
 if (process.env.NODE_ENV === 'production') {
   const frontendDistPath = path.join(__dirname, '../../frontend/dist')
-
-  // Serve static files
   app.use(express.static(frontendDistPath))
-
-  // Handle client-side routing - return index.html for all non-API routes
   app.get('/*splat', (_req, res) => {
     res.sendFile(path.join(frontendDistPath, 'index.html'))
   })
@@ -77,8 +83,9 @@ function installShutdownHandlers(httpServer: HttpServer): void {
     forceExit.unref()
     try {
       await mcp.close()
+      await closeAuthDb()
     } catch (err) {
-      console.error('Error closing MCP transports:', err)
+      console.error('Error during shutdown:', err)
     }
     httpServer.close(() => process.exit(0))
   }
@@ -89,6 +96,7 @@ function installShutdownHandlers(httpServer: HttpServer): void {
 async function startServer() {
   try {
     await connectDatabase()
+    await connectAuthDb()
     const httpServer = app.listen(PORT, () => {
       console.log(`Server running on http://localhost:${PORT}`)
     })
