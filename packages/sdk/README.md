@@ -52,7 +52,7 @@ new ImprimeClient(options?: ImprimeClientOptions)
 ```
 
 **Options:**
-- `baseUrl?: string` - Base URL of the Imprime API (default: `http://localhost:3001/api`)
+- `baseUrl?: string` - Base URL of the Imprime API
 - `timeout?: number` - Request timeout in milliseconds (default: `30000`)
 
 ### Presentation Methods

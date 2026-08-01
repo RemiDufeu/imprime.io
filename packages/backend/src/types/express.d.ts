@@ -3,7 +3,7 @@ import type { AuthUser } from '@imprime/common'
 declare global {
   namespace Express {
     interface Request {
-      /** Utilisateur authentifié, posé par le middleware `requireAuth`. */
+      /** Authenticated user, set by the `requireAuth` middleware. */
       user?: AuthUser
     }
   }

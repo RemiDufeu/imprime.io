@@ -50,7 +50,7 @@ export class ImprimeClient {
   private apiKey?: string
 
   constructor(options: ImprimeClientOptions = {}) {
-    this.baseUrl = options.baseUrl || 'http://localhost:3001/api'
+    this.baseUrl = options.baseUrl!
     this.timeout = options.timeout || 30000
     this.apiKey = options.apiKey
   }

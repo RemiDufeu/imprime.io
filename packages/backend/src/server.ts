@@ -45,23 +45,23 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
 
-// Providers d'auth activés (public, utilisé par la page de connexion)
+// Enabled auth providers (public, consumed by the login page)
 app.get('/api/auth-providers', (_req, res) => {
   res.json(authService.enabledProviders)
 })
 
-// Routes API protégées (session cookie ou clé d'API)
+// Protected API routes (session cookie or API key)
 app.use('/api/presentations', requireAuth, presentationsRouter)
 app.use('/api/presentations', requireAuth, slideRouter)
 app.use('/api/presentations', requireAuth, variablesRouter)
 app.use('/api/export', requireAuth, exportRouter)
 app.use('/api/images', requireAuth, imagesRouter)
 
-// MCP (sessions propres, hors auth pour l'instant)
+// MCP (owns its own sessions, outside the requireAuth pipeline for now)
 const mcp = createMcpRouter()
 app.use('/api/mcp', mcp.router)
 
-// Error handling middleware (après toutes les routes)
+// Error handling middleware (after all routes)
 app.use(errorHandler)
 
 // Serve static files from frontend build in production

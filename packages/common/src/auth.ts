@@ -1,14 +1,14 @@
 /**
- * Utilisateur authentifié tel qu'exposé aux couches applicatives (posé par le
- * middleware d'auth sur `req.user`). Partagé entre backend et frontend.
+ * Authenticated user as exposed to application layers (set by the auth
+ * middleware on `req.user`). Shared between backend and frontend.
  */
 export interface AuthUser {
   id: string
 }
 
 /**
- * Providers d'authentification activés côté serveur, exposés à l'UI pour
- * n'afficher que les options réellement disponibles.
+ * Auth providers enabled on the server, exposed to the UI so it only shows
+ * the options that are actually available.
  */
 export interface EnabledAuthProviders {
   emailPassword: boolean
