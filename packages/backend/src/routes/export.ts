@@ -2,6 +2,7 @@ import { Router, type Response } from 'express'
 import type { ExportDTO } from '@imprime/common'
 import { presentationService, exportService } from '../services/index.js'
 import { takePdf } from '../services/pdfDownloadStore.js'
+import { requireOwnsPresentation } from '../middleware/requireOwnsPresentation.js'
 
 const router = Router()
 
@@ -16,8 +17,8 @@ function setPdfDownloadHeaders(res: Response, buffer: Buffer, filename: string):
   res.setHeader('Content-Length', buffer.length)
 }
 
-router.post('/:id/pdf', async (req, res) => {
-  const presentation = await presentationService.getById(req.params.id, req.user!.id)
+router.post('/:id/pdf', requireOwnsPresentation, async (req, res) => {
+  const presentation = await presentationService.getById(req.params.id)
   const payload: ExportDTO.PdfRequest = { variableValues: req.body || {} }
 
   const startTime = Date.now()

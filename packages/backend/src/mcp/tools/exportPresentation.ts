@@ -2,6 +2,7 @@ import { z } from 'zod/v3'
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { presentationService, exportService } from '../../services/index.js'
 import { putPdf } from '../../services/pdfDownloadStore.js'
+import { assertOwnsPresentation } from '../../middleware/requireOwnsPresentation.js'
 import { toolError, errorMessage } from './errors.js'
 
 const DOWNLOAD_TTL_SECONDS = 600
@@ -45,7 +46,8 @@ export function registerExportPresentation(server: McpServer, ownerId: string): 
     },
     async ({ presentationId, variableValues }) => {
       try {
-        const presentation = await presentationService.getById(presentationId, ownerId)
+        await assertOwnsPresentation(presentationId, ownerId)
+        const presentation = await presentationService.getById(presentationId)
         const pdfBuffer = await exportService.exportToPDF(presentation, {
           variableValues: variableValues ?? {},
         })

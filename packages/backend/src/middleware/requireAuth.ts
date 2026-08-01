@@ -3,13 +3,13 @@ import { fromNodeHeaders } from 'better-auth/node'
 import { authService } from '../services/index.js'
 
 /**
- * Exige un utilisateur authentifié.
+ * Require authentication for the request.
  *
- * Accepte deux modes :
- *  - session cookie (navigateur), résolue par Better Auth,
- *  - clé d'API via l'en-tête `x-api-key` (accès programmatique / SDK).
+ * Accepts two authentication methods:
+ *  - session cookie resolved by Better Auth,
+ *  - API key via the `x-api-key` header (programmatic access / SDK).
  *
- * Pose `req.user` ou répond 401.
+ * Sets `req.user` or responds with 401.
  */
 export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -17,7 +17,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       headers: fromNodeHeaders(req.headers),
     })
     if (session?.user) {
-      req.user = { id: session.user.id, email: session.user.email ?? undefined }
+      req.user = { id: session.user.id }
       next()
       return
     }

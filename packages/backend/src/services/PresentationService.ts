@@ -31,24 +31,13 @@ export class PresentationService {
     return presentations.map(presentationToSummaryDTO)
   }
 
-  /**
-   * Vérifie que la présentation existe ET appartient à `ownerId`.
-   * Lève `NotFoundError` sinon (ne divulgue pas l'existence à un tiers).
-   */
-  public async assertOwner(id: string, ownerId: string): Promise<void> {
-    const presentation = await PresentationModel.findById(id)
-    if (!presentation || presentation.ownerId !== ownerId) {
-      throw new NotFoundError('Presentation not found', 'PRESENTATION_NOT_FOUND')
-    }
-  }
-
-  public async getById(id: string, ownerId: string): Promise<Presentation> {
+  public async getById(id: string): Promise<Presentation> {
     const [presentation, slides, variables] = await Promise.all([
       PresentationModel.findById(id),
       SlideModel.find({ presentationId: toObjectId(id) }).sort({ order: 1 }),
       VariableDataModel.find({ presentationId: toObjectId(id) }),
     ])
-    if (!presentation || presentation.ownerId !== ownerId) {
+    if (!presentation) {
       throw new NotFoundError('Presentation not found', 'PRESENTATION_NOT_FOUND')
     }
     return {
@@ -61,12 +50,12 @@ export class PresentationService {
   public async create(data: PresentationDTO.Create, ownerId: string): Promise<Presentation> {
     const presentation = await PresentationModel.create({ ...presentationCreateToModel(data), ownerId })
     await SlideModel.create(slideCreateToModel(presentation._id, 0))
-    return await this.getById(presentation._id.toString(), ownerId)
+    return await this.getById(presentation._id.toString())
   }
 
-  public async update(id: string, data: PresentationDTO.Update, ownerId: string): Promise<Presentation> {
+  public async update(id: string, data: PresentationDTO.Update): Promise<Presentation> {
     const presentation = await PresentationModel.findById(id)
-    if (!presentation || presentation.ownerId !== ownerId) {
+    if (!presentation) {
       throw new NotFoundError('Presentation not found', 'PRESENTATION_NOT_FOUND')
     }
 
@@ -86,12 +75,12 @@ export class PresentationService {
       ))
     }
 
-    return await this.getById(id, ownerId)
+    return await this.getById(id)
   }
 
-  public async delete(id: string, ownerId: string): Promise<void> {
+  public async delete(id: string): Promise<void> {
     const presentation = await PresentationModel.findById(id)
-    if (!presentation || presentation.ownerId !== ownerId) {
+    if (!presentation) {
       throw new NotFoundError('Presentation not found', 'PRESENTATION_NOT_FOUND')
     }
 

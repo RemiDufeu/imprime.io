@@ -68,7 +68,7 @@ export function createMcpRouter(): McpRouter {
       return
     }
 
-    // MCP est une surface programmatique : authentification par clé d'API.
+    // Resolve the owner ID from the API key header
     const apiKeyHeader = req.headers['x-api-key']
     const ownerId =
       typeof apiKeyHeader === 'string' ? await authService.resolveApiKeyOwner(apiKeyHeader) : null
