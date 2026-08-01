@@ -66,7 +66,6 @@ export default function LoginPage() {
     const { error } = await signIn.email({
       email: values.email,
       password: values.password,
-      callbackURL: postLoginTarget,
     })
     if (error) {
       message.error(error.message || 'Invalid credentials')
@@ -82,7 +81,6 @@ export default function LoginPage() {
       email: values.email,
       password: values.password,
       name: values.name,
-      callbackURL: postLoginTarget,
     })
     if (error) {
       message.error(error.message || 'Sign-up failed')
