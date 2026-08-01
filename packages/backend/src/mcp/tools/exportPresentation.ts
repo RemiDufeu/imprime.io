@@ -9,9 +9,7 @@ const DOWNLOAD_TTL_SECONDS = 600
 function getApiBaseUrl(): string {
   const url = process.env.VITE_API_URL
   if (!url || !/^https?:\/\//i.test(url)) {
-    throw new Error(
-      'VITE_API_URL must be set to an absolute http(s) URL (e.g. https://imrime.io) to enable MCP PDF downloads'
-    )
+    throw new Error('VITE_API_URL must be set to an absolute http(s) URL')
   }
   return url.replace(/\/$/, '')
 }
