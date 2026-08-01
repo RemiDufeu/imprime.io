@@ -49,7 +49,7 @@ function buildAuth(mailer: MailerService) {
   }
 
   const instance = betterAuth({
-    baseURL: process.env.BETTER_AUTH_URL,
+    baseURL: process.env.PUBLIC_APP_URL,
     secret: process.env.BETTER_AUTH_SECRET,
     trustedOrigins: trustedOrigins(),
     database: mongodbAdapter(authDb, { client: authMongoClient }),
