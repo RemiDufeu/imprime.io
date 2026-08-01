@@ -4,7 +4,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js'
 import { registerTools } from './tools/index.js'
-import { resolveApiKeyOwner } from '../auth/resolveApiKeyOwner.js'
+import { authService } from '../services/index.js'
 
 interface SessionMeta {
   transport: StreamableHTTPServerTransport
@@ -70,7 +70,8 @@ export function createMcpRouter(): McpRouter {
 
     // MCP est une surface programmatique : authentification par clé d'API.
     const apiKeyHeader = req.headers['x-api-key']
-    const ownerId = typeof apiKeyHeader === 'string' ? await resolveApiKeyOwner(apiKeyHeader) : null
+    const ownerId =
+      typeof apiKeyHeader === 'string' ? await authService.resolveApiKeyOwner(apiKeyHeader) : null
     if (!ownerId) {
       res.status(401).json({
         jsonrpc: '2.0',

@@ -1,7 +1,6 @@
 import type { Request, Response, NextFunction } from 'express'
 import { fromNodeHeaders } from 'better-auth/node'
-import { auth } from '../auth/auth.js'
-import { resolveApiKeyOwner } from '../auth/resolveApiKeyOwner.js'
+import { authService } from '../services/index.js'
 
 /**
  * Exige un utilisateur authentifié.
@@ -14,7 +13,9 @@ import { resolveApiKeyOwner } from '../auth/resolveApiKeyOwner.js'
  */
 export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const session = await auth.api.getSession({ headers: fromNodeHeaders(req.headers) })
+    const session = await authService.instance.api.getSession({
+      headers: fromNodeHeaders(req.headers),
+    })
     if (session?.user) {
       req.user = { id: session.user.id, email: session.user.email ?? undefined }
       next()
@@ -23,7 +24,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 
     const apiKeyHeader = req.headers['x-api-key']
     if (typeof apiKeyHeader === 'string' && apiKeyHeader.length > 0) {
-      const userId = await resolveApiKeyOwner(apiKeyHeader)
+      const userId = await authService.resolveApiKeyOwner(apiKeyHeader)
       if (userId) {
         req.user = { id: userId }
         next()

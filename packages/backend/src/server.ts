@@ -7,7 +7,7 @@ import { toNodeHandler } from 'better-auth/node'
 import type { Server as HttpServer } from 'http'
 import { connectDatabase } from './config/database.js'
 import { connectAuthDb, closeAuthDb } from './config/authDb.js'
-import { auth, enabledAuthProviders } from './auth/auth.js'
+import { authService } from './services/index.js'
 import { requireAuth } from './middleware/requireAuth.js'
 import presentationsRouter from './routes/presentations.js'
 import slideRouter from './routes/slides.js'
@@ -31,7 +31,7 @@ const expressMiddleware = CORS_ORIGIN === '*'
 // CORS First
 app.use(expressMiddleware)
 
-app.all('/api/auth/*splat', toNodeHandler(auth))
+app.all('/api/auth/*splat', toNodeHandler(authService.instance))
 app.use(express.json({ limit: '10mb' }))
 
 // Request logging
@@ -47,7 +47,7 @@ app.get('/api/health', (req, res) => {
 
 // Providers d'auth activés (public, utilisé par la page de connexion)
 app.get('/api/auth-providers', (_req, res) => {
-  res.json(enabledAuthProviders)
+  res.json(authService.enabledProviders)
 })
 
 // Routes API protégées (session cookie ou clé d'API)
