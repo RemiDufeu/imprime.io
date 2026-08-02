@@ -5,6 +5,7 @@ import SlideEditor from './components/SlideEditor/SlideEditor'
 import FullScreen from '../../components/Layout/FullScreen/FullScreen'
 import SpinnerFullScreen from '../../components/Feedback/SpinnerFullScreen'
 import SlideList from './components/SlideList'
+import ShapeTreePanel from './components/ShapeTreePanel'
 import './EditorPage.css'
 import { useEditorStore } from '../../store/editor/EditorStore'
 
@@ -65,6 +66,7 @@ export default function EditorPage() {
     <div className='page-container'>
       <SlideList />
       <SlideEditor />
+      <ShapeTreePanel />
     </div>
   </>)
 }

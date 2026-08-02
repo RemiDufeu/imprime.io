@@ -111,6 +111,11 @@ export function SVGSelectionWrapper({ shape, readonly, children }: SVGSelectionW
         ? undefined
         : isSelected ? 'grab' : 'pointer'
 
+    // Editor visibility toggle — hidden shapes are still selectable through
+    // the layers panel but do not render on the canvas. This check must come
+    // *after* every hook call so hook order stays stable across toggles.
+    if (shape.hidden) return null
+
     return (
         <g ref={svgRef} data-shape-id={shape.id}>
             <g

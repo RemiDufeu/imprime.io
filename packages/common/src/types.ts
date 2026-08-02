@@ -10,6 +10,10 @@ export interface BaseShape {
   stroke?: string
   strokeWidth?: number
   strokeStyle?: 'solid' | 'dashed' | 'dotted'
+  // Editor-only visibility toggle. When true, the shape is skipped by the
+  // renderer (SVG in the editor, image export in the backend) but stays in
+  // the data so the user can re-enable it.
+  hidden?: boolean
 }
 
 export interface RectangleShape extends BaseShape {

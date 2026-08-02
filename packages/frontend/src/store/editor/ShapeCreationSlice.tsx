@@ -7,37 +7,7 @@ import type { ShapeSlice } from './ShapeSlice'
 import type { ToolSlice } from './ToolSlice'
 import type { ToolAttributesSlice } from './ToolAttributeSlice'
 import { imagesAPI } from '../../api/api'
-
-function findInnermostGroupAt(
-    shapes: Shape[],
-    px: number,
-    py: number,
-    parentAbsX = 0,
-    parentAbsY = 0
-): { id: string; absX: number; absY: number } | null {
-    // Iterate reverse so the top-most (last-drawn) group wins on overlap.
-    for (let i = shapes.length - 1; i >= 0; i--) {
-        const s = shapes[i]
-        if (s.type !== 'group') continue
-        const ax = parentAbsX + s.x
-        const ay = parentAbsY + s.y
-        if (px >= ax && px <= ax + s.width && py >= ay && py <= ay + s.height) {
-            const nested = findInnermostGroupAt(s.children, px, py, ax, ay)
-            return nested || { id: s.id, absX: ax, absY: ay }
-        }
-    }
-    return null
-}
-
-function appendToGroup(shapes: Shape[], groupId: string, child: Shape): Shape[] {
-    return shapes.map(s => {
-        if (s.type !== 'group') return s
-        if (s.id === groupId) {
-            return { ...s, children: [...s.children, child] }
-        }
-        return { ...s, children: appendToGroup(s.children, groupId, child) }
-    })
-}
+import { findInnermostGroupAt, insertShape } from '../../utils/shapeTree'
 
 export interface DrawingData {
     startX: number
@@ -185,7 +155,7 @@ export const createShapeCreationSlice: StateCreator<
             const parent = findInnermostGroupAt(currentSlide.shapes, x, y)
             if (parent) {
                 const nested = { ...newShape, x: x - parent.absX, y: y - parent.absY } as Shape
-                const nextShapes = appendToGroup(currentSlide.shapes, parent.id, nested)
+                const nextShapes = insertShape(currentSlide.shapes, parent.id, nested)
                 updateSlideShapes(currentSlide._id, nextShapes)
                 selectShape(parent.id)
             } else {

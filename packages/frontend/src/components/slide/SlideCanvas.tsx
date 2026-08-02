@@ -4,6 +4,7 @@ import { SLIDE_WIDTH, SLIDE_HEIGHT } from '../../constants/canvas'
 import { SVGShape } from './svg/SVGShape'
 import { SVGSelectionWrapper } from './svg/SVGSelectionWrapper'
 import { SVGDrawingPreview } from './svg/SVGDrawingPreview'
+import { SVGDwellOverlay } from './svg/SVGDwellOverlay'
 import { useEditorStore } from '../../store/editor/EditorStore'
 
 interface SlideCanvasProps {
@@ -119,6 +120,9 @@ export function SlideCanvas({
 
                 {/* Drawing preview (only in edit mode) */}
                 {!readonly && <SVGDrawingPreview />}
+
+                {/* Dwell feedback for drag-into-group re-parenting */}
+                {!readonly && <SVGDwellOverlay />}
             </svg>
         </div>
     )

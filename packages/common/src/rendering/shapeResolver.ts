@@ -10,6 +10,9 @@ function expandGroup(group: GroupShape): Shape[] {
 export function resolveShapes(shapes: Shape[]): Shape[] {
   const out: Shape[] = []
   for (const shape of shapes) {
+    // Hidden shapes (and hidden groups + their entire subtree) are excluded
+    // from render output.
+    if (shape.hidden) continue
     if (shape.type === 'group') {
       out.push(...expandGroup(shape))
     } else {

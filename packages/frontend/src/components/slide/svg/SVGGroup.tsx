@@ -1,25 +1,24 @@
 import type { GroupShape } from '@imprime/sdk'
 import { SVGShape } from './SVGShape'
+import { SVGSelectionWrapper } from './SVGSelectionWrapper'
 
 interface SVGGroupProps {
     shape: GroupShape
     readonly?: boolean
 }
 
-export function SVGGroup({ shape, readonly }: SVGGroupProps) {
+// Renders a group as a dashed box + optional label. Children are drawn in the
+// group's local coordinate space via a translate — that way each child renders
+// at its own relative (x, y) and can carry its own SVGSelectionWrapper for
+// individual selection/drag without any coordinate gymnastics.
+export function SVGGroup({ shape, readonly = false }: SVGGroupProps) {
     const label = shape.name ?? 'group'
 
-    const absoluteChildren = shape.children.map(child => ({
-        ...child,
-        x: shape.x + child.x,
-        y: shape.y + child.y,
-    }))
-
     return (
-        <g>
+        <g transform={`translate(${shape.x} ${shape.y})`}>
             <rect
-                x={shape.x}
-                y={shape.y}
+                x={0}
+                y={0}
                 width={shape.width}
                 height={shape.height}
                 fill="rgba(148, 163, 184, 0.04)"
@@ -31,8 +30,8 @@ export function SVGGroup({ shape, readonly }: SVGGroupProps) {
                 pointerEvents="all"
             />
             <text
-                x={shape.x + 8}
-                y={shape.y + 20}
+                x={8}
+                y={20}
                 fontSize={14}
                 fontFamily="monospace"
                 fill="#64748b"
@@ -40,8 +39,10 @@ export function SVGGroup({ shape, readonly }: SVGGroupProps) {
             >
                 {label}
             </text>
-            {absoluteChildren.map(child => (
-                <SVGShape key={child.id} shape={child} readonly={readonly} />
+            {shape.children.map(child => (
+                <SVGSelectionWrapper key={child.id} shape={child} readonly={readonly}>
+                    <SVGShape shape={child} readonly={readonly} />
+                </SVGSelectionWrapper>
             ))}
         </g>
     )
