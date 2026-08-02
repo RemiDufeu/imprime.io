@@ -42,6 +42,7 @@ function buildAuth(mailer: MailerService) {
     github: Boolean(github),
     microsoft: Boolean(microsoft),
     requireEmailVerification,
+    passwordReset: requireEmailVerification,
   }
 
   if (requireEmailVerification && !mailer.isConfigured) {
@@ -58,6 +59,19 @@ function buildAuth(mailer: MailerService) {
     emailAndPassword: {
       enabled: true,
       requireEmailVerification,
+      ...(requireEmailVerification
+        ? {
+            sendResetPassword: async ({
+              user,
+              url,
+            }: {
+              user: { email: string; name?: string }
+              url: string
+            }) => {
+              await mailer.sendPasswordResetEmail(user, url)
+            },
+          }
+        : {}),
     },
     ...(requireEmailVerification
       ? {
@@ -81,6 +95,16 @@ function buildAuth(mailer: MailerService) {
       ...(github ? { github } : {}),
       ...(microsoft ? { microsoft } : {}),
     },
+    ...(requireEmailVerification
+      ? {
+          account: {
+            accountLinking: {
+              enabled: true,
+              trustedProviders: ['google', 'github', 'microsoft'],
+            },
+          },
+        }
+      : {}),
     plugins: [
       apiKey(),
       mcp({

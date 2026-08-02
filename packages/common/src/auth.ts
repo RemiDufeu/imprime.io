@@ -16,4 +16,5 @@ export interface EnabledAuthProviders {
   github: boolean
   microsoft: boolean
   requireEmailVerification: boolean
+  passwordReset: boolean
 }

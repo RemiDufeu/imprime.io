@@ -77,4 +77,17 @@ export class MailerService {
       html: `<p>${greeting},</p><p>Click the following link to verify your email address:</p><p><a href="${url}">${url}</a></p>`,
     })
   }
+
+  public async sendPasswordResetEmail(
+    user: { email: string; name?: string },
+    url: string,
+  ): Promise<void> {
+    const greeting = `Hello${user.name ? ' ' + user.name : ''}`
+    await this.sendMail({
+      to: user.email,
+      subject: 'Reset your password',
+      text: `${greeting},\n\nClick the following link to reset your password:\n${url}\n\nIf you didn't request a password reset, you can safely ignore this email.\n`,
+      html: `<p>${greeting},</p><p>Click the following link to reset your password:</p><p><a href="${url}">${url}</a></p><p>If you didn't request a password reset, you can safely ignore this email.</p>`,
+    })
+  }
 }

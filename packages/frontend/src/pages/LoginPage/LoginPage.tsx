@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Navigate, useSearchParams } from 'react-router-dom'
-import { Button, Card, Divider, Form, Input, Space, Tabs, Typography, message } from 'antd'
+import { Link, Navigate, useSearchParams } from 'react-router-dom'
+import { Button, Card, Divider, Form, Input, Space, Tabs, Tooltip, Typography, message } from 'antd'
 import { GithubOutlined, GoogleOutlined, WindowsOutlined } from '@ant-design/icons'
 import type { EnabledAuthProviders } from '@imprime/sdk'
 import { signIn, signUp, useSession } from '../../auth/authClient'
@@ -42,7 +42,7 @@ export default function LoginPage() {
       .getAuthProviders()
       .then(setProviders)
       .catch(() =>
-        setProviders({ emailPassword: true, google: false, github: false, microsoft: false, requireEmailVerification: false }),
+        setProviders({ emailPassword: true, google: false, github: false, microsoft: false, requireEmailVerification: false, passwordReset: false }),
       )
   }, [])
 
@@ -140,6 +140,17 @@ export default function LoginPage() {
                     <Button type="primary" htmlType="submit" block size="large" loading={emailLoading}>
                       Sign in
                     </Button>
+                    <Typography.Paragraph style={{ marginTop: 16, marginBottom: 0 }}>
+                      {providers.passwordReset ? (
+                        <Link to="/forgot-password">Forgot password?</Link>
+                      ) : (
+                        <Tooltip title="Password reset by email is disabled — please contact your administrator.">
+                          <Typography.Text type="secondary" style={{ cursor: 'not-allowed' }}>
+                            Forgot password?
+                          </Typography.Text>
+                        </Tooltip>
+                      )}
+                    </Typography.Paragraph>
                   </Form>
                 ),
               },
