@@ -52,10 +52,11 @@ export function SlideCanvas({
         const coords = getSVGCoordinates(e.clientX, e.clientY)
         if (!coords) return
 
-        // If shape/text tool is selected, start drawing
+        // If shape/text/group tool is selected, start drawing
         if (selectedTool === 'rectangle' ||
             selectedTool === 'ellipse' ||
-            selectedTool === 'text') {
+            selectedTool === 'text' ||
+            selectedTool === 'group') {
             startDrawing(coords.x, coords.y)
         } else if (clickedOnEmpty) {
             // Deselect shapes only if clicked on empty area

@@ -43,6 +43,8 @@ export const createShapeSlice : StateCreator<
                     contextBarType = 'shape'
                 } else if (selectedShape.type === 'text') {
                     contextBarType = 'text'
+                } else if (selectedShape.type === 'group') {
+                    contextBarType = 'group'
                 }
             } else {
                 contextBarType = 'none'

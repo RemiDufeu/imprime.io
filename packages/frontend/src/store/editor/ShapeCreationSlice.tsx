@@ -8,6 +8,37 @@ import type { ToolSlice } from './ToolSlice'
 import type { ToolAttributesSlice } from './ToolAttributeSlice'
 import { imagesAPI } from '../../api/api'
 
+function findInnermostGroupAt(
+    shapes: Shape[],
+    px: number,
+    py: number,
+    parentAbsX = 0,
+    parentAbsY = 0
+): { id: string; absX: number; absY: number } | null {
+    // Iterate reverse so the top-most (last-drawn) group wins on overlap.
+    for (let i = shapes.length - 1; i >= 0; i--) {
+        const s = shapes[i]
+        if (s.type !== 'group') continue
+        const ax = parentAbsX + s.x
+        const ay = parentAbsY + s.y
+        if (px >= ax && px <= ax + s.width && py >= ay && py <= ay + s.height) {
+            const nested = findInnermostGroupAt(s.children, px, py, ax, ay)
+            return nested || { id: s.id, absX: ax, absY: ay }
+        }
+    }
+    return null
+}
+
+function appendToGroup(shapes: Shape[], groupId: string, child: Shape): Shape[] {
+    return shapes.map(s => {
+        if (s.type !== 'group') return s
+        if (s.id === groupId) {
+            return { ...s, children: [...s.children, child] }
+        }
+        return { ...s, children: appendToGroup(s.children, groupId, child) }
+    })
+}
+
 export interface DrawingData {
     startX: number
     startY: number
@@ -47,7 +78,12 @@ export const createShapeCreationSlice: StateCreator<
         startDrawing: (x: number, y: number) => {
             const { selectedTool } = get()
 
-            if (selectedTool !== 'rectangle' && selectedTool !== 'ellipse' && selectedTool !== 'text') {
+            if (
+                selectedTool !== 'rectangle' &&
+                selectedTool !== 'ellipse' &&
+                selectedTool !== 'text' &&
+                selectedTool !== 'group'
+            ) {
                 return
             }
 
@@ -116,6 +152,13 @@ export const createShapeCreationSlice: StateCreator<
                         children: [{text : ''}]
                     }],
                 }
+            } else if (selectedTool === 'group') {
+                newShape = {
+                    id: shapeId,
+                    type: 'group',
+                    x, y, width, height,
+                    children: [],
+                }
             } else if (selectedTool === 'ellipse') {
                 newShape = {
                     id: shapeId,
@@ -139,8 +182,16 @@ export const createShapeCreationSlice: StateCreator<
                 }
             }
 
-            updateSlideShapes(currentSlide._id, [...currentSlide.shapes, newShape])
-            selectShape(shapeId)
+            const parent = findInnermostGroupAt(currentSlide.shapes, x, y)
+            if (parent) {
+                const nested = { ...newShape, x: x - parent.absX, y: y - parent.absY } as Shape
+                const nextShapes = appendToGroup(currentSlide.shapes, parent.id, nested)
+                updateSlideShapes(currentSlide._id, nextShapes)
+                selectShape(parent.id)
+            } else {
+                updateSlideShapes(currentSlide._id, [...currentSlide.shapes, newShape])
+                selectShape(shapeId)
+            }
             get().setTool('move')
             cancelDrawing()
         },

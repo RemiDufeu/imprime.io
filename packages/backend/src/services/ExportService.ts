@@ -9,9 +9,10 @@ import type {
   TextBoxShape,
   ImageShape,
   CustomText,
-  VariableElement
+  VariableElement,
+  VariableValueType
 } from '@imprime/common'
-import { SLIDE_WIDTH, SLIDE_HEIGHT, getDashArray } from '@imprime/common'
+import { SLIDE_WIDTH, SLIDE_HEIGHT, getDashArray, resolveShapes } from '@imprime/common'
 import type { ImageService } from './ImageService.js'
 import { AppError, ValidationError } from './errors.js'
 import { normalizeFontFamily, getFontStyleProps, initializeFonts } from '../config/fonts.js'
@@ -21,38 +22,35 @@ import type { Style } from '@react-pdf/types'
 initializeFonts()
 
 export interface RenderOptions {
-  variableValues?: Record<string, string>
+  variableValues?: Record<string, VariableValueType>
 }
 
 export class ExportService {
   constructor(private imageService: ImageService) { }
 
-  private validateVariables(presentation: Presentation, variableValues: Record<string, string>): void {
+  private validateVariables(presentation: Presentation, variableValues: Record<string, VariableValueType>): void {
     const requiredVariables = presentation.variableData?.filter(v => v.required) || []
 
     for (const variable of requiredVariables) {
-      if (!variableValues[variable.name] || variableValues[variable.name].trim() === '') {
+      const value = variableValues[variable.name]
+      if (value === undefined || value === null || value.trim() === '') {
         throw new ValidationError(`Required variable "${variable.name}" is missing`)
       }
     }
   }
 
-  private getVariableValue(variableId: string, presentation: Presentation, variableValues: Record<string, string>): string {
+  private getVariableValue(variableId: string, presentation: Presentation, variableValues: Record<string, VariableValueType>): string {
     const variablePresentation = presentation.variableData.find(v => v._id == variableId)
-
     if (!variablePresentation) return ''
-
-    if (variableValues[variablePresentation.name]?.length) {
-      return variableValues[variablePresentation.name]
-    }
-
-    return variablePresentation?.default || ''
+    const runtime = variableValues[variablePresentation.name]
+    if (runtime !== undefined && runtime !== null && runtime !== '') return runtime
+    return variablePresentation.default ?? ''
   }
 
-  private async fetchImageData(presentation: Presentation): Promise<Map<string, string>> {
+  private async fetchImageData(resolvedSlides: Slide[]): Promise<Map<string, string>> {
     const imageIds = new Set<string>()
 
-    for (const slide of presentation.slides) {
+    for (const slide of resolvedSlides) {
       for (const shape of slide.shapes) {
         if (shape.type === 'image') {
           imageIds.add(shape.imageId)
@@ -179,14 +177,17 @@ export class ExportService {
   private renderTextBox(
     shape: TextBoxShape,
     presentation: Presentation,
-    variableValues: Record<string, string>
+    variableValues: Record<string, VariableValueType>
   ): React.ReactElement {
     const { x, y, width, paragraphes } = shape
 
     const renderTextSegment = (child: CustomText | VariableElement, pIndex: number, cIndex: number): React.ReactElement => {
       if ('type' in child && child.type === 'variable') {
         const varElement = child as VariableElement;
-        const value = this.getVariableValue(varElement.variableId, presentation, variableValues)
+        // itemPath variables are baked by resolveShapes; only global variableId refs land here.
+        const value = varElement.variableId
+          ? this.getVariableValue(varElement.variableId, presentation, variableValues)
+          : ''
         const fontFamily = normalizeFontFamily(varElement.fontFamily)
         const styleProps = getFontStyleProps(varElement.bold, varElement.italic)
 
@@ -300,7 +301,7 @@ export class ExportService {
     shape: Shape,
     imageDataMap: Map<string, string>,
     presentation: Presentation,
-    variableValues: Record<string, string>
+    variableValues: Record<string, VariableValueType>
   ): React.ReactElement {
     switch (shape.type) {
       case 'rectangle':
@@ -311,6 +312,8 @@ export class ExportService {
         return this.renderTextBox(shape, presentation, variableValues)
       case 'image':
         return this.renderImage(shape, imageDataMap)
+      case 'group':
+        return React.createElement(View, { key: shape.id })
       default: {
         return React.createElement(View, {})
       }
@@ -321,7 +324,7 @@ export class ExportService {
     slide: Slide,
     imageDataMap: Map<string, string>,
     presentation: Presentation,
-    variableValues: Record<string, string>
+    variableValues: Record<string, VariableValueType>
   ): React.ReactElement {
     const shapes = slide.shapes.map(shape =>
       this.renderShape(shape, imageDataMap, presentation, variableValues)
@@ -345,9 +348,14 @@ export class ExportService {
 
     this.validateVariables(presentation, variableValues)
 
-    const imageDataMap = await this.fetchImageData(presentation)
+    const resolvedSlides: Slide[] = presentation.slides.map(slide => ({
+      ...slide,
+      shapes: resolveShapes(slide.shapes),
+    }))
 
-    const pages = presentation.slides.map(slide =>
+    const imageDataMap = await this.fetchImageData(resolvedSlides)
+
+    const pages = resolvedSlides.map(slide =>
       this.renderSlide(slide, imageDataMap, presentation, variableValues)
     )
 

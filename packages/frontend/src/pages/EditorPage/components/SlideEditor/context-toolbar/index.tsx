@@ -1,6 +1,7 @@
 import { useEditorStore } from '../../../../../store/editor/EditorStore'
 import { ShapeContextBar } from './ShapeContextBar'
 import { TextContextBar } from './TextContextBar'
+import { GroupContextBar } from './GroupContextBar'
 
 export function ContextToolbar() {
   const contextBarType = useEditorStore(state => state.contextBarType)
@@ -14,6 +15,7 @@ export function ContextToolbar() {
     <>
       {contextBarType === 'shape' && <ShapeContextBar />}
       {contextBarType === 'text' && <TextContextBar />}
+      {contextBarType === 'group' && <GroupContextBar />}
     </>
   )
 }

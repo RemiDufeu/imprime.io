@@ -75,6 +75,23 @@ export function SVGDrawingPreview() {
                 />
             )
 
+        case 'group':
+            return (
+                <rect
+                    x={x}
+                    y={y}
+                    width={width}
+                    height={height}
+                    fill="rgba(148, 163, 184, 0.04)"
+                    stroke="#94a3b8"
+                    strokeWidth={2}
+                    strokeDasharray="8 6"
+                    rx={4}
+                    ry={4}
+                    pointerEvents="none"
+                />
+            )
+
         default:
             return null
     }

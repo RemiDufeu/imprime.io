@@ -105,15 +105,22 @@ export class SlideService {
             }
           })
         })
+      } else if (shape.type === 'group') {
+        errors.push(...this.validateVariableReferences(shape.children, validVariableIds))
       }
     })
     return errors
   }
 
   private collectImageIds(shapes: Shape[]): string[] {
-    return shapes
-      .filter((s): s is ImageShape => s.type === 'image')
-      .map(s => s.imageId)
-      .filter(Boolean)
+    const ids: string[] = []
+    for (const shape of shapes) {
+      if (shape.type === 'image') {
+        if (shape.imageId) ids.push(shape.imageId)
+      } else if (shape.type === 'group') {
+        ids.push(...this.collectImageIds(shape.children))
+      }
+    }
+    return ids
   }
 }

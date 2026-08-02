@@ -1,5 +1,12 @@
 import { Button, Tooltip, theme } from 'antd'
-import { DragOutlined, PlusSquareOutlined, FontSizeOutlined, PictureOutlined, PlusCircleOutlined } from '@ant-design/icons'
+import {
+  DragOutlined,
+  PlusSquareOutlined,
+  FontSizeOutlined,
+  PictureOutlined,
+  PlusCircleOutlined,
+  GroupOutlined,
+} from '@ant-design/icons'
 import type { ToolType } from '../../../../store/editor/ToolSlice'
 import { useEditorStore } from '../../../../store/editor/EditorStore'
 
@@ -12,6 +19,7 @@ const TOOLS: Array<{
   { type: 'rectangle', label: 'Add rectangle', icon: <PlusSquareOutlined /> },
   { type: 'ellipse', label: 'Add ellipse', icon: <PlusCircleOutlined /> },
   { type: 'text', label: 'Add text box', icon: <FontSizeOutlined /> },
+  { type: 'group', label: 'Add group', icon: <GroupOutlined /> },
 ]
 
 export default function Toolbar() {

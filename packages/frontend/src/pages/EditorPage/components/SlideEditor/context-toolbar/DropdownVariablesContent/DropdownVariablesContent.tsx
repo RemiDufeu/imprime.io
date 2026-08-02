@@ -191,9 +191,9 @@ export function DropdownVariablesContent({ onClose }: DropdownVariablesContentPr
                       <span className="variable-name">{variable.name}</span>
                     </div>
                     <div className="variable-sub">
-                      {variable.default && (
-                        <>Default: <span className="default-value">{variable.default}</span></>)
-                      }
+                      {variable.default !== undefined && variable.default !== null && variable.default !== '' && (
+                        <>Default: <span className="default-value">{variable.default}</span></>
+                      )}
                       {variable.required && (
                         <>Required</>
                       )}

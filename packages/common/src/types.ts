@@ -62,7 +62,18 @@ export interface ImageShape extends BaseShape {
   alt?: string
 }
 
-export type Shape = RectangleShape | EllipseShape | TextBoxShape | ImageShape
+export interface GroupShape extends BaseShape {
+  type: 'group'
+  name?: string
+  children: Shape[]
+}
+
+export type Shape =
+  | RectangleShape
+  | EllipseShape
+  | TextBoxShape
+  | ImageShape
+  | GroupShape
 
 // ============================================
 // Slide & Presentation Types
@@ -94,14 +105,15 @@ export interface PresentationSummary {
 
 export interface VariableData {
   _id: string
-  type : VariableType
-  name : string
-  value? : VariableValueType
-  default? : VariableValueType
-  required? : boolean
+  type: VariableType
+  name: string
+  value?: VariableValueType
+  default?: VariableValueType
+  required?: boolean
 }
 
 export type VariableType = "string"
+
 export type VariableValueType = string
 
 // ============================================
@@ -183,7 +195,7 @@ export namespace ImageDTO {
 
 export namespace ExportDTO {
   export interface PdfRequest {
-    variableValues?: Record<string, string>
+    variableValues?: Record<string, VariableValueType>
   }
 }
 
