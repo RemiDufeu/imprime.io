@@ -35,6 +35,7 @@ function buildAuth(mailer: MailerService) {
     : undefined
 
   const requireEmailVerification = process.env.REQUIRE_EMAIL_VERIFICATION === 'true'
+  const passwordResetEnabled = mailer.isConfigured
 
   const enabledProviders: EnabledAuthProviders = {
     emailPassword: true,
@@ -42,7 +43,7 @@ function buildAuth(mailer: MailerService) {
     github: Boolean(github),
     microsoft: Boolean(microsoft),
     requireEmailVerification,
-    passwordReset: requireEmailVerification,
+    passwordReset: passwordResetEnabled,
   }
 
   if (requireEmailVerification && !mailer.isConfigured) {
@@ -59,7 +60,10 @@ function buildAuth(mailer: MailerService) {
     emailAndPassword: {
       enabled: true,
       requireEmailVerification,
-      ...(requireEmailVerification
+      minPasswordLength: 8,
+      maxPasswordLength: 128,
+      resetPasswordTokenExpiresIn: 15 * 60,
+      ...(passwordResetEnabled
         ? {
             sendResetPassword: async ({
               user,
@@ -111,9 +115,6 @@ function buildAuth(mailer: MailerService) {
         loginPage: '/login',
         oidcConfig: {
           loginPage: '/login',
-          // Only triggered when the OAuth client sends `prompt=consent` in the
-          // authorize request. Standard OIDC — Claude and other well-behaved
-          // clients may request it to force re-authorization.
           consentPage: '/oauth/consent',
         },
       }),

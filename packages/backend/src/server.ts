@@ -1,6 +1,8 @@
 import './loadEnv.js'
 import express from 'express'
 import cors from 'cors'
+import helmet from 'helmet'
+import rateLimit from 'express-rate-limit'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { toNodeHandler } from 'better-auth/node'
@@ -24,13 +26,37 @@ const __dirname = path.dirname(__filename)
 const app = express()
 const PORT = process.env.PORT || 3001
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173'
+const IS_PRODUCTION = process.env.NODE_ENV === 'production'
+
+if (IS_PRODUCTION && CORS_ORIGIN === '*') {
+  throw new Error(
+    'CORS_ORIGIN="*" is not allowed in production. Set an explicit origin list (comma-separated).',
+  )
+}
+
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+    hsts: IS_PRODUCTION ? { maxAge: 15552000, includeSubDomains: true } : false,
+  }),
+)
 
 const expressMiddleware = CORS_ORIGIN === '*'
   ? cors({ origin: '*', credentials: false })
-  : cors({ origin: CORS_ORIGIN, credentials: true })
+  : cors({ origin: CORS_ORIGIN.split(',').map((o) => o.trim()), credentials: true })
 
 // CORS First
 app.use(expressMiddleware)
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Too many authentication attempts. Please try again later.' },
+})
+app.use('/api/auth', authLimiter)
 
 app.all('/api/auth/*splat', toNodeHandler(authService.instance))
 
@@ -54,7 +80,8 @@ app.use(express.json({ limit: '10mb' }))
 
 // Request logging
 app.use((req, res, next) => {
-  console.log(`${req.method} ${req.path}`)
+  const isAuthPath = req.path.startsWith('/api/auth')
+  console.log(`${req.method} ${isAuthPath ? req.path : req.originalUrl}`)
   next()
 })
 

@@ -20,6 +20,8 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.6.1",
+    "helmet": "^8.3.0",
     "mongodb": "^6.20.0",
     "mongoose": "^8.9.5",
     "nodemailer": "^6.10.1",
