@@ -1,6 +1,6 @@
 import { Input } from 'antd'
 import type { GroupShape } from '@imprime/sdk'
-import { useEditorStore } from '../../../../../store/editor/EditorStore'
+import { useEditorStore } from '../../../../../../store/editor/EditorStore'
 
 export function GroupContextBar() {
   const selectedShape = useEditorStore(state => state.selectedShape)

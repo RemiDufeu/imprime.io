@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Alert, Button } from 'antd'
-import SlideEditor from './components/SlideEditor/SlideEditor'
+import SlideEditor from './Components/SlideEditor/SlideEditor'
 import FullScreen from '../../components/Layout/FullScreen/FullScreen'
 import SpinnerFullScreen from '../../components/Feedback/SpinnerFullScreen'
 import './EditorPage.css'

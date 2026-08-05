@@ -15,8 +15,8 @@ import {
     DeleteOutlined,
     HolderOutlined,
 } from '@ant-design/icons'
-import { useCurrentSlide, useEditorStore } from '../../../../store/editor/EditorStore'
 import './ShapeTreePanel.css'
+import { useCurrentSlide, useEditorStore } from '../../../../../../store/editor/EditorStore'
 
 const INDENT_PX = 14
 const DRAG_MIME = 'application/x-imprime-shape-id'

@@ -1,4 +1,4 @@
-import { useEditorStore } from '../../../../../store/editor/EditorStore'
+import { useEditorStore } from '../../../../../../store/editor/EditorStore'
 import { ShapeContextBar } from './ShapeContextBar'
 import { TextContextBar } from './TextContextBar'
 import { GroupContextBar } from './GroupContextBar'

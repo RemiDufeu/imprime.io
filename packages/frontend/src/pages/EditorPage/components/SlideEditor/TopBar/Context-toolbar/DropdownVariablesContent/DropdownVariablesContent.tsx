@@ -1,7 +1,7 @@
 import { Input, Button, List, Form, Switch, Popconfirm } from 'antd'
 import { ArrowLeftOutlined, PlusOutlined, SearchOutlined, DeleteOutlined } from '@ant-design/icons'
 import { useState, useMemo } from 'react'
-import { useEditorStore } from '../../../../../../store/editor/EditorStore'
+import { useEditorStore } from '../../../../../../../store/editor/EditorStore'
 import type { VariableData } from '@imprime/sdk'
 import './DropdownVariablesContent.css'
 

@@ -7,8 +7,8 @@ import {
   PlusCircleOutlined,
   GroupOutlined,
 } from '@ant-design/icons'
-import type { ToolType } from '../../../../store/editor/ToolSlice'
-import { useEditorStore } from '../../../../store/editor/EditorStore'
+import type { ToolType } from '../../../../../../store/editor/ToolSlice'
+import { useEditorStore } from '../../../../../../store/editor/EditorStore'
 
 const TOOLS: Array<{
   type: ToolType

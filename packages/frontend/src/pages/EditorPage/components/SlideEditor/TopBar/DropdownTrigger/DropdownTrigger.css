@@ -1,0 +1,29 @@
+.dropdown-menu {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.dropdown-menu-end {
+    margin-left: auto;
+}
+
+.dropdown-menu-trigger {
+    box-shadow: var(--ant-box-shadow);
+}
+
+.dropdown-menu-trigger-inner {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.dropdown-menu-chevron {
+    transition: transform 0.2s ease;
+    font-size: 10px;
+}
+
+.dropdown-menu-chevron.open {
+    transform: rotate(180deg);
+}
