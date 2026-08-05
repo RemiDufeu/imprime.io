@@ -59,6 +59,11 @@
     flex: 1;
     justify-content: center;
     align-items: end;
+    pointer-events: none;
+}
+
+.centered-zoombar > * {
+    pointer-events: auto;
 }
 
 .toolbar-container, .zoombar-container, .floating-panel {
