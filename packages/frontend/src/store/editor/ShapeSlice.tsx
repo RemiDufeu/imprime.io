@@ -102,7 +102,8 @@ export const createShapeSlice : StateCreator<
         const copy = cloneShapeWithNewIds(loc.shape)
         // Slight offset so the copy is visually distinct from the source.
         const OFFSET = 20
-        const relocated = { ...copy, x: copy.x + OFFSET, y: copy.y + OFFSET } as Shape
+        const copiedName = loc.shape.name ? `${loc.shape.name} copie` : undefined
+        const relocated = { ...copy, x: copy.x + OFFSET, y: copy.y + OFFSET, name: copiedName } as Shape
 
         // Insert directly after the source in its parent's children.
         const parentChildren = loc.parentGroupId === null
@@ -126,8 +127,18 @@ export const createShapeSlice : StateCreator<
         // Reject moves into own subtree (would make a group its own descendant).
         if (targetGroupId !== null && isDescendantOf(currentSlide.shapes, targetGroupId, id)) return
 
+        const sourceLoc = findShapeById(currentSlide.shapes, id)
+        if (!sourceLoc) return
+        const targetParentAbs = targetGroupId === null
+            ? { absX: 0, absY: 0 }
+            : findShapeById(currentSlide.shapes, targetGroupId)
+        if (targetParentAbs === null) return
+        const newX = sourceLoc.absX - targetParentAbs.absX
+        const newY = sourceLoc.absY - targetParentAbs.absY
+
         const { removed, remaining } = extractShapeById(currentSlide.shapes, id)
         if (!removed) return
+        const repositioned = { ...removed, x: newX, y: newY } as Shape
 
         // If moving within the same parent, the target index may shift once the
         // source is removed. Caller passes the index in the *pre-removal* tree,
@@ -140,7 +151,7 @@ export const createShapeSlice : StateCreator<
             ? index - 1
             : index
 
-        const nextShapes = insertShapeAt(remaining, targetGroupId, adjustedIndex, removed)
+        const nextShapes = insertShapeAt(remaining, targetGroupId, adjustedIndex, repositioned)
         updateSlideShapes(currentSlide._id, nextShapes)
         selectShape(id)
     },

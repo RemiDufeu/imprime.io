@@ -7,7 +7,7 @@ import type { ShapeSlice } from './ShapeSlice'
 import type { ToolSlice } from './ToolSlice'
 import type { ToolAttributesSlice } from './ToolAttributeSlice'
 import { imagesAPI } from '../../api/api'
-import { findInnermostGroupAt, insertShape } from '../../utils/shapeTree'
+import { findInnermostGroupAt, insertShape, nextShapeName } from '../../utils/shapeTree'
 
 export interface DrawingData {
     startX: number
@@ -116,6 +116,7 @@ export const createShapeCreationSlice: StateCreator<
                 newShape = {
                     id: shapeId,
                     type: 'text',
+                    name: nextShapeName(currentSlide.shapes, 'text'),
                     x, y, width, height,
                     paragraphes: [{
                         type: 'paragraph',
@@ -126,6 +127,7 @@ export const createShapeCreationSlice: StateCreator<
                 newShape = {
                     id: shapeId,
                     type: 'group',
+                    name: nextShapeName(currentSlide.shapes, 'group'),
                     x, y, width, height,
                     children: [],
                 }
@@ -133,6 +135,7 @@ export const createShapeCreationSlice: StateCreator<
                 newShape = {
                     id: shapeId,
                     type: 'ellipse',
+                    name: nextShapeName(currentSlide.shapes, 'ellipse'),
                     x, y, width, height,
                     fill: attributes.fillColor,
                     stroke: attributes.strokeColor,
@@ -143,6 +146,7 @@ export const createShapeCreationSlice: StateCreator<
                 newShape = {
                     id: shapeId,
                     type: 'rectangle',
+                    name: nextShapeName(currentSlide.shapes, 'rectangle'),
                     x, y, width, height,
                     fill: attributes.fillColor,
                     stroke: attributes.strokeColor,
@@ -208,21 +212,22 @@ export const createShapeCreationSlice: StateCreator<
                             const x = Math.floor((1920 - width) / 2)
                             const y = Math.floor((1080 - height) / 2)
 
+                            // Re-fetch current slide in case it changed
+                            const slide = getCurrentSlide()
+                            if (!slide) return
+
                             const shapeId = crypto.randomUUID()
                             const newShape: Shape = {
                                 id: shapeId,
                                 type: 'image',
+                                name: nextShapeName(slide.shapes, 'image'),
                                 x, y, width, height,
                                 imageId: uploadResult._id,
                                 alt: file.name,
                             }
 
-                            // Re-fetch current slide in case it changed
-                            const slide = getCurrentSlide()
-                            if (slide) {
-                                updateSlideShapes(slide._id, [...slide.shapes, newShape])
-                                selectShape(shapeId)
-                            }
+                            updateSlideShapes(slide._id, [...slide.shapes, newShape])
+                            selectShape(shapeId)
 
                             hideLoading()
                             message.success('Image uploaded successfully')

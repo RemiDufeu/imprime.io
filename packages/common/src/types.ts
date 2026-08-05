@@ -14,6 +14,7 @@ export interface BaseShape {
   // renderer (SVG in the editor, image export in the backend) but stays in
   // the data so the user can re-enable it.
   hidden?: boolean
+  name?: string
 }
 
 export interface RectangleShape extends BaseShape {
@@ -68,7 +69,6 @@ export interface ImageShape extends BaseShape {
 
 export interface GroupShape extends BaseShape {
   type: 'group'
-  name?: string
   children: Shape[]
 }
 

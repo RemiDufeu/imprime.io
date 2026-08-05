@@ -54,7 +54,7 @@ export function ShapeContextBar() {
   }
 
   return (
-    <div className="toolbar-container toolbar-section">
+    <div className="toolbar-container context-toolbar">
       {/* Fill Section */}
       <div className="toolbar-item">
         <span className="toolbar-label">Fill</span>

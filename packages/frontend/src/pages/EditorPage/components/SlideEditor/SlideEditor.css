@@ -1,47 +1,8 @@
-/* Shared styles for Toolbar and ZoomBar */
-.toolbar-container, .zoombar-container{
-    display: inline-flex;
-    align-items: center;
-    background: var(--ant-color-bg-container);
-    box-shadow: var(--ant-box-shadow);
-    border-radius: var(--ant-border-radius);
-    border: var(--ant-line-width) var(--ant-line-type) var(--ant-color-border);
-    gap: 4px;
-    box-sizing: border-box;
-}
-
-.toolbar-container .btn:hover, .zoombar-container .btn:hover {
-    color: var(--ant-color-primary) !important;
-    background-color: transparent !important;
-}
-
 .editor-container {
     flex: 1;
     position: relative;
-    margin-left: var(--space-s);
-    display: flex;
     overflow: hidden;
     min-width: 0;
-}
-
-.zoombar-container {
-    position: absolute;
-    bottom: var(--space-s);
-    right: var(--space-s);
-    z-index: 10;
-}
-
-.editor-top-actions {
-    position: absolute;
-    width: 100%;
-    top: var(--space-s);
-    display: flex;
-    gap: var(--space-m);
-    z-index: 10;
-}
-
-.context-toolbar {
-    padding: 0 var(--space-s);
 }
 
 .canva-container {
@@ -60,7 +21,59 @@
     padding: var(--space-xl);
 }
 
+.toolbars {
+    display: flex;
+    flex: 1;
+    gap: var(--space-m);
+}
+
 /* Context toolbar specific styles */
+.actions-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+}
+
+.top-bar-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-s) var(--space-m);
+    pointer-events: auto;
+    gap: var(--space-m);
+}
+
+.toolbar-container, .zoombar-container {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.centered-zoombar {
+    display: flex;
+    flex: 1;
+    justify-content: center;
+    align-items: end;
+}
+
+.toolbar-container, .zoombar-container, .floating-panel {
+    background: var(--ant-color-bg-container);
+    box-shadow: var(--ant-box-shadow);
+    border-radius: var(--ant-border-radius);
+    border: var(--ant-line-width) var(--ant-line-type) var(--ant-color-border);
+    box-sizing: border-box;
+}
+
+.context-toolbar {
+    padding: 0 var(--space-s);
+    gap: var(--space-s);
+}
+
 .toolbar-container .toolbar-section {
     display: flex;
     align-items: center;
@@ -89,4 +102,29 @@
     height: 24px;
     background-color: var(--ant-color-border);
     margin: 0 4px;
+}
+
+.floating-panels {
+    display: flex;
+    flex: 1;
+    padding: var(--space-s);
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.floating-panel {
+    height: 100%;
+    transform: scaleY(0);
+    width: fit-content;
+    transform-origin: top;
+    opacity: 0;
+    transition:
+        transform 0.2s ease,
+        opacity 0.2s ease;
+}
+
+.floating-panel.open {
+    transform: scaleY(1);
+    opacity: 1;
+    pointer-events: auto;
 }

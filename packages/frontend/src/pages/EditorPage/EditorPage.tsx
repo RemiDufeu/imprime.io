@@ -4,8 +4,6 @@ import { Alert, Button } from 'antd'
 import SlideEditor from './components/SlideEditor/SlideEditor'
 import FullScreen from '../../components/Layout/FullScreen/FullScreen'
 import SpinnerFullScreen from '../../components/Feedback/SpinnerFullScreen'
-import SlideList from './components/SlideList'
-import ShapeTreePanel from './components/ShapeTreePanel'
 import './EditorPage.css'
 import { useEditorStore } from '../../store/editor/EditorStore'
 
@@ -62,11 +60,9 @@ export default function EditorPage() {
     )
   }
 
-  return (<>
+  return (
     <div className='page-container'>
-      <SlideList />
       <SlideEditor />
-      <ShapeTreePanel />
     </div>
-  </>)
+  )
 }

@@ -270,7 +270,6 @@ function ShapeRow({
                 draggable={!isRenaming}
                 onClick={() => handlers.onSelect(shape.id)}
                 onDoubleClick={(e) => {
-                    if (!isGroup) return
                     e.stopPropagation()
                     handlers.onStartRename(shape.id)
                 }}
@@ -320,12 +319,14 @@ function ShapeRow({
                 <span className="shape-tree-row-icon">{shapeIcon(shape)}</span>
                 {isRenaming ? (
                     <RenameInput
-                        initial={shape.type === 'group' ? shape.name ?? '' : ''}
+                        initial={shape.name ?? ''}
                         onCommit={(v) => handlers.onCommitRename(shape.id, v)}
                         onCancel={handlers.onCancelRename}
                     />
                 ) : (
-                    <span className="shape-tree-row-label">{shapeLabel(shape)}</span>
+                    <span className="shape-tree-row-label">
+                        {shape.name ?? ''}
+                    </span>
                 )}
                 <span
                     className="shape-tree-row-actions"
@@ -415,21 +416,6 @@ function shapeIcon(shape: Shape) {
         case 'text': return <FontSizeOutlined />
         case 'image': return <PictureOutlined />
         case 'group': return <FolderOutlined />
-    }
-}
-
-function shapeLabel(shape: Shape): string {
-    switch (shape.type) {
-        case 'group': return shape.name ?? 'Group'
-        case 'text': {
-            const firstText = shape.paragraphes
-                ?.flatMap(p => p.children)
-                .find(c => 'text' in c && c.text)
-            return (firstText && 'text' in firstText && firstText.text) || 'Text'
-        }
-        case 'image': return shape.alt ?? 'Image'
-        case 'rectangle': return 'Rectangle'
-        case 'ellipse': return 'Ellipse'
     }
 }
 

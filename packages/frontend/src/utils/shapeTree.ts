@@ -129,6 +129,27 @@ export function isDescendantOf(shapes: Shape[], shapeId: string, ancestorId: str
   return false
 }
 
+const TYPE_LABEL: Record<Shape['type'], string> = {
+  rectangle: 'Rectangle',
+  ellipse: 'Ellipse',
+  text: 'Text',
+  image: 'Image',
+  group: 'Group',
+}
+
+// Auto-generate a fresh name for a newly-created shape
+export function nextShapeName(shapes: Shape[], type: Shape['type']): string {
+  let count = 0
+  const walk = (list: Shape[]) => {
+    for (const s of list) {
+      if (s.type === type) count += 1
+      if (s.type === 'group') walk(s.children)
+    }
+  }
+  walk(shapes)
+  return `${TYPE_LABEL[type]} ${count + 1}`
+}
+
 // Find the innermost group whose absolute bounding box contains (px, py).
 // Skips the shape identified by `excludeId` (used to avoid dropping a group
 // into itself, or a shape into its current parent while dragging).

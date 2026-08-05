@@ -78,7 +78,7 @@ export function TextContextBar() {
 
   return (
     <>
-      <div className="toolbar-container toolbar-section">
+      <div className="toolbar-container context-toolbar">
         <div className="toolbar-item">
           <span className="toolbar-label">Font</span>
           <div onMouseDown={(e) => e.preventDefault()}>

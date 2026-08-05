@@ -1,4 +1,6 @@
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useState } from 'react'
+import { Button } from 'antd'
+import { DownOutlined } from '@ant-design/icons'
 import ZoomBar from './ZoomBar'
 import { SlideCanvas } from '../../../../components/slide/SlideCanvas'
 import { EDITOR_DISPLAY_WIDTH, EDITOR_DISPLAY_HEIGHT } from '../../../../constants/canvas'
@@ -6,6 +8,8 @@ import './SlideEditor.css'
 import Toolbar from './Toolbar'
 import LayeringToolbar from '../LayeringToolbar/LayeringToolbar'
 import { ContextToolbar } from './context-toolbar'
+import SlideList from '../SlideList'
+import ShapeTreePanel from '../ShapeTreePanel'
 import { useCurrentSlide, useEditorStore } from '../../../../store/editor/EditorStore'
 
 export default function SlideEditor() {
@@ -13,27 +17,24 @@ export default function SlideEditor() {
   const zoom = useEditorStore(state => state.zoom)
   const setZoom = useEditorStore(state => state.setZoom)
   const currentSlide = useCurrentSlide()
+  const [slidesOpen, setSlidesOpen] = useState(false)
+  const [layersOpen, setLayersOpen] = useState(false)
 
-  // Handle zoom with mouse wheel (with native preventDefault)
   useEffect(() => {
     const canvaContainer = canvaContainerRef.current
     if (!canvaContainer) return
 
     const handleWheel = (e: WheelEvent) => {
-      // Check if Ctrl or Cmd is pressed for zoom
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault()
         e.stopPropagation()
 
         const zoomSpeed = 0.1
-
-        // Negative deltaY = scroll up = zoom in
         const delta = e.deltaY > 0 ? -zoomSpeed : zoomSpeed
         setZoom(prevZoom => prevZoom + delta)
       }
     }
 
-    // Add listener with { passive: false } to allow preventDefault
     canvaContainer.addEventListener('wheel', handleWheel, { passive: false })
 
     return () => {
@@ -46,23 +47,67 @@ export default function SlideEditor() {
   }
 
   return (
-    <>
-      <div className='editor-container'>
-        <div className='editor-top-actions'>
-          <Toolbar /> <ContextToolbar />
+    <div className='editor-container'>
+      <div className='canva-container' ref={canvaContainerRef}>
+        <div>
+          <SlideCanvas
+            slide={currentSlide}
+            width={EDITOR_DISPLAY_WIDTH * zoom}
+            height={EDITOR_DISPLAY_HEIGHT * zoom}
+          />
         </div>
-        <div className='canva-container' ref={canvaContainerRef}>
-          <div>
-            <SlideCanvas
-              slide={currentSlide}
-              width={EDITOR_DISPLAY_WIDTH * zoom}
-              height={EDITOR_DISPLAY_HEIGHT * zoom}
-            />
+      </div>
+
+      <div className='actions-layer'>
+        <div className='top-bar-actions'>
+          <div className="dropdown-menu">
+            <Button
+              className="dropdown-menu-trigger"
+              onClick={() => setSlidesOpen(v => !v)}
+            >
+              <span className="dropdown-menu-trigger-inner">
+                Slides
+                <DownOutlined className={`dropdown-menu-chevron ${slidesOpen ? 'open' : ''}`} />
+              </span>
+            </Button>
+          </div>
+
+          <div className='toolbars'>
+            <Toolbar />
+            <ContextToolbar />
+          </div>
+
+          <div className="dropdown-menu dropdown-menu-end">
+            <Button
+              className="dropdown-menu-trigger"
+              onClick={() => setLayersOpen(v => !v)}
+            >
+              <span className="dropdown-menu-trigger-inner">
+                Shape tree
+                <DownOutlined className={`dropdown-menu-chevron ${layersOpen ? 'open' : ''}`} />
+              </span>
+            </Button>
           </div>
         </div>
-        <ZoomBar />
+        <div className='floating-panels'>
+          <div
+            className={`floating-panel ${slidesOpen ? 'open' : ''}`}
+            aria-hidden={!slidesOpen}
+          >
+            <SlideList />
+          </div>
+          <div className="centered-zoombar">
+            <ZoomBar />
+          </div>
+          <div
+            className={`floating-panel ${layersOpen ? 'open' : ''}`}
+            aria-hidden={!layersOpen}
+          >
+            <ShapeTreePanel />
+          </div>
+        </div>
       </div>
       <LayeringToolbar />
-    </>
+    </div>
   )
 }

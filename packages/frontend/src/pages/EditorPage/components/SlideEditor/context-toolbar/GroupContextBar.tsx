@@ -13,7 +13,7 @@ export function GroupContextBar() {
   const shape: GroupShape = selectedShape
 
   return (
-    <div className="toolbar-container toolbar-section">
+    <div className="toolbar-container context-toolbar">
       <div className="toolbar-item">
         <span className="toolbar-label">Name</span>
         <Input
