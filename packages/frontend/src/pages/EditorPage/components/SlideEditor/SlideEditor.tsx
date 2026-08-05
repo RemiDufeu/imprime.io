@@ -1,16 +1,17 @@
-import { useState } from 'react'
 import LayeringToolbar from '../LayeringToolbar/LayeringToolbar'
 import { CanvasArea } from './CanvasArea/CanvasArea'
 import { TopBar } from './TopBar/TopBar'
 import { FloatingPanels } from './FloatingPanels/FloatingPanels'
-import { useCurrentSlide } from '../../../../store/editor/EditorStore'
-import './toolbars.css'
+import { useCurrentSlide, useEditorStore } from '../../../../store/editor/EditorStore'
+import './Toolbars.css'
 import './SlideEditor.css'
 
 export default function SlideEditor() {
   const currentSlide = useCurrentSlide()
-  const [slidesOpen, setSlidesOpen] = useState(false)
-  const [layersOpen, setLayersOpen] = useState(false)
+  const slidesOpen = useEditorStore(state => state.slidesPanelOpen)
+  const layersOpen = useEditorStore(state => state.layersPanelOpen)
+  const setSlidesOpen = useEditorStore(state => state.setSlidesPanelOpen)
+  const setLayersOpen = useEditorStore(state => state.setLayersPanelOpen)
 
   if (!currentSlide) {
     return null

@@ -1,7 +1,7 @@
 import { Button, Slider, Tooltip, theme } from 'antd'
 import { ZoomInOutlined, ZoomOutOutlined } from '@ant-design/icons'
 import { useEditorStore } from '../../../../../store/editor/EditorStore'
-import { MAX_ZOOM, MIN_ZOOM, ZOOM_LEVELS } from '../../../../../store/editor/ZoomSlice'
+import { MAX_ZOOM, MIN_ZOOM, ZOOM_LEVELS } from '../../../../../store/editor/PreferencesSlice'
 
 export default function ZoomBar() {
   const zoom = useEditorStore(state => state.zoom)
