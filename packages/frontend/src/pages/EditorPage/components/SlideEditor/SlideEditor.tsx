@@ -5,6 +5,7 @@ import { FloatingPanels } from './FloatingPanels/FloatingPanels'
 import EditorHeader from '../../../Layout/EditorHeader'
 import UserMenu from '../../../Layout/UserMenu'
 import { useCurrentSlide, useEditorStore } from '../../../../store/editor/EditorStore'
+import { useEditorShortcuts } from './useEditorShortcuts'
 import './Toolbars.css'
 import './SlideEditor.css'
 
@@ -14,6 +15,8 @@ export default function SlideEditor() {
   const layersOpen = useEditorStore(state => state.layersPanelOpen)
   const setSlidesOpen = useEditorStore(state => state.setSlidesPanelOpen)
   const setLayersOpen = useEditorStore(state => state.setLayersPanelOpen)
+
+  useEditorShortcuts()
 
   if (!currentSlide) {
     return null

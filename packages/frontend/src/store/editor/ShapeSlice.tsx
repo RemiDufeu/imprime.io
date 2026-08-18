@@ -18,6 +18,7 @@ import {
 
 export interface ShapeSlice {
     selectedShape: Shape | null
+    clipboardShape: Shape | null
     selectShape: (id: string | null) => void
     updateShape: (id: string, updates: Partial<Shape>) => void
     deleteShape: (id: string) => void
@@ -27,6 +28,8 @@ export interface ShapeSlice {
     // Move a shape to a new parent + index in the tree. `targetGroupId === null`
     // means the slide root. Rejects moves that would put a group inside itself.
     moveShape: (id: string, targetGroupId: string | null, index: number) => void
+    copyShape: (id: string) => void
+    pasteShape: () => void
 }
 
 export const createShapeSlice : StateCreator<
@@ -36,6 +39,7 @@ export const createShapeSlice : StateCreator<
     ShapeSlice
 > = (set, get) => ({
     selectedShape: null,
+    clipboardShape: null,
     selectShape: (id) => {
         // Retrieve with Id (walk the tree — shapes can be nested in groups)
         let selectedShape: Shape | null = null
@@ -154,5 +158,27 @@ export const createShapeSlice : StateCreator<
         const nextShapes = insertShapeAt(remaining, targetGroupId, adjustedIndex, repositioned)
         updateSlideShapes(currentSlide._id, nextShapes)
         selectShape(id)
+    },
+    copyShape: (id: string) => {
+        const { presentation, currentSlideIndex } = get()
+        if (!presentation) return
+        const currentSlide = presentation.slides[currentSlideIndex]
+        if (!currentSlide) return
+        const loc = findShapeById(currentSlide.shapes, id)
+        if (!loc) return
+        set({ clipboardShape: loc.shape })
+    },
+    pasteShape: () => {
+        const { presentation, currentSlideIndex, updateSlideShapes, selectShape, clipboardShape } = get()
+        if (!presentation || !clipboardShape) return
+        const currentSlide = presentation.slides[currentSlideIndex]
+        if (!currentSlide) return
+        const copy = cloneShapeWithNewIds(clipboardShape)
+        const OFFSET = 20
+        const pastedName = clipboardShape.name ? `${clipboardShape.name} copie` : undefined
+        const relocated = { ...copy, x: copy.x + OFFSET, y: copy.y + OFFSET, name: pastedName } as Shape
+        const nextShapes = insertShapeAt(currentSlide.shapes, null, currentSlide.shapes.length, relocated)
+        updateSlideShapes(currentSlide._id, nextShapes)
+        selectShape(relocated.id)
     },
 })
