@@ -8,7 +8,7 @@
         transform 0.2s ease,
         opacity 0.2s ease;
     background: var(--ant-color-bg-container);
-    box-shadow: var(--ant-box-shadow);
+    box-shadow: var(--ant-box-shadow-secondary);
     border-radius: var(--ant-border-radius);
     border: var(--ant-line-width) var(--ant-line-type) var(--ant-color-border);
     box-sizing: border-box;

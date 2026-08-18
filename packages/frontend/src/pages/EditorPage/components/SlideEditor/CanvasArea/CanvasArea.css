@@ -11,5 +11,5 @@
 
 .canva-container > div {
     box-sizing: border-box;
-    padding: var(--space-xl);
+    padding: 120px 350px 20px;
 }

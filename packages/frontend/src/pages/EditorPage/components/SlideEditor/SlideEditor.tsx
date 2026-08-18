@@ -2,6 +2,8 @@ import LayeringToolbar from '../LayeringToolbar/LayeringToolbar'
 import { CanvasArea } from './CanvasArea/CanvasArea'
 import { TopBar } from './TopBar/TopBar'
 import { FloatingPanels } from './FloatingPanels/FloatingPanels'
+import EditorHeader from '../../../Layout/EditorHeader'
+import UserMenu from '../../../Layout/UserMenu'
 import { useCurrentSlide, useEditorStore } from '../../../../store/editor/EditorStore'
 import './Toolbars.css'
 import './SlideEditor.css'
@@ -22,6 +24,10 @@ export default function SlideEditor() {
       <CanvasArea slide={currentSlide} />
 
       <div className='actions-layer'>
+        <div className='editor-header-row'>
+          <EditorHeader />
+          <UserMenu />
+        </div>
         <TopBar
           slidesOpen={slidesOpen}
           onToggleSlides={() => setSlidesOpen(v => !v)}

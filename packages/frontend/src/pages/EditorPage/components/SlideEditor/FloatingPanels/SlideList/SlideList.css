@@ -2,7 +2,6 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  margin: 0 var(--space-s);
   box-sizing: border-box;
   flex-shrink: 0;
   box-sizing: content-box;
