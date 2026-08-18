@@ -7,13 +7,8 @@ interface SVGGroupProps {
     readonly?: boolean
 }
 
-// Renders a group as a dashed box + optional label. Children are drawn in the
-// group's local coordinate space via a translate — that way each child renders
-// at its own relative (x, y) and can carry its own SVGSelectionWrapper for
-// individual selection/drag without any coordinate gymnastics.
+// Renders a group as a dashed box. Children are drawn in the
 export function SVGGroup({ shape, readonly = false }: SVGGroupProps) {
-    const label = shape.name ?? 'group'
-
     return (
         <g transform={`translate(${shape.x} ${shape.y})`}>
             <rect
@@ -29,16 +24,6 @@ export function SVGGroup({ shape, readonly = false }: SVGGroupProps) {
                 ry={4}
                 pointerEvents="all"
             />
-            <text
-                x={8}
-                y={20}
-                fontSize={14}
-                fontFamily="monospace"
-                fill="#64748b"
-                pointerEvents="none"
-            >
-                {label}
-            </text>
             {shape.children.map(child => (
                 <SVGSelectionWrapper key={child.id} shape={child} readonly={readonly}>
                     <SVGShape shape={child} readonly={readonly} />
