@@ -67,9 +67,19 @@ export interface ImageShape extends BaseShape {
   alt?: string
 }
 
+export type GroupLayoutDirection = 'none' | 'horizontal' | 'vertical'
+export type GroupJustify = 'start' | 'center' | 'end' | 'space-between' | 'space-around'
+export type GroupAlign = 'start' | 'center' | 'end' | 'stretch'
+
 export interface GroupShape extends BaseShape {
   type: 'group'
   children: Shape[]
+  // Flexbox-like auto-layout for children. Defaults to 'none' (free-form
+  // positioning, children keep their own x/y) when unset — existing groups
+  layout?: GroupLayoutDirection
+  justify?: GroupJustify
+  align?: GroupAlign
+  gap?: number
 }
 
 export type Shape =

@@ -12,7 +12,7 @@ import type {
   VariableElement,
   VariableValueType
 } from '@imprime/common'
-import { SLIDE_WIDTH, SLIDE_HEIGHT, getDashArray, resolveShapes } from '@imprime/common'
+import { SLIDE_WIDTH, SLIDE_HEIGHT, getDashArray, resolveShapes, getEllipseGeometry, getRectangleCornerRadius } from '@imprime/common'
 import type { ImageService } from './ImageService.js'
 import { AppError, ValidationError } from './errors.js'
 import { normalizeFontFamily, getFontStyleProps, initializeFonts } from '../config/fonts.js'
@@ -93,7 +93,8 @@ export class ExportService {
   }
 
   private renderRectangle(shape: RectangleShape): React.ReactElement {
-    const { x, y, width, height, fill, cornerRadius, stroke, strokeWidth, strokeStyle } = shape
+    const { x, y, width, height, fill, stroke, strokeWidth, strokeStyle } = shape
+    const cornerRadius = getRectangleCornerRadius(shape)
     const sw = strokeWidth || 0
 
     const svgLeft = Math.max(0, x - sw / 2)
@@ -124,8 +125,8 @@ export class ExportService {
         height,
         fill: this.parseColor(fill, 'none').color,
         fillOpacity: this.parseColor(fill, 'none').opacity,
-        rx: cornerRadius || 0,
-        ry: cornerRadius || 0,
+        rx: cornerRadius,
+        ry: cornerRadius,
         stroke: this.parseColor(stroke, 'none').color,
         strokeOpacity: this.parseColor(stroke, 'none').opacity,
         strokeWidth: sw,
@@ -136,6 +137,7 @@ export class ExportService {
 
   private renderEllipse(shape: EllipseShape): React.ReactElement {
     const { x, y, width, height, fill, stroke, strokeWidth, strokeStyle } = shape
+    const geometry = getEllipseGeometry(shape)
     const sw = strokeWidth || 0
 
     const svgLeft = Math.max(0, x - sw / 2)
@@ -160,10 +162,10 @@ export class ExportService {
       }
     },
       React.createElement(Ellipse, {
-        cx: x + width / 2 - svgLeft,
-        cy: y + height / 2 - svgTop,
-        rx: width / 2,
-        ry: height / 2,
+        cx: geometry.cx - svgLeft,
+        cy: geometry.cy - svgTop,
+        rx: geometry.rx,
+        ry: geometry.ry,
         fill: this.parseColor(fill, 'none').color,
         fillOpacity: this.parseColor(fill, 'none').opacity,
         stroke: this.parseColor(stroke, 'none').color,
@@ -251,7 +253,6 @@ export class ExportService {
         left: x,
         top: y,
         width,
-        padding: 8,
       }
     }, paragraphElements)
   }

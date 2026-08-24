@@ -1,11 +1,13 @@
 import type { RectangleShape } from '@imprime/sdk'
-import { getDashArray } from '@imprime/sdk'
+import { getDashArray, getRectangleCornerRadius } from '@imprime/sdk'
 
 interface SVGRectangleProps {
     shape: RectangleShape
 }
 
 export function SVGRectangle({ shape }: SVGRectangleProps) {
+    const cornerRadius = getRectangleCornerRadius(shape)
+
     return (
         <rect
             x={shape.x}
@@ -16,8 +18,8 @@ export function SVGRectangle({ shape }: SVGRectangleProps) {
             stroke={shape.stroke}
             strokeWidth={shape.strokeWidth}
             strokeDasharray={getDashArray(shape.strokeStyle)}
-            rx={shape.cornerRadius}
-            ry={shape.cornerRadius}
+            rx={cornerRadius}
+            ry={cornerRadius}
         />
     )
 }
