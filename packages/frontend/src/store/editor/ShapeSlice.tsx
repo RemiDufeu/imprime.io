@@ -14,6 +14,7 @@ import {
     insertShapeAt,
     cloneShapeWithNewIds,
     isDescendantOf,
+    getSiblingList,
 } from '../../utils/shapeTree'
 
 export interface ShapeSlice {
@@ -30,6 +31,10 @@ export interface ShapeSlice {
     moveShape: (id: string, targetGroupId: string | null, index: number) => void
     copyShape: (id: string) => void
     pasteShape: () => void
+    // Pull a shape out of its parent group into the group's own parent (or
+    // the slide root), keeping its absolute position. No-op if the shape
+    // isn't inside a group.
+    ungroupShape: (id: string) => void
 }
 
 export const createShapeSlice : StateCreator<
@@ -180,5 +185,31 @@ export const createShapeSlice : StateCreator<
         const nextShapes = insertShapeAt(currentSlide.shapes, null, currentSlide.shapes.length, relocated)
         updateSlideShapes(currentSlide._id, nextShapes)
         selectShape(relocated.id)
+    },
+    ungroupShape: (id: string) => {
+        const { presentation, currentSlideIndex, updateSlideShapes, selectShape } = get()
+        if (!presentation) return
+        const currentSlide = presentation.slides[currentSlideIndex]
+        if (!currentSlide) return
+        const loc = findShapeById(currentSlide.shapes, id)
+        if (!loc || loc.parentGroupId === null) return
+
+        const parentLoc = findShapeById(currentSlide.shapes, loc.parentGroupId)
+        if (!parentLoc || parentLoc.shape.type !== 'group') return
+        const group = parentLoc.shape
+
+        const relocated = { ...loc.shape, x: loc.shape.x + group.x, y: loc.shape.y + group.y } as Shape
+
+        const { remaining } = extractShapeById(currentSlide.shapes, id)
+
+        // Insert right after the (former) group in its own container, so the
+        // shape stays visually close to where it came from.
+        const grandSiblings = getSiblingList(remaining, parentLoc.parentGroupId)
+        const groupIndex = grandSiblings.findIndex(s => s.id === loc.parentGroupId)
+        const insertIndex = groupIndex === -1 ? grandSiblings.length : groupIndex + 1
+
+        const nextShapes = insertShapeAt(remaining, parentLoc.parentGroupId, insertIndex, relocated)
+        updateSlideShapes(currentSlide._id, nextShapes)
+        selectShape(id)
     },
 })
