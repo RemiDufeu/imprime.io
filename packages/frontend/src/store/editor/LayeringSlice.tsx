@@ -3,6 +3,7 @@ import type { ShapeSlice } from "./ShapeSlice"
 import type { SlideSlice } from "./SlideSlice"
 import type { PresentationSlice } from "./PresentationSlice"
 import type { Shape } from "@imprime/sdk"
+import { findShapeById, getSiblingList, replaceSiblingList } from "../../utils/shapeTree"
 
 type ReorderShapeFunction = (shapes: Shape[], shapeIndex: number) => Shape[]
 
@@ -29,10 +30,15 @@ export const createLayeringSlice: StateCreator<
         const currentSlide = presentation?.slides[currentSlideIndex]
         if (!currentSlide) return
 
-        const shapeIndex = currentSlide.shapes.findIndex(s => s.id === shapeId)
-        if (shapeIndex === -1 || !canReorder(shapeIndex, currentSlide.shapes.length)) return
+        const loc = findShapeById(currentSlide.shapes, shapeId)
+        if (!loc) return
 
-        const newShapes = reorder([...currentSlide.shapes], shapeIndex)
+        const siblings = getSiblingList(currentSlide.shapes, loc.parentGroupId)
+        const shapeIndex = siblings.findIndex(s => s.id === shapeId)
+        if (shapeIndex === -1 || !canReorder(shapeIndex, siblings.length)) return
+
+        const newSiblings = reorder([...siblings], shapeIndex)
+        const newShapes = replaceSiblingList(currentSlide.shapes, loc.parentGroupId, newSiblings)
         updateSlideShapes(currentSlide._id, newShapes)
     }
 

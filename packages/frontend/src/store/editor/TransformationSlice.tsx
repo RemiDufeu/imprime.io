@@ -40,6 +40,7 @@ interface DragState {
     originalParentGroupId: string | null
     // Group under the cursor right now (or null = will drop to root canvas).
     dropTarget: DropTarget | null
+    currentGroupId: string | null
 }
 
 export interface TransformationSlice {
@@ -90,6 +91,7 @@ export const createTransformationSlice: StateCreator<
                 originalAbsY: loc?.absY ?? selectedShape.y,
                 originalParentGroupId: loc?.parentGroupId ?? null,
                 dropTarget: null,
+                currentGroupId: loc?.parentGroupId ?? null,
             },
         })
     },
@@ -112,6 +114,7 @@ export const createTransformationSlice: StateCreator<
                 originalAbsY: selectedShape.y,
                 originalParentGroupId: null,
                 dropTarget: null,
+                currentGroupId: null,
             },
         })
     },
@@ -179,6 +182,7 @@ export const createTransformationSlice: StateCreator<
         if (!slide) return
 
         const hit = findInnermostGroupAt(slide.shapes, currentSVG.x, currentSVG.y, selectedShape.id)
+        const nextGroupId = hit?.id ?? null
         const nextTarget: DropTarget | null =
             hit && hit.id !== dragData.originalParentGroupId
                 ? { groupId: hit.id, x: hit.absX, y: hit.absY, width: hit.width, height: hit.height }
@@ -186,11 +190,11 @@ export const createTransformationSlice: StateCreator<
 
         // Only write to the store if it actually changed (avoids extra renders).
         const prev = dragData.dropTarget
-        const same =
+        const sameTarget =
             (prev === null && nextTarget === null)
             || (prev !== null && nextTarget !== null && prev.groupId === nextTarget.groupId)
-        if (!same) {
-            set({ dragData: { ...dragData, dropTarget: nextTarget } })
+        if (!sameTarget || dragData.currentGroupId !== nextGroupId) {
+            set({ dragData: { ...dragData, dropTarget: nextTarget, currentGroupId: nextGroupId } })
         }
     },
 
@@ -215,11 +219,7 @@ export const createTransformationSlice: StateCreator<
                 const newAbsX = dragData.originalAbsX + deltaX
                 const newAbsY = dragData.originalAbsY + deltaY
 
-                // Destination parent = whichever group the drop-target highlight
-                // last resolved to (may be null for root). This matches what the
-                // user visually saw, which is what onMouseMove computed from the
-                // live cursor position.
-                const targetGroupId = dragData.dropTarget?.groupId ?? null
+                const targetGroupId = dragData.currentGroupId
 
                 // Only reparent when the destination actually differs from the
                 // source parent — otherwise it's a plain move within the same

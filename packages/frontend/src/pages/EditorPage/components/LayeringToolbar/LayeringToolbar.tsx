@@ -9,6 +9,7 @@ import {
 } from '@ant-design/icons'
 import './LayeringToolbar.css'
 import { useCurrentSlide, useEditorStore } from '../../../../store/editor/EditorStore'
+import { findShapeById, getSiblingList } from '../../../../utils/shapeTree'
 
 const TOOLBAR_OFFSET = 12
 
@@ -65,11 +66,12 @@ export default function LayeringToolbar() {
 
   if (!position) return null
 
-  const selectedShape = currentSlide?.shapes.find(s => s.id === selectedShapeId)
-  if (!selectedShape) return null
+  const loc = currentSlide ? findShapeById(currentSlide.shapes, selectedShapeId!) : null
+  if (!loc) return null
 
-  const shapeIndex = currentSlide!.shapes.findIndex(s => s.id === selectedShapeId)
-  const isAtFront = shapeIndex === currentSlide!.shapes.length - 1
+  const siblings = getSiblingList(currentSlide!.shapes, loc.parentGroupId)
+  const shapeIndex = siblings.findIndex(s => s.id === selectedShapeId)
+  const isAtFront = shapeIndex === siblings.length - 1
   const isAtBack = shapeIndex === 0
   const { left, top } = position
 

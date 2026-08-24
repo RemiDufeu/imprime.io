@@ -104,6 +104,26 @@ export function insertShapeAt(shapes: Shape[], groupId: string | null, index: nu
   })
 }
 
+// The sibling list a shape lives in: root `shapes`, or the children array of
+// its parent group. Used to scope z-order reordering to the shape's own
+// container instead of always operating on the slide root.
+export function getSiblingList(shapes: Shape[], groupId: string | null): Shape[] {
+  if (groupId === null) return shapes
+  const loc = findShapeById(shapes, groupId)
+  return loc && loc.shape.type === 'group' ? loc.shape.children : []
+}
+
+// Replace the sibling list at `groupId` (root, or a group's children) with
+// `newList`. Symmetric to getSiblingList.
+export function replaceSiblingList(shapes: Shape[], groupId: string | null, newList: Shape[]): Shape[] {
+  if (groupId === null) return newList
+  return shapes.map(s => {
+    if (s.type !== 'group') return s
+    if (s.id === groupId) return { ...s, children: newList }
+    return { ...s, children: replaceSiblingList(s.children, groupId, newList) }
+  })
+}
+
 // Deep-clone a shape and rewrite every id in the subtree to a fresh UUID.
 // Needed by "duplicate" so the copy is independent of the source.
 export function cloneShapeWithNewIds(shape: Shape): Shape {
