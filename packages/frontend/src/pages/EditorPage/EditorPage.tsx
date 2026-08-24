@@ -1,11 +1,11 @@
 import { useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Alert, Button } from 'antd'
-import SlideEditor from './Components/SlideEditor/SlideEditor'
 import FullScreen from '../../components/Layout/FullScreen/FullScreen'
 import SpinnerFullScreen from '../../components/Feedback/SpinnerFullScreen'
 import './EditorPage.css'
 import { useEditorStore } from '../../store/editor/EditorStore'
+import SlideEditor from './components/SlideEditor/SlideEditor'
 
 export default function EditorPage() {
   const { id } = useParams<{ id: string }>()
