@@ -29,6 +29,9 @@ export interface ShapeSlice {
     // Move a shape to a new parent + index in the tree. `targetGroupId === null`
     // means the slide root. Rejects moves that would put a group inside itself.
     moveShape: (id: string, targetGroupId: string | null, index: number) => void
+    // Move a shape into a group, appended at the end of its children — i.e. the
+    // top of the group's visual stack (highest z-order among its children).
+    moveShapeIntoGroup: (id: string, targetGroupId: string) => void
     copyShape: (id: string) => void
     pasteShape: () => void
     // Pull a shape out of its parent group into the group's own parent (or
@@ -163,6 +166,16 @@ export const createShapeSlice : StateCreator<
         const nextShapes = insertShapeAt(remaining, targetGroupId, adjustedIndex, repositioned)
         updateSlideShapes(currentSlide._id, nextShapes)
         selectShape(id)
+    },
+    moveShapeIntoGroup: (id: string, targetGroupId: string) => {
+        const { presentation, currentSlideIndex, moveShape } = get()
+        if (!presentation) return
+        const currentSlide = presentation.slides[currentSlideIndex]
+        if (!currentSlide) return
+
+        const target = findShapeById(currentSlide.shapes, targetGroupId)?.shape
+        if (target?.type !== 'group') return
+        moveShape(id, targetGroupId, target.children.length)
     },
     copyShape: (id: string) => {
         const { presentation, currentSlideIndex } = get()

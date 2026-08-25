@@ -1,5 +1,5 @@
 import { FloatingPanel } from './Panel/FloatingPanel'
-import ShapeTreePanel from './ShapeTreePanel'
+import ShapeTreePanel from './ShapeTreePanel/ShapeTreePanel'
 import SlideList from './SlideList'
 import ZoomBar from './ZoomBar'
 import './FloatingPanels.css'
