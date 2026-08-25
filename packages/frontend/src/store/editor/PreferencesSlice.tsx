@@ -21,8 +21,8 @@ export const createPreferencesSlice: StateCreator<
   PreferencesSlice
 > = (set, get) => ({
     zoom: DEFAULT_ZOOM,
-    slidesPanelOpen: false,
-    layersPanelOpen: false,
+    slidesPanelOpen: true,
+    layersPanelOpen: true,
     setZoom: (newZoom) => {
         const prevZoom = get().zoom
         const nextZoom = typeof newZoom === 'function' ? newZoom(prevZoom) : newZoom

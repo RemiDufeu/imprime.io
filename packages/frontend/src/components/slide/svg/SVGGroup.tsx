@@ -1,4 +1,5 @@
 import type { GroupShape } from '@imprime/sdk'
+import { theme } from 'antd'
 import { SVGShape } from './SVGShape'
 import { SVGSelectionWrapper } from './SVGSelectionWrapper'
 
@@ -9,6 +10,8 @@ interface SVGGroupProps {
 
 // Renders a group as a dashed box. Children are drawn in the
 export function SVGGroup({ shape, readonly = false }: SVGGroupProps) {
+    const { token } = theme.useToken()
+
     return (
         <g transform={`translate(${shape.x} ${shape.y})`}>
             <rect
@@ -16,8 +19,8 @@ export function SVGGroup({ shape, readonly = false }: SVGGroupProps) {
                 y={0}
                 width={shape.width}
                 height={shape.height}
-                fill="rgba(148, 163, 184, 0.04)"
-                stroke="#94a3b8"
+                fill={token.colorFillTertiary}
+                stroke={token.colorBorder}
                 strokeWidth={2}
                 strokeDasharray="8 6"
                 rx={4}
