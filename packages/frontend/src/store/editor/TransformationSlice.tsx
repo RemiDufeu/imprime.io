@@ -3,6 +3,7 @@ import type { ShapeSlice } from '../../store/editor/ShapeSlice'
 import type { SlideSlice } from './SlideSlice'
 import type { PresentationSlice } from './PresentationSlice'
 import { findShapeById, findInnermostGroupAt, extractShapeById, insertShape } from '../../utils/shapeTree'
+import { selectCurrentSlide } from './selectors'
 
 export type ResizeHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w'
 
@@ -71,10 +72,10 @@ export const createTransformationSlice: StateCreator<
     transformationData: null,
     dragData: null,
     startDrag: (svgElement, clientX, clientY) => {
-        const { selectedShape, presentation, currentSlideIndex } = get()
+        const { selectedShape } = get()
         if (!selectedShape) return
 
-        const slide = presentation?.slides[currentSlideIndex]
+        const slide = selectCurrentSlide(get())
         const loc = slide ? findShapeById(slide.shapes, selectedShape.id) : null
 
         set({
@@ -120,7 +121,7 @@ export const createTransformationSlice: StateCreator<
     },
 
     onMouseMove: (clientX, clientY) => {
-        const { dragData, selectedShape, presentation, currentSlideIndex } = get()
+        const { dragData, selectedShape } = get()
         if (!dragData || !selectedShape) return
 
         const startSVG = clientToSVG(dragData.svgElement, dragData.startClientX, dragData.startClientY)
@@ -178,7 +179,7 @@ export const createTransformationSlice: StateCreator<
         // Live drop-target highlight (Canva-style): show the group under the
         // cursor as a highlighted drop zone, unless it's already the shape's
         // current parent.
-        const slide = presentation?.slides[currentSlideIndex]
+        const slide = selectCurrentSlide(get())
         if (!slide) return
 
         const hit = findInnermostGroupAt(slide.shapes, currentSVG.x, currentSVG.y, selectedShape.id)
@@ -199,7 +200,7 @@ export const createTransformationSlice: StateCreator<
     },
 
     onMouseUp: () => {
-        const { dragData, transformationData, selectedShape, presentation, currentSlideIndex, updateSlideShapes, selectShape, updateShape } = get()
+        const { dragData, transformationData, selectedShape, presentation, updateSlideShapes, selectShape, updateShape } = get()
 
         if (!dragData) return
 
@@ -211,7 +212,7 @@ export const createTransformationSlice: StateCreator<
             && transformationData
             && presentation
         ) {
-            const slide = presentation.slides[currentSlideIndex]
+            const slide = selectCurrentSlide(get())
             if (slide) {
                 // Absolute position of the shape at mouseUp.
                 const deltaX = transformationData.x - dragData.originalX

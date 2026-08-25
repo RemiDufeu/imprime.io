@@ -16,6 +16,7 @@ import {
     isDescendantOf,
     getSiblingList,
 } from '../../utils/shapeTree'
+import { selectCurrentSlide } from './selectors'
 
 export interface ShapeSlice {
     selectedShape: Shape | null
@@ -52,8 +53,7 @@ export const createShapeSlice : StateCreator<
         // Retrieve with Id (walk the tree — shapes can be nested in groups)
         let selectedShape: Shape | null = null
          try {
-            const state = get()
-            const currentSlide = state.presentation?.slides[state.currentSlideIndex]
+            const currentSlide = selectCurrentSlide(get())
             if (!currentSlide) return
             if (id !== null) {
                 selectedShape = findShapeById(currentSlide.shapes, id)?.shape ?? null
@@ -89,25 +89,25 @@ export const createShapeSlice : StateCreator<
         set({ selectedShape, contextBarType, attributes: updatedAttributes, editor : null })
     },
     updateShape: (id: string, updates: Partial<Shape>) => {
-        const { presentation, currentSlideIndex, updateSlideShapes } = get()
+        const { presentation, updateSlideShapes } = get()
         if (!presentation) return
-        const currentSlide = presentation.slides[currentSlideIndex]
+        const currentSlide = selectCurrentSlide(get())
         if (!currentSlide) return
         const updatedShapes = updateShapeById(currentSlide.shapes, id, updates)
         updateSlideShapes(currentSlide._id, updatedShapes)
     },
     deleteShape: (id: string) => {
-        const { presentation, currentSlideIndex, updateSlideShapes } = get()
+        const { presentation, updateSlideShapes } = get()
         if (!presentation) return
-        const currentSlide = presentation.slides[currentSlideIndex]
+        const currentSlide = selectCurrentSlide(get())
         if (!currentSlide) return
         const updatedShapes = deleteShapeById(currentSlide.shapes, id)
         updateSlideShapes(currentSlide._id, updatedShapes)
     },
     duplicateShape: (id: string) => {
-        const { presentation, currentSlideIndex, updateSlideShapes, selectShape } = get()
+        const { presentation, updateSlideShapes, selectShape } = get()
         if (!presentation) return
-        const currentSlide = presentation.slides[currentSlideIndex]
+        const currentSlide = selectCurrentSlide(get())
         if (!currentSlide) return
         const loc = findShapeById(currentSlide.shapes, id)
         if (!loc) return
@@ -132,9 +132,9 @@ export const createShapeSlice : StateCreator<
         selectShape(relocated.id)
     },
     moveShape: (id: string, targetGroupId: string | null, index: number) => {
-        const { presentation, currentSlideIndex, updateSlideShapes, selectShape } = get()
+        const { presentation, updateSlideShapes, selectShape } = get()
         if (!presentation) return
-        const currentSlide = presentation.slides[currentSlideIndex]
+        const currentSlide = selectCurrentSlide(get())
         if (!currentSlide) return
         // Reject moves into own subtree (would make a group its own descendant).
         if (targetGroupId !== null && isDescendantOf(currentSlide.shapes, targetGroupId, id)) return
@@ -168,9 +168,9 @@ export const createShapeSlice : StateCreator<
         selectShape(id)
     },
     moveShapeIntoGroup: (id: string, targetGroupId: string) => {
-        const { presentation, currentSlideIndex, moveShape } = get()
+        const { presentation, moveShape } = get()
         if (!presentation) return
-        const currentSlide = presentation.slides[currentSlideIndex]
+        const currentSlide = selectCurrentSlide(get())
         if (!currentSlide) return
 
         const target = findShapeById(currentSlide.shapes, targetGroupId)?.shape
@@ -178,18 +178,18 @@ export const createShapeSlice : StateCreator<
         moveShape(id, targetGroupId, target.children.length)
     },
     copyShape: (id: string) => {
-        const { presentation, currentSlideIndex } = get()
+        const { presentation } = get()
         if (!presentation) return
-        const currentSlide = presentation.slides[currentSlideIndex]
+        const currentSlide = selectCurrentSlide(get())
         if (!currentSlide) return
         const loc = findShapeById(currentSlide.shapes, id)
         if (!loc) return
         set({ clipboardShape: loc.shape })
     },
     pasteShape: () => {
-        const { presentation, currentSlideIndex, updateSlideShapes, selectShape, clipboardShape } = get()
+        const { presentation, updateSlideShapes, selectShape, clipboardShape } = get()
         if (!presentation || !clipboardShape) return
-        const currentSlide = presentation.slides[currentSlideIndex]
+        const currentSlide = selectCurrentSlide(get())
         if (!currentSlide) return
         const copy = cloneShapeWithNewIds(clipboardShape)
         const OFFSET = 20
@@ -200,9 +200,9 @@ export const createShapeSlice : StateCreator<
         selectShape(relocated.id)
     },
     ungroupShape: (id: string) => {
-        const { presentation, currentSlideIndex, updateSlideShapes, selectShape } = get()
+        const { presentation, updateSlideShapes, selectShape } = get()
         if (!presentation) return
-        const currentSlide = presentation.slides[currentSlideIndex]
+        const currentSlide = selectCurrentSlide(get())
         if (!currentSlide) return
         const loc = findShapeById(currentSlide.shapes, id)
         if (!loc || loc.parentGroupId === null) return

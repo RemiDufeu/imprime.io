@@ -11,6 +11,7 @@ import { createLayeringSlice, type LayeringSlice } from "./LayeringSlice"
 import { createShapeCreationSlice, type ShapeCreationSlice } from "./ShapeCreationSlice"
 import { createRichTextEditorSlice, type RichTextEditorSlice } from "./RichTextEditorSlice"
 import { createVariableSlice, type VariableSlice } from "./VariableSlice"
+import { selectCurrentSlide } from "./selectors"
 
 type BaseEditorStore = PresentationSlice &
     PreferencesSlice &
@@ -52,5 +53,4 @@ export const useEditorStore = create<BaseEditorStore>()(
     ),
 )
 
-export const useCurrentSlide = () =>
-    useEditorStore((s) => s.presentation?.slides[s.currentSlideIndex] ?? null);
+export const useCurrentSlide = () => useEditorStore(selectCurrentSlide);

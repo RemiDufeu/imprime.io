@@ -8,6 +8,7 @@ import type { ToolSlice } from './ToolSlice'
 import type { ToolAttributesSlice } from './ToolAttributeSlice'
 import { imagesAPI } from '../../api/api'
 import { findInnermostGroupAt, insertShape, nextShapeName } from '../../utils/shapeTree'
+import { selectCurrentSlide } from './selectors'
 
 export interface DrawingData {
     startX: number
@@ -36,10 +37,7 @@ export const createShapeCreationSlice: StateCreator<
 > = (set, get) => {
     let rafId: number | null = null
 
-    const getCurrentSlide = () => {
-        const { presentation, currentSlideIndex } = get()
-        return presentation?.slides[currentSlideIndex] ?? null
-    }
+    const getCurrentSlide = () => selectCurrentSlide(get())
 
     return {
         isDrawing: false,
