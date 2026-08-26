@@ -1,30 +1,26 @@
 import type { StateCreator } from 'zustand'
+import type { Shape } from '@imprime/sdk'
 import type { ShapeSlice } from '../../store/editor/ShapeSlice'
 import type { SlideSlice } from './SlideSlice'
 import type { PresentationSlice } from './PresentationSlice'
 import { findShapeById, findInnermostGroupAt, extractShapeById, insertShape } from '../../utils/shapeTree'
+import { resizeRect, type Rect, type ResizeHandle } from '../../utils/transform'
 import { selectCurrentSlide } from './selectors'
 
-export type ResizeHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w'
+export type { ResizeHandle }
 
-export interface TransformationData {
-    x: number
-    y: number
-    width: number
-    height: number
-}
+export type TransformationData = Rect
 
-// Live highlight of the group that would receive the shape if the user
-// dropped right now. Absolute bbox in slide coords, for the overlay to render.
-export interface DropTarget {
+// Absolute bbox (slide coords) of the group that would receive the shape if the
+// user dropped right now. Purely for the overlay to render — the re-parent
+// decision itself reads `hoveredGroupId`.
+export interface GroupHighlight extends Rect {
     groupId: string
-    x: number
-    y: number
-    width: number
-    height: number
 }
 
-interface DragState {
+// Fields common to both drag modes: where the pointer started and the shape's
+// rect at that moment, all in the shape's own (parent-relative) coord space.
+interface DragBase {
     svgElement: SVGSVGElement
     startClientX: number
     startClientY: number
@@ -32,17 +28,29 @@ interface DragState {
     originalY: number
     originalWidth: number
     originalHeight: number
-    handle: ResizeHandle | null
-    // Set only for translation drags (not resizes). Absolute position of the
-    // shape and its parent group at drag start — needed to convert the final
-    // absolute drop point into the destination parent's local coord space.
-    originalAbsX: number
-    originalAbsY: number
-    originalParentGroupId: string | null
-    // Group under the cursor right now (or null = will drop to root canvas).
-    dropTarget: DropTarget | null
-    currentGroupId: string | null
 }
+
+// A drag is either a resize or a translation, never both. Splitting them keeps
+// the re-parenting fields off the resize path, where they have no meaning.
+export type DragState =
+    | (DragBase & {
+        kind: 'resize'
+        handle: ResizeHandle
+    })
+    | (DragBase & {
+        kind: 'translate'
+        // Absolute position of the shape and its parent at drag start — needed
+        // to convert the final drop point into the destination's local space.
+        originalAbsX: number
+        originalAbsY: number
+        originalParentGroupId: string | null
+        // Group under the cursor right now (null = will drop to the root canvas).
+        // This is what decides the re-parent on mouseUp.
+        hoveredGroupId: string | null
+        // Same group, but suppressed while it's already the shape's parent —
+        // only ever read by the drop-highlight overlay.
+        highlightedGroup: GroupHighlight | null
+    })
 
 export interface TransformationSlice {
     transformationData: TransformationData | null
@@ -61,209 +69,156 @@ const clientToSVG = (svgElement: SVGSVGElement, clientX: number, clientY: number
     return pt.matrixTransform(svgElement.getScreenCTM()?.inverse())
 }
 
-const MIN_SIZE = 20
+const baseDragState = (
+    shape: Shape,
+    svgElement: SVGSVGElement,
+    clientX: number,
+    clientY: number,
+): DragBase => ({
+    svgElement,
+    startClientX: clientX,
+    startClientY: clientY,
+    originalX: shape.x,
+    originalY: shape.y,
+    originalWidth: shape.width,
+    originalHeight: shape.height,
+})
 
 export const createTransformationSlice: StateCreator<
     ShapeSlice & TransformationSlice & SlideSlice & PresentationSlice,
     [],
     [],
     TransformationSlice
-> = (set, get) => ({
-    transformationData: null,
-    dragData: null,
-    startDrag: (svgElement, clientX, clientY) => {
-        const { selectedShape } = get()
-        if (!selectedShape) return
+> = (set, get) => {
+    const commitRect = (rect: Rect, shapeId: string) => {
+        const { updateShape, selectShape } = get()
+        updateShape(shapeId, rect)
+        selectShape(shapeId)
+    }
 
-        const slide = selectCurrentSlide(get())
-        const loc = slide ? findShapeById(slide.shapes, selectedShape.id) : null
-
-        set({
-            dragData: {
-                svgElement,
-                startClientX: clientX,
-                startClientY: clientY,
-                originalX: selectedShape.x,
-                originalY: selectedShape.y,
-                originalWidth: selectedShape.width,
-                originalHeight: selectedShape.height,
-                handle: null,
-                originalAbsX: loc?.absX ?? selectedShape.x,
-                originalAbsY: loc?.absY ?? selectedShape.y,
-                originalParentGroupId: loc?.parentGroupId ?? null,
-                dropTarget: null,
-                currentGroupId: loc?.parentGroupId ?? null,
-            },
-        })
-    },
-
-    startResize: (svgElement, handle, clientX, clientY) => {
-        const { selectedShape } = get()
-        if (!selectedShape) return
-
-        set({
-            dragData: {
-                svgElement,
-                startClientX: clientX,
-                startClientY: clientY,
-                originalX: selectedShape.x,
-                originalY: selectedShape.y,
-                originalWidth: selectedShape.width,
-                originalHeight: selectedShape.height,
-                handle,
-                originalAbsX: selectedShape.x,
-                originalAbsY: selectedShape.y,
-                originalParentGroupId: null,
-                dropTarget: null,
-                currentGroupId: null,
-            },
-        })
-    },
-
-    onMouseMove: (clientX, clientY) => {
-        const { dragData, selectedShape } = get()
-        if (!dragData || !selectedShape) return
-
-        const startSVG = clientToSVG(dragData.svgElement, dragData.startClientX, dragData.startClientY)
-        const currentSVG = clientToSVG(dragData.svgElement, clientX, clientY)
-        const deltaX = currentSVG.x - startSVG.x
-        const deltaY = currentSVG.y - startSVG.y
-
-        if (dragData.handle !== null) {
-            // Resize path — unchanged.
-            const handle = dragData.handle
-            let newX = dragData.originalX
-            let newY = dragData.originalY
-            let newWidth = dragData.originalWidth
-            let newHeight = dragData.originalHeight
-            if (handle.includes('n')) {
-                newY = dragData.originalY + deltaY
-                newHeight = dragData.originalHeight - deltaY
-                if (newHeight < MIN_SIZE) {
-                    newHeight = MIN_SIZE
-                    newY = dragData.originalY + dragData.originalHeight - MIN_SIZE
-                }
-            }
-            if (handle.includes('s')) {
-                newHeight = dragData.originalHeight + deltaY
-                if (newHeight < MIN_SIZE) newHeight = MIN_SIZE
-            }
-            if (handle.includes('w')) {
-                newX = dragData.originalX + deltaX
-                newWidth = dragData.originalWidth - deltaX
-                if (newWidth < MIN_SIZE) {
-                    newWidth = MIN_SIZE
-                    newX = dragData.originalX + dragData.originalWidth - MIN_SIZE
-                }
-            }
-            if (handle.includes('e')) {
-                newWidth = dragData.originalWidth + deltaX
-                if (newWidth < MIN_SIZE) newWidth = MIN_SIZE
-            }
-            set({
-                transformationData: { x: newX, y: newY, width: newWidth, height: newHeight },
-            })
-            return
-        }
-
-        // Translation path — position update.
-        set({
-            transformationData: {
-                x: dragData.originalX + deltaX,
-                y: dragData.originalY + deltaY,
-                width: dragData.originalWidth,
-                height: dragData.originalHeight,
-            },
-        })
-
-        // Live drop-target highlight (Canva-style): show the group under the
-        // cursor as a highlighted drop zone, unless it's already the shape's
-        // current parent.
+    const reparent = (drag: Extract<DragState, { kind: 'translate' }>, rect: Rect, shapeId: string) => {
         const slide = selectCurrentSlide(get())
         if (!slide) return
 
-        const hit = findInnermostGroupAt(slide.shapes, currentSVG.x, currentSVG.y, selectedShape.id)
-        const nextGroupId = hit?.id ?? null
-        const nextTarget: DropTarget | null =
-            hit && hit.id !== dragData.originalParentGroupId
-                ? { groupId: hit.id, x: hit.absX, y: hit.absY, width: hit.width, height: hit.height }
-                : null
+        const newAbsX = drag.originalAbsX + (rect.x - drag.originalX)
+        const newAbsY = drag.originalAbsY + (rect.y - drag.originalY)
 
-        // Only write to the store if it actually changed (avoids extra renders).
-        const prev = dragData.dropTarget
-        const sameTarget =
-            (prev === null && nextTarget === null)
-            || (prev !== null && nextTarget !== null && prev.groupId === nextTarget.groupId)
-        if (!sameTarget || dragData.currentGroupId !== nextGroupId) {
-            set({ dragData: { ...dragData, dropTarget: nextTarget, currentGroupId: nextGroupId } })
-        }
-    },
+        const parentLoc = drag.hoveredGroupId !== null
+            ? findShapeById(slide.shapes, drag.hoveredGroupId)
+            : null
+        const parentAbsX = parentLoc?.absX ?? 0
+        const parentAbsY = parentLoc?.absY ?? 0
 
-    onMouseUp: () => {
-        const { dragData, transformationData, selectedShape, presentation, updateSlideShapes, selectShape, updateShape } = get()
+        const { removed, remaining } = extractShapeById(slide.shapes, shapeId)
+        if (!removed) return
 
-        if (!dragData) return
+        const relocated = { ...removed, x: newAbsX - parentAbsX, y: newAbsY - parentAbsY }
+        get().updateSlideShapes(slide._id, insertShape(remaining, drag.hoveredGroupId, relocated))
+        get().selectShape(shapeId)
+    }
 
-        // Translation drag — decide the destination parent from the FINAL cursor
-        // position (Canva/Figma pattern: no dwell, position wins on drop).
-        if (
-            dragData.handle === null
-            && selectedShape
-            && transformationData
-            && presentation
-        ) {
+    return {
+        transformationData: null,
+        dragData: null,
+
+        startDrag: (svgElement, clientX, clientY) => {
+            const { selectedShape } = get()
+            if (!selectedShape) return
+
             const slide = selectCurrentSlide(get())
-            if (slide) {
-                // Absolute position of the shape at mouseUp.
-                const deltaX = transformationData.x - dragData.originalX
-                const deltaY = transformationData.y - dragData.originalY
-                const newAbsX = dragData.originalAbsX + deltaX
-                const newAbsY = dragData.originalAbsY + deltaY
+            const loc = slide ? findShapeById(slide.shapes, selectedShape.id) : null
 
-                const targetGroupId = dragData.currentGroupId
+            set({
+                dragData: {
+                    ...baseDragState(selectedShape, svgElement, clientX, clientY),
+                    kind: 'translate',
+                    originalAbsX: loc?.absX ?? selectedShape.x,
+                    originalAbsY: loc?.absY ?? selectedShape.y,
+                    originalParentGroupId: loc?.parentGroupId ?? null,
+                    hoveredGroupId: loc?.parentGroupId ?? null,
+                    highlightedGroup: null,
+                },
+            })
+        },
 
-                // Only reparent when the destination actually differs from the
-                // source parent — otherwise it's a plain move within the same
-                // container.
-                if (targetGroupId !== dragData.originalParentGroupId) {
-                    let parentAbsX = 0
-                    let parentAbsY = 0
-                    if (targetGroupId !== null) {
-                        const parentLoc = findShapeById(slide.shapes, targetGroupId)
-                        if (parentLoc) { parentAbsX = parentLoc.absX; parentAbsY = parentLoc.absY }
-                    }
-                    const nextRelX = newAbsX - parentAbsX
-                    const nextRelY = newAbsY - parentAbsY
+        startResize: (svgElement, handle, clientX, clientY) => {
+            const { selectedShape } = get()
+            if (!selectedShape) return
 
-                    const extracted = extractShapeById(slide.shapes, selectedShape.id)
-                    if (extracted.removed) {
-                        const relocated = { ...extracted.removed, x: nextRelX, y: nextRelY }
-                        const nextShapes = insertShape(extracted.remaining, targetGroupId, relocated)
-                        updateSlideShapes(slide._id, nextShapes)
-                        selectShape(selectedShape.id)
-                    }
+            set({
+                dragData: {
+                    ...baseDragState(selectedShape, svgElement, clientX, clientY),
+                    kind: 'resize',
+                    handle,
+                },
+            })
+        },
+
+        onMouseMove: (clientX, clientY) => {
+            const { dragData, selectedShape } = get()
+            if (!dragData || !selectedShape) return
+
+            const startSVG = clientToSVG(dragData.svgElement, dragData.startClientX, dragData.startClientY)
+            const currentSVG = clientToSVG(dragData.svgElement, clientX, clientY)
+            const deltaX = currentSVG.x - startSVG.x
+            const deltaY = currentSVG.y - startSVG.y
+
+            const original: Rect = {
+                x: dragData.originalX,
+                y: dragData.originalY,
+                width: dragData.originalWidth,
+                height: dragData.originalHeight,
+            }
+
+            if (dragData.kind === 'resize') {
+                set({ transformationData: resizeRect(dragData.handle, original, deltaX, deltaY) })
+                return
+            }
+
+            set({
+                transformationData: { ...original, x: original.x + deltaX, y: original.y + deltaY },
+            })
+
+            // Live drop-target highlight (Canva-style): show the group under the
+            // cursor as a drop zone, unless it's already the shape's parent.
+            const slide = selectCurrentSlide(get())
+            if (!slide) return
+
+            const hit = findInnermostGroupAt(slide.shapes, currentSVG.x, currentSVG.y, selectedShape.id)
+            const hoveredGroupId = hit?.id ?? null
+            const highlightedGroup: GroupHighlight | null =
+                hit && hit.id !== dragData.originalParentGroupId
+                    ? { groupId: hit.id, x: hit.absX, y: hit.absY, width: hit.width, height: hit.height }
+                    : null
+
+            // Only write when something actually changed (avoids extra renders).
+            // The id check matters on its own: moving from the original parent
+            // out to the canvas leaves `highlightedGroup` null on both sides.
+            const prev = dragData.highlightedGroup
+            const sameHighlight = prev?.groupId === highlightedGroup?.groupId
+            if (!sameHighlight || dragData.hoveredGroupId !== hoveredGroupId) {
+                set({ dragData: { ...dragData, highlightedGroup, hoveredGroupId } })
+            }
+        },
+
+        onMouseUp: () => {
+            const { dragData, transformationData, selectedShape } = get()
+            if (!dragData) return
+
+            if (transformationData && selectedShape) {
+                // Re-parent only when the destination differs from the source
+                // parent; otherwise it's a plain move within the same container.
+                if (
+                    dragData.kind === 'translate'
+                    && dragData.hoveredGroupId !== dragData.originalParentGroupId
+                ) {
+                    reparent(dragData, transformationData, selectedShape.id)
                 } else {
-                    // Same parent — plain in-place move.
-                    updateShape(selectedShape.id, {
-                        x: transformationData.x,
-                        y: transformationData.y,
-                        width: transformationData.width,
-                        height: transformationData.height,
-                    })
-                    selectShape(selectedShape.id)
+                    commitRect(transformationData, selectedShape.id)
                 }
             }
-        } else if (transformationData && selectedShape) {
-            // Resize path — no re-parenting.
-            updateShape(selectedShape.id, {
-                x: transformationData.x,
-                y: transformationData.y,
-                width: transformationData.width,
-                height: transformationData.height,
-            })
-            selectShape(selectedShape.id)
-        }
 
-        set({ dragData: null, transformationData: null })
-    },
-})
+            set({ dragData: null, transformationData: null })
+        },
+    }
+}
