@@ -1,6 +1,6 @@
 import { InputNumber, Select, Divider } from 'antd'
-import { useEditorStore } from '../../../../../store/editor/EditorStore'
-import { DebouncedColorPicker } from '../../../../../components/common'
+import { useEditorStore } from '../../../../../../store/editor/EditorStore'
+import { DebouncedColorPicker } from '../../../../../../components/common'
 
 export function ShapeContextBar() {
   const selectedTool = useEditorStore(state => state.selectedTool)
@@ -54,7 +54,7 @@ export function ShapeContextBar() {
   }
 
   return (
-    <div className="toolbar-container toolbar-section">
+    <div className="toolbar-container context-toolbar">
       {/* Fill Section */}
       <div className="toolbar-item">
         <span className="toolbar-label">Fill</span>

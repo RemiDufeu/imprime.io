@@ -6,9 +6,11 @@ import {
   UpOutlined,
   DownOutlined,
   DeleteFilled,
+  UngroupOutlined,
 } from '@ant-design/icons'
 import './LayeringToolbar.css'
 import { useCurrentSlide, useEditorStore } from '../../../../store/editor/EditorStore'
+import { findShapeById, getSiblingList } from '../../../../utils/shapeTree'
 
 const TOOLBAR_OFFSET = 12
 
@@ -26,6 +28,7 @@ export default function LayeringToolbar() {
   const sendToBack = useEditorStore(state => state.sendToBack)
   const bringForward = useEditorStore(state => state.bringForward)
   const sendBackward = useEditorStore(state => state.sendBackward)
+  const ungroupShape = useEditorStore(state => state.ungroupShape)
 
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null)
 
@@ -65,11 +68,12 @@ export default function LayeringToolbar() {
 
   if (!position) return null
 
-  const selectedShape = currentSlide?.shapes.find(s => s.id === selectedShapeId)
-  if (!selectedShape) return null
+  const loc = currentSlide ? findShapeById(currentSlide.shapes, selectedShapeId!) : null
+  if (!loc) return null
 
-  const shapeIndex = currentSlide!.shapes.findIndex(s => s.id === selectedShapeId)
-  const isAtFront = shapeIndex === currentSlide!.shapes.length - 1
+  const siblings = getSiblingList(currentSlide!.shapes, loc.parentGroupId)
+  const shapeIndex = siblings.findIndex(s => s.id === selectedShapeId)
+  const isAtFront = shapeIndex === siblings.length - 1
   const isAtBack = shapeIndex === 0
   const { left, top } = position
 
@@ -101,6 +105,18 @@ export default function LayeringToolbar() {
           />
         </Tooltip>
       </Popconfirm>
+      {loc.parentGroupId !== null && (
+        <div className='layering-toolbar'>
+          <Tooltip title="Remove from group" placement="left">
+            <Button
+              type="text"
+              size="small"
+              icon={<UngroupOutlined />}
+              onClick={() => ungroupShape(selectedShapeId!)}
+            />
+          </Tooltip>
+        </div>
+        )}
       <div className="layering-toolbar">
         <Tooltip title="Bring to front" placement="left">
           <Button

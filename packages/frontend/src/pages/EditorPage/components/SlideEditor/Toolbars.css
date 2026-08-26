@@ -1,0 +1,50 @@
+.toolbar-container, .zoombar-container {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--ant-color-bg-container);
+    box-shadow: var(--ant-box-shadow);
+    border-radius: var(--ant-border-radius);
+    border: var(--ant-line-width) var(--ant-line-type) var(--ant-color-border);
+    box-sizing: border-box;
+}
+
+.toolbar-container .btn:hover, .zoombar-container .btn:hover {
+    color: var(--ant-color-primary) !important;
+    background-color: transparent !important;
+}
+
+.context-toolbar {
+    padding: 0 var(--space-s);
+    gap: var(--space-s);
+}
+
+.toolbar-container .toolbar-section {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.toolbar-section {
+    padding: 0 var(--space-s);
+}
+
+.toolbar-container .toolbar-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.toolbar-container .toolbar-label {
+    font-size: 13px;
+    color: var(--ant-color-text-secondary);
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.toolbar-container .toolbar-divider {
+    width: 1px;
+    height: 24px;
+    background-color: var(--ant-color-border);
+    margin: 0 4px;
+}

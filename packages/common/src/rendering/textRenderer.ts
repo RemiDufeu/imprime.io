@@ -56,7 +56,8 @@ function renderVariable(
   element: VariableElement,
   getVariableValue: (variableId: string) => string
 ): string {
-  const value = escapeHTML(getVariableValue(element.variableId))
+  const raw = getVariableValue(element.variableId)
+  const value = escapeHTML(raw)
   let text = value
 
   // Apply bold

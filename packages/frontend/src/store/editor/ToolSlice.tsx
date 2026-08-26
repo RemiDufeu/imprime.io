@@ -2,7 +2,7 @@ import type { StateCreator } from 'zustand'
 import type { ShapeSlice } from './ShapeSlice'
 import type { ToolAttributesSlice, ContextBarType } from './ToolAttributeSlice'
 
-export type ToolType = 'move' | 'rectangle' | 'ellipse' | 'text'
+export type ToolType = 'move' | 'rectangle' | 'ellipse' | 'text' | 'group'
 
 export interface ToolSlice {
   selectedTool: ToolType,
@@ -26,12 +26,16 @@ export const createToolSlice: StateCreator<
                 contextBarType = 'shape'
             } else if (selectedShape.type === 'text') {
                 contextBarType = 'text'
+            } else if (selectedShape.type === 'group') {
+                contextBarType = 'group'
             }
         }
         else if (tool === 'rectangle' || tool === 'ellipse') {
             contextBarType = 'shape'
         } else if (tool === 'text') {
             contextBarType = 'text'
+        } else if (tool === 'group') {
+            contextBarType = 'group'
         }
 
         set({ selectedTool: tool, contextBarType })

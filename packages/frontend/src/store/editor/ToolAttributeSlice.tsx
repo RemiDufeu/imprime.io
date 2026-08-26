@@ -22,7 +22,7 @@ export const DEFAULT_STYLE: ActiveStyles = {
 
 export type StrokeStyle = 'solid' | 'dashed' | 'dotted'
 
-export type ContextBarType = 'none' | 'shape' | 'text'
+export type ContextBarType = 'none' | 'shape' | 'text' | 'group'
 
 interface ShapeAttributes {
     fillColor: string

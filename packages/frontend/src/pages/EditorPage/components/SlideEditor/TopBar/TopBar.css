@@ -1,0 +1,14 @@
+.top-bar-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-s) var(--space-m);
+    pointer-events: auto;
+    gap: var(--space-m);
+}
+
+.toolbars {
+    display: flex;
+    flex: 1;
+    gap: var(--space-m);
+}

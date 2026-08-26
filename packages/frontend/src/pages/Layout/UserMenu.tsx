@@ -18,7 +18,7 @@ export default function UserMenu() {
   const navigate = useNavigate()
   const { data } = useSession()
 
-  if (!data) return null
+  if (!data?.user) return null
 
   async function handleLogout() {
     await signOut()

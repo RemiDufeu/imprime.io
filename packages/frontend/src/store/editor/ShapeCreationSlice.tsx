@@ -7,6 +7,8 @@ import type { ShapeSlice } from './ShapeSlice'
 import type { ToolSlice } from './ToolSlice'
 import type { ToolAttributesSlice } from './ToolAttributeSlice'
 import { imagesAPI } from '../../api/api'
+import { findInnermostGroupAt, insertShape, nextShapeName } from '../../utils/shapeTree'
+import { selectCurrentSlide } from './selectors'
 
 export interface DrawingData {
     startX: number
@@ -35,10 +37,7 @@ export const createShapeCreationSlice: StateCreator<
 > = (set, get) => {
     let rafId: number | null = null
 
-    const getCurrentSlide = () => {
-        const { presentation, currentSlideIndex } = get()
-        return presentation?.slides[currentSlideIndex] ?? null
-    }
+    const getCurrentSlide = () => selectCurrentSlide(get())
 
     return {
         isDrawing: false,
@@ -47,7 +46,12 @@ export const createShapeCreationSlice: StateCreator<
         startDrawing: (x: number, y: number) => {
             const { selectedTool } = get()
 
-            if (selectedTool !== 'rectangle' && selectedTool !== 'ellipse' && selectedTool !== 'text') {
+            if (
+                selectedTool !== 'rectangle' &&
+                selectedTool !== 'ellipse' &&
+                selectedTool !== 'text' &&
+                selectedTool !== 'group'
+            ) {
                 return
             }
 
@@ -110,16 +114,26 @@ export const createShapeCreationSlice: StateCreator<
                 newShape = {
                     id: shapeId,
                     type: 'text',
+                    name: nextShapeName(currentSlide.shapes, 'text'),
                     x, y, width, height,
                     paragraphes: [{
                         type: 'paragraph',
                         children: [{text : ''}]
                     }],
                 }
+            } else if (selectedTool === 'group') {
+                newShape = {
+                    id: shapeId,
+                    type: 'group',
+                    name: nextShapeName(currentSlide.shapes, 'group'),
+                    x, y, width, height,
+                    children: [],
+                }
             } else if (selectedTool === 'ellipse') {
                 newShape = {
                     id: shapeId,
                     type: 'ellipse',
+                    name: nextShapeName(currentSlide.shapes, 'ellipse'),
                     x, y, width, height,
                     fill: attributes.fillColor,
                     stroke: attributes.strokeColor,
@@ -130,6 +144,7 @@ export const createShapeCreationSlice: StateCreator<
                 newShape = {
                     id: shapeId,
                     type: 'rectangle',
+                    name: nextShapeName(currentSlide.shapes, 'rectangle'),
                     x, y, width, height,
                     fill: attributes.fillColor,
                     stroke: attributes.strokeColor,
@@ -139,8 +154,16 @@ export const createShapeCreationSlice: StateCreator<
                 }
             }
 
-            updateSlideShapes(currentSlide._id, [...currentSlide.shapes, newShape])
-            selectShape(shapeId)
+            const parent = findInnermostGroupAt(currentSlide.shapes, x, y)
+            if (parent) {
+                const nested = { ...newShape, x: x - parent.absX, y: y - parent.absY } as Shape
+                const nextShapes = insertShape(currentSlide.shapes, parent.id, nested)
+                updateSlideShapes(currentSlide._id, nextShapes)
+                selectShape(parent.id)
+            } else {
+                updateSlideShapes(currentSlide._id, [...currentSlide.shapes, newShape])
+                selectShape(shapeId)
+            }
             get().setTool('move')
             cancelDrawing()
         },
@@ -187,21 +210,22 @@ export const createShapeCreationSlice: StateCreator<
                             const x = Math.floor((1920 - width) / 2)
                             const y = Math.floor((1080 - height) / 2)
 
+                            // Re-fetch current slide in case it changed
+                            const slide = getCurrentSlide()
+                            if (!slide) return
+
                             const shapeId = crypto.randomUUID()
                             const newShape: Shape = {
                                 id: shapeId,
                                 type: 'image',
+                                name: nextShapeName(slide.shapes, 'image'),
                                 x, y, width, height,
                                 imageId: uploadResult._id,
                                 alt: file.name,
                             }
 
-                            // Re-fetch current slide in case it changed
-                            const slide = getCurrentSlide()
-                            if (slide) {
-                                updateSlideShapes(slide._id, [...slide.shapes, newShape])
-                                selectShape(shapeId)
-                            }
+                            updateSlideShapes(slide._id, [...slide.shapes, newShape])
+                            selectShape(shapeId)
 
                             hideLoading()
                             message.success('Image uploaded successfully')

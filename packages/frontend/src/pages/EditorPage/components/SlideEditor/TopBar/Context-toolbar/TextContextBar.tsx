@@ -6,8 +6,8 @@ import {
   UnderlineOutlined,
 } from '@ant-design/icons'
 import { useState, useEffect } from 'react'
-import { useEditorStore } from '../../../../../store/editor/EditorStore'
-import { DebouncedColorPicker } from '../../../../../components/common'
+import { useEditorStore } from '../../../../../../store/editor/EditorStore'
+import { DebouncedColorPicker } from '../../../../../../components/common'
 import { DropdownVariablesContent } from './DropdownVariablesContent/DropdownVariablesContent'
 
 const FONT_FAMILIES = [
@@ -78,7 +78,7 @@ export function TextContextBar() {
 
   return (
     <>
-      <div className="toolbar-container toolbar-section">
+      <div className="toolbar-container context-toolbar">
         <div className="toolbar-item">
           <span className="toolbar-label">Font</span>
           <div onMouseDown={(e) => e.preventDefault()}>

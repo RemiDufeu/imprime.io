@@ -2,8 +2,8 @@ import { Button, Popconfirm } from "antd";
 import { PlusOutlined, DeleteOutlined } from "@ant-design/icons";
 import "./SlideList.css";
 import { useRef, useState, useLayoutEffect } from "react";
-import { SlideCanvas } from "../../../../components/slide/SlideCanvas";
-import { useEditorStore } from "../../../../store/editor/EditorStore";
+import { SlideCanvas } from "../../../../../../components/slide/SlideCanvas";
+import { useEditorStore } from "../../../../../../store/editor/EditorStore";
 
 export default function SlideList() {
 

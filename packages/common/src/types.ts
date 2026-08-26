@@ -10,6 +10,11 @@ export interface BaseShape {
   stroke?: string
   strokeWidth?: number
   strokeStyle?: 'solid' | 'dashed' | 'dotted'
+  // Editor-only visibility toggle. When true, the shape is skipped by the
+  // renderer (SVG in the editor, image export in the backend) but stays in
+  // the data so the user can re-enable it.
+  hidden?: boolean
+  name?: string
 }
 
 export interface RectangleShape extends BaseShape {
@@ -62,7 +67,27 @@ export interface ImageShape extends BaseShape {
   alt?: string
 }
 
-export type Shape = RectangleShape | EllipseShape | TextBoxShape | ImageShape
+export type GroupLayoutDirection = 'none' | 'horizontal' | 'vertical'
+export type GroupJustify = 'start' | 'center' | 'end' | 'space-between' | 'space-around'
+export type GroupAlign = 'start' | 'center' | 'end' | 'stretch'
+
+export interface GroupShape extends BaseShape {
+  type: 'group'
+  children: Shape[]
+  // Flexbox-like auto-layout for children. Defaults to 'none' (free-form
+  // positioning, children keep their own x/y) when unset — existing groups
+  layout?: GroupLayoutDirection
+  justify?: GroupJustify
+  align?: GroupAlign
+  gap?: number
+}
+
+export type Shape =
+  | RectangleShape
+  | EllipseShape
+  | TextBoxShape
+  | ImageShape
+  | GroupShape
 
 // ============================================
 // Slide & Presentation Types
@@ -94,14 +119,15 @@ export interface PresentationSummary {
 
 export interface VariableData {
   _id: string
-  type : VariableType
-  name : string
-  value? : VariableValueType
-  default? : VariableValueType
-  required? : boolean
+  type: VariableType
+  name: string
+  value?: VariableValueType
+  default?: VariableValueType
+  required?: boolean
 }
 
 export type VariableType = "string"
+
 export type VariableValueType = string
 
 // ============================================
@@ -183,7 +209,7 @@ export namespace ImageDTO {
 
 export namespace ExportDTO {
   export interface PdfRequest {
-    variableValues?: Record<string, string>
+    variableValues?: Record<string, VariableValueType>
   }
 }
 

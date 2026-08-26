@@ -4,6 +4,7 @@ import { SLIDE_WIDTH, SLIDE_HEIGHT } from '../../constants/canvas'
 import { SVGShape } from './svg/SVGShape'
 import { SVGSelectionWrapper } from './svg/SVGSelectionWrapper'
 import { SVGDrawingPreview } from './svg/SVGDrawingPreview'
+import { SVGDropHighlight } from './svg/SVGDropHighlight'
 import { useEditorStore } from '../../store/editor/EditorStore'
 
 interface SlideCanvasProps {
@@ -52,10 +53,11 @@ export function SlideCanvas({
         const coords = getSVGCoordinates(e.clientX, e.clientY)
         if (!coords) return
 
-        // If shape/text tool is selected, start drawing
+        // If shape/text/group tool is selected, start drawing
         if (selectedTool === 'rectangle' ||
             selectedTool === 'ellipse' ||
-            selectedTool === 'text') {
+            selectedTool === 'text' ||
+            selectedTool === 'group') {
             startDrawing(coords.x, coords.y)
         } else if (clickedOnEmpty) {
             // Deselect shapes only if clicked on empty area
@@ -118,6 +120,9 @@ export function SlideCanvas({
 
                 {/* Drawing preview (only in edit mode) */}
                 {!readonly && <SVGDrawingPreview />}
+
+                {/* Highlights the group that would receive the shape on drop */}
+                {!readonly && <SVGDropHighlight />}
             </svg>
         </div>
     )

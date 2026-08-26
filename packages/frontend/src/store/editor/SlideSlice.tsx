@@ -3,6 +3,7 @@ import type { StateCreator } from "zustand"
 import type { PresentationSlice } from "./PresentationSlice"
 import { presentationsAPI } from "../../api/api"
 import type { ShapeSlice } from "./ShapeSlice"
+import { reflowGroups } from "../../utils/groupLayout"
 
 export interface SlideSlice {
     currentSlideIndex: number
@@ -69,17 +70,19 @@ export const createSlideSlice: StateCreator<
     updateSlideShapes: (slideId: string, shapes: Shape[]) => {
         const { presentation, _saveSlide } = get()
         if (!presentation) return
+        // shape positions (rendering, hit-testing, selection).
+        const reflowed = reflowGroups(shapes)
 
         set({
             presentation: {
                 ...presentation,
                 slides: presentation.slides.map((slide) =>
-                    slide._id === slideId ? { ...slide, shapes } : slide
+                    slide._id === slideId ? { ...slide, shapes: reflowed } : slide
                 ),
             },
         })
 
-        _saveSlide(slideId, shapes)
+        _saveSlide(slideId, reflowed)
     },
     _saveSlide: async (slideId: string, shapes: Shape[], retryCount = 0) => {
         const { presentation } = get()

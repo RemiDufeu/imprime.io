@@ -1,0 +1,19 @@
+.floating-panels {
+    display: flex;
+    flex: 1;
+    padding: var(--space-s);
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.centered-zoombar {
+    display: flex;
+    flex: 1;
+    justify-content: center;
+    align-items: end;
+    pointer-events: none;
+}
+
+.centered-zoombar > * {
+    pointer-events: auto;
+}

@@ -1,7 +1,7 @@
 import { Input, Button, List, Form, Switch, Popconfirm } from 'antd'
 import { ArrowLeftOutlined, PlusOutlined, SearchOutlined, DeleteOutlined } from '@ant-design/icons'
 import { useState, useMemo } from 'react'
-import { useEditorStore } from '../../../../../../store/editor/EditorStore'
+import { useEditorStore } from '../../../../../../../store/editor/EditorStore'
 import type { VariableData } from '@imprime/sdk'
 import './DropdownVariablesContent.css'
 
@@ -191,9 +191,9 @@ export function DropdownVariablesContent({ onClose }: DropdownVariablesContentPr
                       <span className="variable-name">{variable.name}</span>
                     </div>
                     <div className="variable-sub">
-                      {variable.default && (
-                        <>Default: <span className="default-value">{variable.default}</span></>)
-                      }
+                      {variable.default !== undefined && variable.default !== null && variable.default !== '' && (
+                        <>Default: <span className="default-value">{variable.default}</span></>
+                      )}
                       {variable.required && (
                         <>Required</>
                       )}

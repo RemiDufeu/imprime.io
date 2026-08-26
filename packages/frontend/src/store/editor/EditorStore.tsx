@@ -1,6 +1,6 @@
 import { create } from "zustand"
 import { createPresentationSlice, type PresentationSlice } from "./PresentationSlice"
-import { createZoomSlice, type ZoomSlice } from "./ZoomSlice"
+import { createPreferencesSlice, type PreferencesSlice } from "./PreferencesSlice"
 import { persist, subscribeWithSelector } from "zustand/middleware"
 import { createToolSlice, type ToolSlice } from "./ToolSlice"
 import { createSlideSlice, type SlideSlice } from "./SlideSlice"
@@ -11,9 +11,10 @@ import { createLayeringSlice, type LayeringSlice } from "./LayeringSlice"
 import { createShapeCreationSlice, type ShapeCreationSlice } from "./ShapeCreationSlice"
 import { createRichTextEditorSlice, type RichTextEditorSlice } from "./RichTextEditorSlice"
 import { createVariableSlice, type VariableSlice } from "./VariableSlice"
+import { selectCurrentSlide } from "./selectors"
 
 type BaseEditorStore = PresentationSlice &
-    ZoomSlice &
+    PreferencesSlice &
     ToolSlice &
     SlideSlice &
     ShapeSlice &
@@ -31,7 +32,7 @@ export const useEditorStore = create<BaseEditorStore>()(
                 ...createPresentationSlice(...args),
                 ...createSlideSlice(...args),
                 ...createShapeSlice(...args),
-                ...createZoomSlice(...args),
+                ...createPreferencesSlice(...args),
                 ...createToolSlice(...args),
                 ...createTransformationSlice(...args),
                 ...createToolAttributesSlice(...args),
@@ -44,11 +45,12 @@ export const useEditorStore = create<BaseEditorStore>()(
                 name: 'editor-store',
                 partialize: (state) => ({
                     zoom: state.zoom,
+                    slidesPanelOpen: state.slidesPanelOpen,
+                    layersPanelOpen: state.layersPanelOpen,
                 }),
             }
         ),
     ),
 )
 
-export const useCurrentSlide = () =>
-    useEditorStore((s) => s.presentation?.slides[s.currentSlideIndex] ?? null);
+export const useCurrentSlide = () => useEditorStore(selectCurrentSlide);
