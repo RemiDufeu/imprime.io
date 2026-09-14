@@ -6,6 +6,8 @@ import {
   PictureOutlined,
   PlusCircleOutlined,
   GroupOutlined,
+  BranchesOutlined,
+  RetweetOutlined,
 } from '@ant-design/icons'
 import type { ToolType } from '../../../../../../store/editor/ToolSlice'
 import { useEditorStore } from '../../../../../../store/editor/EditorStore'
@@ -19,7 +21,9 @@ const TOOLS: Array<{
   { type: 'rectangle', label: 'Add rectangle', icon: <PlusSquareOutlined /> },
   { type: 'ellipse', label: 'Add ellipse', icon: <PlusCircleOutlined /> },
   { type: 'text', label: 'Add text box', icon: <FontSizeOutlined /> },
-  { type: 'group', label: 'Add group', icon: <GroupOutlined /> },
+  { type: 'group', label: 'Add layout group', icon: <GroupOutlined /> },
+  { type: 'if-group', label: 'Add if group', icon: <BranchesOutlined /> },
+  { type: 'for-group', label: 'Add for group', icon: <RetweetOutlined /> },
 ]
 
 export default function Toolbar() {

@@ -16,6 +16,7 @@ import { useShapeTreeUI } from '../ShapeTreeUIContext'
 import { SiblingList } from '../SiblingList/SiblingList'
 import { RenameInput } from '../RenameInput/RenameInput'
 import { shapeIcon } from './shapeIcon'
+import { isContainerShape } from '../../../../../../../utils/shapeTree'
 
 const INDENT_PX = 14
 const DRAG_MIME = 'application/x-imprime-shape-id'
@@ -48,7 +49,7 @@ export function ShapeRow({
     const [collapsed, setCollapsed] = useState(false)
     const [isRenaming, setIsRenaming] = useState(false)
 
-    const isGroup = shape.type === 'group'
+    const isGroup = isContainerShape(shape)
     const isCollapsed = isGroup && collapsed
     const isBeingDragged = draggedId === shape.id
 
@@ -227,7 +228,7 @@ export function ShapeRow({
                     </Tooltip>
                 </span>
             </div>
-            {isGroup && !isCollapsed && (
+            {isContainerShape(shape) && !isCollapsed && (
                 <SiblingList
                     shapes={shape.children}
                     parentId={shape.id}

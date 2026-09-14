@@ -1,5 +1,6 @@
 import type { Shape } from '@imprime/sdk'
 import { layoutGroupChildren } from '@imprime/sdk'
+import { isContainerShape } from './shapeTree'
 
 // Walk the whole tree and re-lay-out every group that has an active layout.
 // A group's own children are positioned first (so a `stretch`-resized child
@@ -7,8 +8,8 @@ import { layoutGroupChildren } from '@imprime/sdk'
 // this way a nested auto-layout group reflows against its up-to-date size.
 export function reflowGroups(shapes: Shape[]): Shape[] {
   return shapes.map(s => {
-    if (s.type !== 'group') return s
-    const laidOut = layoutGroupChildren(s)
+    if (!isContainerShape(s)) return s
+    const laidOut = s.type === 'group' ? layoutGroupChildren(s) : s.children
     return { ...s, children: reflowGroups(laidOut) }
   })
 }

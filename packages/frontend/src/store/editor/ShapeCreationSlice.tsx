@@ -50,7 +50,9 @@ export const createShapeCreationSlice: StateCreator<
                 selectedTool !== 'rectangle' &&
                 selectedTool !== 'ellipse' &&
                 selectedTool !== 'text' &&
-                selectedTool !== 'group'
+                selectedTool !== 'group' &&
+                selectedTool !== 'if-group' &&
+                selectedTool !== 'for-group'
             ) {
                 return
             }
@@ -126,6 +128,22 @@ export const createShapeCreationSlice: StateCreator<
                     id: shapeId,
                     type: 'group',
                     name: nextShapeName(currentSlide.shapes, 'group'),
+                    x, y, width, height,
+                    children: [],
+                }
+            } else if (selectedTool === 'if-group') {
+                newShape = {
+                    id: shapeId,
+                    type: 'if-group',
+                    name: nextShapeName(currentSlide.shapes, 'if-group'),
+                    x, y, width, height,
+                    children: [],
+                }
+            } else if (selectedTool === 'for-group') {
+                newShape = {
+                    id: shapeId,
+                    type: 'for-group',
+                    name: nextShapeName(currentSlide.shapes, 'for-group'),
                     x, y, width, height,
                     children: [],
                 }

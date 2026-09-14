@@ -5,6 +5,8 @@ import {
     FontSizeOutlined,
     PictureOutlined,
     FolderOutlined,
+    BranchesOutlined,
+    RetweetOutlined,
 } from '@ant-design/icons'
 
 export function shapeIcon(shape: Shape) {
@@ -14,5 +16,7 @@ export function shapeIcon(shape: Shape) {
         case 'text': return <FontSizeOutlined />
         case 'image': return <PictureOutlined />
         case 'group': return <FolderOutlined />
+        case 'if-group': return <BranchesOutlined />
+        case 'for-group': return <RetweetOutlined />
     }
 }

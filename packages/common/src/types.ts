@@ -82,12 +82,34 @@ export interface GroupShape extends BaseShape {
   gap?: number
 }
 
+// Conditional container: children only appear in the exported output when
+// the referenced variable evaluates to a truthy value (case-insensitive
+// "true" for the V1 string-typed variable system).
+export interface IfGroupShape extends BaseShape {
+  type: 'if-group'
+  children: Shape[]
+  conditionVariable?: string
+}
+
+// Repeat container: children are duplicated once per item in the referenced
+// list variable. V1 stores the list as a comma-separated string on an
+// existing string variable — later this will be a proper array/object type.
+export interface ForGroupShape extends BaseShape {
+  type: 'for-group'
+  children: Shape[]
+  itemsVariable?: string
+}
+
+export type ContainerShape = GroupShape | IfGroupShape | ForGroupShape
+
 export type Shape =
   | RectangleShape
   | EllipseShape
   | TextBoxShape
   | ImageShape
   | GroupShape
+  | IfGroupShape
+  | ForGroupShape
 
 // ============================================
 // Slide & Presentation Types

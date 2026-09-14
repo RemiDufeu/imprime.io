@@ -1,9 +1,11 @@
+import { theme } from 'antd'
 import { useEditorStore } from '../../../store/editor/EditorStore'
 
 export function SVGDrawingPreview() {
     const drawingData = useEditorStore(state => state.drawingData)
     const toolAttributes = useEditorStore(state => state.attributes)
     const selectedTool = useEditorStore(state => state.selectedTool)
+    const { token } = theme.useToken()
 
     if (!drawingData) return null
 
@@ -76,14 +78,19 @@ export function SVGDrawingPreview() {
             )
 
         case 'group':
+        case 'if-group':
+        case 'for-group': {
+            const stroke = type === 'if-group' ? token.colorInfo
+                : type === 'for-group' ? token.colorWarning
+                : token.colorBorder
             return (
                 <rect
                     x={x}
                     y={y}
                     width={width}
                     height={height}
-                    fill="rgba(148, 163, 184, 0.04)"
-                    stroke="#94a3b8"
+                    fill={token.colorFillTertiary}
+                    stroke={stroke}
                     strokeWidth={2}
                     strokeDasharray="8 6"
                     rx={4}
@@ -91,6 +98,7 @@ export function SVGDrawingPreview() {
                     pointerEvents="none"
                 />
             )
+        }
 
         default:
             return null

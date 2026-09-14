@@ -105,7 +105,7 @@ export class SlideService {
             }
           })
         })
-      } else if (shape.type === 'group') {
+      } else if (shape.type === 'group' || shape.type === 'if-group' || shape.type === 'for-group') {
         errors.push(...this.validateVariableReferences(shape.children, validVariableIds))
       }
     })
@@ -117,7 +117,7 @@ export class SlideService {
     for (const shape of shapes) {
       if (shape.type === 'image') {
         if (shape.imageId) ids.push(shape.imageId)
-      } else if (shape.type === 'group') {
+      } else if (shape.type === 'group' || shape.type === 'if-group' || shape.type === 'for-group') {
         ids.push(...this.collectImageIds(shape.children))
       }
     }

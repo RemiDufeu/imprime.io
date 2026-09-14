@@ -15,6 +15,7 @@ import {
     cloneShapeWithNewIds,
     isDescendantOf,
     getSiblingList,
+    isContainerShape,
 } from '../../utils/shapeTree'
 import { selectCurrentSlide } from './selectors'
 
@@ -68,12 +69,16 @@ export const createShapeSlice : StateCreator<
         // Update context bar type based on selected shape and tool
         if (selectedTool === 'move') {
             if(selectedShape) {
-                 if (selectedShape.type === 'rectangle' || selectedShape.type === 'ellipse') {
+                if (selectedShape.type === 'rectangle' || selectedShape.type === 'ellipse') {
                     contextBarType = 'shape'
                 } else if (selectedShape.type === 'text') {
                     contextBarType = 'text'
                 } else if (selectedShape.type === 'group') {
                     contextBarType = 'group'
+                } else if (selectedShape.type === 'if-group') {
+                    contextBarType = 'if-group'
+                } else if (selectedShape.type === 'for-group') {
+                    contextBarType = 'for-group'
                 }
             } else {
                 contextBarType = 'none'
@@ -174,7 +179,7 @@ export const createShapeSlice : StateCreator<
         if (!currentSlide) return
 
         const target = findShapeById(currentSlide.shapes, targetGroupId)?.shape
-        if (target?.type !== 'group') return
+        if (!target || !isContainerShape(target)) return
         moveShape(id, targetGroupId, target.children.length)
     },
     copyShape: (id: string) => {
@@ -208,7 +213,7 @@ export const createShapeSlice : StateCreator<
         if (!loc || loc.parentGroupId === null) return
 
         const parentLoc = findShapeById(currentSlide.shapes, loc.parentGroupId)
-        if (!parentLoc || parentLoc.shape.type !== 'group') return
+        if (!parentLoc || !isContainerShape(parentLoc.shape)) return
         const group = parentLoc.shape
 
         const relocated = { ...loc.shape, x: loc.shape.x + group.x, y: loc.shape.y + group.y } as Shape

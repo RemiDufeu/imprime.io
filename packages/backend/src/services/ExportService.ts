@@ -351,7 +351,7 @@ export class ExportService {
 
     const resolvedSlides: Slide[] = presentation.slides.map(slide => ({
       ...slide,
-      shapes: resolveShapes(slide.shapes),
+      shapes: resolveShapes(slide.shapes, { variableValues, presentation }),
     }))
 
     const imageDataMap = await this.fetchImageData(resolvedSlides)

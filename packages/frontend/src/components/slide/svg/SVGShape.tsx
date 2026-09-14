@@ -21,6 +21,8 @@ export function SVGShape({ shape, readonly }: SVGShapeProps) {
         case 'image':
             return <SVGImage shape={shape} />
         case 'group':
+        case 'if-group':
+        case 'for-group':
             return <SVGGroup shape={shape} readonly={readonly} />
         default:
             return null

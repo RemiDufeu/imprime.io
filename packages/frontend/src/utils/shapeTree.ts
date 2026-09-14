@@ -1,4 +1,4 @@
-import type { Shape } from '@imprime/sdk'
+import type { Shape, ContainerShape } from '@imprime/sdk'
 
 export interface ShapeLocation {
   shape: Shape
@@ -6,6 +6,10 @@ export interface ShapeLocation {
   // Absolute top-left of the shape in slide coordinates
   absX: number
   absY: number
+}
+
+export function isContainerShape(shape: Shape): shape is ContainerShape {
+  return shape.type === 'group' || shape.type === 'if-group' || shape.type === 'for-group'
 }
 
 // Locate a shape anywhere in the tree along with its parent group and absolute
@@ -21,7 +25,7 @@ export function findShapeById(
     if (s.id === id) {
       return { shape: s, parentGroupId, absX: offX + s.x, absY: offY + s.y }
     }
-    if (s.type === 'group') {
+    if (isContainerShape(s)) {
       const found = findShapeById(s.children, id, s.id, offX + s.x, offY + s.y)
       if (found) return found
     }
@@ -32,7 +36,7 @@ export function findShapeById(
 export function updateShapeById(shapes: Shape[], id: string, updates: Partial<Shape>): Shape[] {
   return shapes.map(s => {
     if (s.id === id) return { ...s, ...updates } as Shape
-    if (s.type === 'group') {
+    if (isContainerShape(s)) {
       return { ...s, children: updateShapeById(s.children, id, updates) }
     }
     return s
@@ -43,7 +47,7 @@ export function deleteShapeById(shapes: Shape[], id: string): Shape[] {
   const out: Shape[] = []
   for (const s of shapes) {
     if (s.id === id) continue
-    if (s.type === 'group') {
+    if (isContainerShape(s)) {
       out.push({ ...s, children: deleteShapeById(s.children, id) })
     } else {
       out.push(s)
@@ -62,7 +66,7 @@ export function extractShapeById(
   const remaining: Shape[] = []
   for (const s of shapes) {
     if (s.id === id) { removed = s; continue }
-    if (s.type === 'group') {
+    if (isContainerShape(s)) {
       const sub = extractShapeById(s.children, id)
       if (sub.removed) {
         removed = sub.removed
@@ -75,12 +79,12 @@ export function extractShapeById(
   return { removed, remaining }
 }
 
-// Insert `shape` at the end of the children of the group with matching id, or
-// at the root when groupId is null.
+// Insert `shape` at the end of the children of the container with matching id,
+// or at the root when groupId is null.
 export function insertShape(shapes: Shape[], groupId: string | null, shape: Shape): Shape[] {
   if (groupId === null) return [...shapes, shape]
   return shapes.map(s => {
-    if (s.type !== 'group') return s
+    if (!isContainerShape(s)) return s
     if (s.id === groupId) return { ...s, children: [...s.children, shape] }
     return { ...s, children: insertShape(s.children, groupId, shape) }
   })
@@ -95,7 +99,7 @@ export function insertShapeAt(shapes: Shape[], groupId: string | null, index: nu
     return [...shapes.slice(0, i), shape, ...shapes.slice(i)]
   }
   return shapes.map(s => {
-    if (s.type !== 'group') return s
+    if (!isContainerShape(s)) return s
     if (s.id === groupId) {
       const i = Math.max(0, Math.min(index, s.children.length))
       return { ...s, children: [...s.children.slice(0, i), shape, ...s.children.slice(i)] }
@@ -105,20 +109,20 @@ export function insertShapeAt(shapes: Shape[], groupId: string | null, index: nu
 }
 
 // The sibling list a shape lives in: root `shapes`, or the children array of
-// its parent group. Used to scope z-order reordering to the shape's own
+// its parent container. Used to scope z-order reordering to the shape's own
 // container instead of always operating on the slide root.
 export function getSiblingList(shapes: Shape[], groupId: string | null): Shape[] {
   if (groupId === null) return shapes
   const loc = findShapeById(shapes, groupId)
-  return loc && loc.shape.type === 'group' ? loc.shape.children : []
+  return loc && isContainerShape(loc.shape) ? loc.shape.children : []
 }
 
-// Replace the sibling list at `groupId` (root, or a group's children) with
+// Replace the sibling list at `groupId` (root, or a container's children) with
 // `newList`. Symmetric to getSiblingList.
 export function replaceSiblingList(shapes: Shape[], groupId: string | null, newList: Shape[]): Shape[] {
   if (groupId === null) return newList
   return shapes.map(s => {
-    if (s.type !== 'group') return s
+    if (!isContainerShape(s)) return s
     if (s.id === groupId) return { ...s, children: newList }
     return { ...s, children: replaceSiblingList(s.children, groupId, newList) }
   })
@@ -128,7 +132,7 @@ export function replaceSiblingList(shapes: Shape[], groupId: string | null, newL
 // Needed by "duplicate" so the copy is independent of the source.
 export function cloneShapeWithNewIds(shape: Shape): Shape {
   const nextId = crypto.randomUUID()
-  if (shape.type === 'group') {
+  if (isContainerShape(shape)) {
     return { ...shape, id: nextId, children: shape.children.map(cloneShapeWithNewIds) }
   }
   return { ...shape, id: nextId }
@@ -139,10 +143,10 @@ export function cloneShapeWithNewIds(shape: Shape): Shape {
 export function isDescendantOf(shapes: Shape[], shapeId: string, ancestorId: string): boolean {
   if (shapeId === ancestorId) return true
   for (const s of shapes) {
-    if (s.id === ancestorId && s.type === 'group') {
+    if (s.id === ancestorId && isContainerShape(s)) {
       return findShapeById(s.children, shapeId) !== null
     }
-    if (s.type === 'group') {
+    if (isContainerShape(s)) {
       if (isDescendantOf(s.children, shapeId, ancestorId)) return true
     }
   }
@@ -155,6 +159,8 @@ const TYPE_LABEL: Record<Shape['type'], string> = {
   text: 'Text',
   image: 'Image',
   group: 'Group',
+  'if-group': 'If',
+  'for-group': 'For',
 }
 
 // Auto-generate a fresh name for a newly-created shape
@@ -163,14 +169,14 @@ export function nextShapeName(shapes: Shape[], type: Shape['type']): string {
   const walk = (list: Shape[]) => {
     for (const s of list) {
       if (s.type === type) count += 1
-      if (s.type === 'group') walk(s.children)
+      if (isContainerShape(s)) walk(s.children)
     }
   }
   walk(shapes)
   return `${TYPE_LABEL[type]} ${count + 1}`
 }
 
-// Find the innermost group whose absolute bounding box contains (px, py).
+// Find the innermost container whose absolute bounding box contains (px, py).
 // Skips the shape identified by `excludeId` (used to avoid dropping a group
 // into itself, or a shape into its current parent while dragging).
 export function findInnermostGroupAt(
@@ -183,7 +189,7 @@ export function findInnermostGroupAt(
 ): { id: string; absX: number; absY: number; width: number; height: number } | null {
   for (let i = shapes.length - 1; i >= 0; i--) {
     const s = shapes[i]
-    if (s.type !== 'group') continue
+    if (!isContainerShape(s)) continue
     if (s.id === excludeId) continue
     const ax = offX + s.x
     const ay = offY + s.y
