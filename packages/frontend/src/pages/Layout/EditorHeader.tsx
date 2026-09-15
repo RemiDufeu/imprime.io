@@ -1,10 +1,12 @@
-import { DownloadOutlined, LeftOutlined } from "@ant-design/icons";
+import { DownloadOutlined, LeftOutlined, ThunderboltFilled } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom"
 import { useState, useEffect } from "react";
 import { presentationsAPI } from "../../api/api";
-import { Button, Input, message, Modal, Form } from "antd";
+import { Button, Input, message, Modal, Form, Switch, Select, Dropdown } from "antd";
+import type { VariableValueType } from "@imprime/sdk";
 import "./EditorHeader.css";
 import { useEditorStore } from "../../store/editor/EditorStore";
+import { DropdownVariablesContent } from "../EditorPage/components/SlideEditor/TopBar/Context-toolbar/DropdownVariablesContent/DropdownVariablesContent";
 
 export default function EditorHeader() {
     const navigate = useNavigate();
@@ -13,6 +15,7 @@ export default function EditorHeader() {
     const [localTitle, setLocalTitle] = useState(presentation?.title ?? '');
     const [isExporting, setIsExporting] = useState(false);
     const [isVariableModalOpen, setIsVariableModalOpen] = useState(false);
+    const [isVariablesDropdownOpen, setIsVariablesDropdownOpen] = useState(false);
     const [form] = Form.useForm();
 
     useEffect(() => {
@@ -45,9 +48,9 @@ export default function EditorHeader() {
 
         if (hasVariables) {
             setIsVariableModalOpen(true);
-            const initialValues: Record<string, string> = {};
+            const initialValues: Record<string, VariableValueType> = {};
             presentation.variableData?.forEach(variable => {
-                if (variable.default) {
+                if (variable.default !== undefined && variable.default !== null) {
                     initialValues[variable.name] = variable.default;
                 }
             });
@@ -58,7 +61,7 @@ export default function EditorHeader() {
         }
     };
 
-    const handleDownloadPDF = async (variableValues: Record<string, string>) => {
+    const handleDownloadPDF = async (variableValues: Record<string, VariableValueType>) => {
         if (!presentation) return;
 
         setIsExporting(true);
@@ -110,13 +113,26 @@ export default function EditorHeader() {
                 className="inputBtn"/>
         </div>
         <div className="gap-header">
+            <Dropdown
+                menu={{ items: [] }}
+                popupRender={() => <DropdownVariablesContent onClose={() => setIsVariablesDropdownOpen(false)} />}
+                trigger={["click"]}
+                placement="bottomRight"
+                open={isVariablesDropdownOpen}
+                onOpenChange={setIsVariablesDropdownOpen}>
+                <Button
+                    size="large"
+                    icon={<ThunderboltFilled />}>
+                    Variables
+                </Button>
+            </Dropdown>
             <Button
                 onClick={handleDownloadClick}
                 color="primary"
                 size="large"
                 loading={isExporting}
                 icon={<DownloadOutlined/>}>
-                Download
+                Imprime
             </Button>
         </div>
     </div>
@@ -137,24 +153,47 @@ export default function EditorHeader() {
             form={form}
             layout="vertical"
         >
-            {presentation?.variableData?.map(variable => (
-                <Form.Item
-                    key={variable._id}
-                    label={variable.name}
-                    name={variable.name}
-                    rules={[
-                        {
-                            required: variable.required,
-                            message: `${variable.name} is required`
-                        }
-                    ]}
-                    tooltip={variable.required ? 'Required' : `Default: ${variable.default || 'None'}`}
-                >
-                    <Input
-                        placeholder={variable.default || `Enter ${variable.name}`}
-                    />
-                </Form.Item>
-            ))}
+            {presentation?.variableData?.map(variable => {
+                const defaultHint = variable.default !== undefined && variable.default !== null
+                    ? `Default: ${Array.isArray(variable.default) ? variable.default.join(', ') : String(variable.default)}`
+                    : 'None';
+
+                let input: React.ReactNode;
+                let valuePropName: string | undefined;
+                if (variable.type === 'boolean') {
+                    input = <Switch />;
+                    valuePropName = 'checked';
+                } else if (variable.type === 'string-list') {
+                    input = (
+                        <Select
+                            mode="tags"
+                            placeholder="Add items..."
+                            tokenSeparators={[',']}
+                            style={{ width: '100%' }}
+                        />
+                    );
+                } else {
+                    input = <Input placeholder={typeof variable.default === 'string' ? variable.default : `Enter ${variable.name}`} />;
+                }
+
+                return (
+                    <Form.Item
+                        key={variable._id}
+                        label={variable.name}
+                        name={variable.name}
+                        valuePropName={valuePropName}
+                        rules={[
+                            {
+                                required: variable.required,
+                                message: `${variable.name} is required`
+                            }
+                        ]}
+                        tooltip={variable.required ? 'Required' : defaultHint}
+                    >
+                        {input}
+                    </Form.Item>
+                );
+            })}
         </Form>
     </Modal>
     </>

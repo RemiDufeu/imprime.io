@@ -10,6 +10,7 @@ import type {
   ImageDTO,
   PresentationDTO,
   VariableDTO,
+  VariableValueType,
   EnabledAuthProviders,
 } from '@imprime/common'
 
@@ -451,7 +452,7 @@ export class ImprimeClient {
    * @param variableValues - Optional record of variable ID to value mappings
    * @returns PDF blob URL that can be used for download
    */
-  async exportToPDF(presentationId: string, variableValues?: Record<string, string>): Promise<Blob> {
+  async exportToPDF(presentationId: string, variableValues?: Record<string, VariableValueType>): Promise<Blob> {
     const url = `${this.baseUrl}/export/${presentationId}/pdf`
 
     const controller = new AbortController()
@@ -486,7 +487,7 @@ export class ImprimeClient {
    * Note: This method is only available in browser environments
    * @param variableValues - Optional record of variable ID to value mappings
    */
-  async downloadPDF(presentationId: string, filename?: string, variableValues?: Record<string, string>): Promise<void> {
+  async downloadPDF(presentationId: string, filename?: string, variableValues?: Record<string, VariableValueType>): Promise<void> {
     if (typeof window === 'undefined' || typeof document === 'undefined') {
       throw new Error('downloadPDF is only available in browser environments')
     }

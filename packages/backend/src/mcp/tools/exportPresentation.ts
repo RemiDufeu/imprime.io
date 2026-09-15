@@ -18,9 +18,9 @@ function getApiBaseUrl(): string {
 const inputSchema = {
   presentationId: z.string().describe('ID of the presentation to export'),
   variableValues: z
-    .record(z.string())
+    .record(z.union([z.string(), z.boolean(), z.array(z.string())]))
     .optional()
-    .describe('Optional map of variable id → value for substitution'),
+    .describe('Optional map of variable name → value for substitution. Accepts string, boolean, or string[]'),
 }
 
 const outputSchema = {

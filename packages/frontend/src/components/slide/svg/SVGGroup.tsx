@@ -18,8 +18,6 @@ export function SVGGroup({ shape, readonly = false }: SVGGroupProps) {
     return (
         <g transform={`translate(${shape.x} ${shape.y})`}>
             <rect
-                x={0}
-                y={0}
                 width={shape.width}
                 height={shape.height}
                 fill={token.colorFillTertiary}

@@ -15,7 +15,9 @@ export function IfGroupContextBar() {
   if (!loc || loc.shape.type !== 'if-group') return null
   const group = loc.shape
 
-  const options = variables.map(v => ({ value: v._id, label: v.name }))
+  const options = variables
+    .filter(v => v.type === 'boolean')
+    .map(v => ({ value: v._id, label: v.name }))
 
   return (
     <div className="toolbar-container context-toolbar">
@@ -26,13 +28,11 @@ export function IfGroupContextBar() {
           onChange={(value: string | undefined) => updateShape(group.id, { conditionVariable: value })}
           size="small"
           style={{ width: 200 }}
-          placeholder="Select a variable"
+          placeholder="Select a boolean variable"
           allowClear
           options={options}
+          notFoundContent="No boolean variables"
         />
-        <span className="toolbar-label" style={{ marginLeft: 8, opacity: 0.7 }}>
-          is "true"
-        </span>
       </div>
     </div>
   )

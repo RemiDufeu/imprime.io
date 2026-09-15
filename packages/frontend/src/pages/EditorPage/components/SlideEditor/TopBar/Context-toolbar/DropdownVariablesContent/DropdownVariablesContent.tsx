@@ -1,16 +1,31 @@
-import { Input, Button, List, Form, Switch, Popconfirm } from 'antd'
+import { Input, Button, List, Form, Switch, Popconfirm, Select } from 'antd'
 import { ArrowLeftOutlined, PlusOutlined, SearchOutlined, DeleteOutlined } from '@ant-design/icons'
 import { useState, useMemo } from 'react'
 import { useEditorStore } from '../../../../../../../store/editor/EditorStore'
-import type { VariableData } from '@imprime/sdk'
+import type { VariableData, VariableType, VariableValueType } from '@imprime/sdk'
 import './DropdownVariablesContent.css'
 
 interface VariableFormData {
   name: string
-  defaultValue?: string
+  type: VariableType
+  defaultValue?: VariableValueType
   required?: boolean
 }
 
+const TYPE_OPTIONS: { value: VariableType; label: string }[] = [
+  { value: 'string', label: 'String' },
+  { value: 'boolean', label: 'Boolean' },
+  { value: 'string-list', label: 'List of strings' },
+]
+
+const TYPE_BADGE_LABEL: Record<VariableType, string> = {
+  'string': 'string',
+  'boolean': 'boolean',
+  'string-list': 'list',
+}
+
+// The text-editor variable dropdown only inserts inline text variables, so
+// only string-typed variables can be picked from that list.
 interface DropdownVariablesContentProps {
   onClose?: () => void
 }
@@ -20,16 +35,18 @@ export function DropdownVariablesContent({ onClose }: DropdownVariablesContentPr
   const [isCreation, setCreation] = useState(false)
   const [form] = Form.useForm<VariableFormData>()
   const [isRequired, setIsRequired] = useState(false)
+  const [selectedType, setSelectedType] = useState<VariableType>('string')
   const [isFormValid, setIsFormValid] = useState(false)
   const presentation = useEditorStore(state => state.presentation)
 
   const variables = presentation?.variableData || []
 
   const filteredVariables = useMemo(() => {
-    if (!searchText.trim()) return variables
+    const stringOnly = variables.filter(v => v.type === 'string')
+    if (!searchText.trim()) return stringOnly
 
     const searchLower = searchText.toLowerCase()
-    return variables.filter(variable =>
+    return stringOnly.filter(variable =>
       variable.name.toLowerCase().includes(searchLower)
     )
   }, [variables, searchText])
@@ -59,6 +76,7 @@ export function DropdownVariablesContent({ onClose }: DropdownVariablesContentPr
     setCreation(false);
     form.resetFields();
     setIsRequired(false);
+    setSelectedType('string');
     setIsFormValid(false);
   }
 
@@ -82,14 +100,13 @@ export function DropdownVariablesContent({ onClose }: DropdownVariablesContentPr
         name: values.name,
         default: values.defaultValue,
         required: values.required || false,
-        type: 'string'
+        type: values.type,
       });
 
       const newVariable = newVariables[newVariables.length - 1];
 
-      if (newVariable) {
+      if (newVariable && newVariable.type === 'string') {
         insertVariable(newVariable._id);
-
         onClose?.();
       }
 
@@ -97,6 +114,49 @@ export function DropdownVariablesContent({ onClose }: DropdownVariablesContentPr
     } catch (error) {
       console.error('Failed to create variable:', error);
     }
+  }
+
+  const renderDefaultInput = () => {
+    if (selectedType === 'boolean') {
+      return (
+        <Form.Item
+          label="Default Value"
+          name="defaultValue"
+          valuePropName="checked"
+          tooltip={isRequired ? "Disabled when variable is required" : undefined}
+        >
+          <Switch disabled={isRequired} />
+        </Form.Item>
+      )
+    }
+    if (selectedType === 'string-list') {
+      return (
+        <Form.Item
+          label="Default Value"
+          name="defaultValue"
+          tooltip={isRequired ? "Disabled when variable is required" : 'Press enter to add an item'}
+        >
+          <Select
+            mode="tags"
+            disabled={isRequired}
+            placeholder="Add items..."
+            tokenSeparators={[',']}
+          />
+        </Form.Item>
+      )
+    }
+    return (
+      <Form.Item
+        label="Default Value"
+        name="defaultValue"
+        tooltip={isRequired ? "Disabled when variable is required" : undefined}
+      >
+        <Input
+          placeholder="Optional"
+          disabled={isRequired}
+        />
+      </Form.Item>
+    )
   }
 
   return (
@@ -112,6 +172,7 @@ export function DropdownVariablesContent({ onClose }: DropdownVariablesContentPr
           form={form}
           layout="vertical"
           className="variable-form"
+          initialValues={{ type: 'string' }}
         >
           <Form.Item
             label="Name"
@@ -124,6 +185,19 @@ export function DropdownVariablesContent({ onClose }: DropdownVariablesContentPr
             <Input
               placeholder="e.g., userName"
               onChange={validateForm}
+            />
+          </Form.Item>
+
+          <Form.Item
+            label="Type"
+            name="type"
+          >
+            <Select
+              options={TYPE_OPTIONS}
+              onChange={(value: VariableType) => {
+                setSelectedType(value)
+                form.setFieldValue('defaultValue', undefined)
+              }}
             />
           </Form.Item>
 
@@ -141,16 +215,7 @@ export function DropdownVariablesContent({ onClose }: DropdownVariablesContentPr
             }} />
           </Form.Item>
 
-          <Form.Item
-            label="Default Value"
-            name="defaultValue"
-            tooltip={isRequired ? "Disabled when variable is required" : undefined}
-          >
-            <Input
-              placeholder="Optional"
-              disabled={isRequired}
-            />
-          </Form.Item>
+          {renderDefaultInput()}
 
           <div className='fill-space'/>
 
@@ -189,10 +254,11 @@ export function DropdownVariablesContent({ onClose }: DropdownVariablesContentPr
                   <div className="variable-main">
                     <div className="variable-name-row">
                       <span className="variable-name">{variable.name}</span>
+                      <span className="variable-type-badge">{TYPE_BADGE_LABEL[variable.type]}</span>
                     </div>
                     <div className="variable-sub">
                       {variable.default !== undefined && variable.default !== null && variable.default !== '' && (
-                        <>Default: <span className="default-value">{variable.default}</span></>
+                        <>Default: <span className="default-value">{String(variable.default)}</span></>
                       )}
                       {variable.required && (
                         <>Required</>
@@ -223,7 +289,7 @@ export function DropdownVariablesContent({ onClose }: DropdownVariablesContentPr
           />
         ) : (
           <div className="no-variables">
-            <span>{searchText ? 'No variables found' : 'No variables yet'}</span>
+            <span>{searchText ? 'No variables found' : 'No string variables yet'}</span>
           </div>
         )}
       </div>

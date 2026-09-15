@@ -28,23 +28,38 @@ export interface RenderOptions {
 export class ExportService {
   constructor(private imageService: ImageService) { }
 
+  private isEmpty(value: VariableValueType | undefined | null): boolean {
+    if (value === undefined || value === null) return true
+    if (typeof value === 'string') return value.trim() === ''
+    if (Array.isArray(value)) return value.length === 0
+    return false
+  }
+
   private validateVariables(presentation: Presentation, variableValues: Record<string, VariableValueType>): void {
     const requiredVariables = presentation.variableData?.filter(v => v.required) || []
 
     for (const variable of requiredVariables) {
       const value = variableValues[variable.name]
-      if (value === undefined || value === null || value.trim() === '') {
+      if (this.isEmpty(value)) {
         throw new ValidationError(`Required variable "${variable.name}" is missing`)
       }
     }
+  }
+
+  private stringify(value: VariableValueType | undefined): string {
+    if (value === undefined || value === null) return ''
+    if (typeof value === 'string') return value
+    if (typeof value === 'boolean') return value ? 'true' : 'false'
+    if (Array.isArray(value)) return value.join(', ')
+    return ''
   }
 
   private getVariableValue(variableId: string, presentation: Presentation, variableValues: Record<string, VariableValueType>): string {
     const variablePresentation = presentation.variableData.find(v => v._id == variableId)
     if (!variablePresentation) return ''
     const runtime = variableValues[variablePresentation.name]
-    if (runtime !== undefined && runtime !== null && runtime !== '') return runtime
-    return variablePresentation.default ?? ''
+    if (!this.isEmpty(runtime)) return this.stringify(runtime)
+    return this.stringify(variablePresentation.default)
   }
 
   private async fetchImageData(resolvedSlides: Slide[]): Promise<Map<string, string>> {
@@ -351,11 +366,11 @@ export class ExportService {
 
     const resolvedSlides: Slide[] = presentation.slides.map(slide => ({
       ...slide,
-      shapes: resolveShapes(slide.shapes, { variableValues, presentation }),
+      shapes: resolveShapes(slide.shapes, { variableValues, presentation })
+        .filter(s => s.y < SLIDE_HEIGHT && s.x < SLIDE_WIDTH),
     }))
 
     const imageDataMap = await this.fetchImageData(resolvedSlides)
-
     const pages = resolvedSlides.map(slide =>
       this.renderSlide(slide, imageDataMap, presentation, variableValues)
     )

@@ -92,12 +92,16 @@ export interface IfGroupShape extends BaseShape {
 }
 
 // Repeat container: children are duplicated once per item in the referenced
-// list variable. V1 stores the list as a comma-separated string on an
-// existing string variable — later this will be a proper array/object type.
+// list variable. Layout params control how iterations are arranged inside the
+// group's own box (same semantics as GroupShape).
 export interface ForGroupShape extends BaseShape {
   type: 'for-group'
   children: Shape[]
   itemsVariable?: string
+  layout?: GroupLayoutDirection
+  justify?: GroupJustify
+  align?: GroupAlign
+  gap?: number
 }
 
 export type ContainerShape = GroupShape | IfGroupShape | ForGroupShape
@@ -148,9 +152,9 @@ export interface VariableData {
   required?: boolean
 }
 
-export type VariableType = "string"
+export type VariableType = "string" | "boolean" | "string-list"
 
-export type VariableValueType = string
+export type VariableValueType = string | boolean | string[]
 
 // ============================================
 // API DTOs (Data Transfer Objects)

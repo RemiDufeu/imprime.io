@@ -1,14 +1,11 @@
-import { Select, Button, Dropdown } from 'antd'
+import { Select, Button } from 'antd'
 import {
   BoldOutlined,
   ItalicOutlined,
-  ThunderboltFilled,
   UnderlineOutlined,
 } from '@ant-design/icons'
-import { useState, useEffect } from 'react'
 import { useEditorStore } from '../../../../../../store/editor/EditorStore'
 import { DebouncedColorPicker } from '../../../../../../components/common'
-import { DropdownVariablesContent } from './DropdownVariablesContent/DropdownVariablesContent'
 
 const FONT_FAMILIES = [
   { value: 'Roboto', label: 'Roboto' },
@@ -55,26 +52,6 @@ export function TextContextBar() {
   const handleUnderlineToggle = () => {
     setUnderline(!attributes.underline)
   }
-
-  const [isVariableButtonEnabled, setIsVariableButtonEnabled] = useState(false)
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
-
-  useEffect(() => {
-    return useEditorStore.subscribe(
-      (state) => ({
-        isFocused: state.isFocused,
-        editor: state.editor,
-        lastSelection: state.lastSelection,
-      }),
-      ({ isFocused, editor, lastSelection }) => {
-        const hasCollapsedSelection = lastSelection !== null &&
-          lastSelection.anchor.offset === lastSelection.focus.offset;
-
-        const isEnabled = isFocused && editor !== null && hasCollapsedSelection;
-        setIsVariableButtonEnabled(isEnabled);
-      }
-    )
-  }, [])
 
   return (
     <>
@@ -157,24 +134,6 @@ export function TextContextBar() {
           />
         </div>
       </div>
-      <Dropdown
-        menu={{ items: [] }}
-        popupRender={() => <DropdownVariablesContent onClose={() => setIsDropdownOpen(false)} />}
-        trigger={["click"]}
-        placement="bottomLeft"
-        open={isDropdownOpen}
-        onOpenChange={setIsDropdownOpen}>
-        <Button
-          disabled={!isVariableButtonEnabled}
-          type='primary'
-          icon={<ThunderboltFilled />}
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={(e) => {
-            e.preventDefault()
-          }}
-        >Variables</Button>
-      </Dropdown>
-
     </>
   )
 }
