@@ -30,6 +30,11 @@
   background-color: var(--ant-color-fill-tertiary);
 }
 
+/* Rows in the management dropdown are not pick-able, only their actions are. */
+.variable-list-item.is-static {
+  cursor: default;
+}
+
 .variable-item-content {
   display: flex;
   justify-content: space-between;

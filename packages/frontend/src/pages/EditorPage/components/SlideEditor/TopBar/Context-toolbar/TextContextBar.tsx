@@ -6,6 +6,7 @@ import {
 } from '@ant-design/icons'
 import { useEditorStore } from '../../../../../../store/editor/EditorStore'
 import { DebouncedColorPicker } from '../../../../../../components/common'
+import { InsertVariableButton } from './InsertVariableButton/InsertVariableButton'
 
 const FONT_FAMILIES = [
   { value: 'Roboto', label: 'Roboto' },
@@ -132,6 +133,14 @@ export function TextContextBar() {
               handleUnderlineToggle()
             }}
           />
+        </div>
+
+        <div className="toolbar-divider" />
+
+        <div className="toolbar-item">
+          <div onMouseDown={(e) => e.preventDefault()}>
+            <InsertVariableButton />
+          </div>
         </div>
       </div>
     </>

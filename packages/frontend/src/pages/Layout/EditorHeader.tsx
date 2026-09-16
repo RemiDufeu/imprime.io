@@ -115,7 +115,7 @@ export default function EditorHeader() {
         <div className="gap-header">
             <Dropdown
                 menu={{ items: [] }}
-                popupRender={() => <DropdownVariablesContent onClose={() => setIsVariablesDropdownOpen(false)} />}
+                popupRender={() => <DropdownVariablesContent />}
                 trigger={["click"]}
                 placement="bottomRight"
                 open={isVariablesDropdownOpen}
