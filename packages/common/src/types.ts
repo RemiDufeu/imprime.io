@@ -28,25 +28,24 @@ export interface EllipseShape extends BaseShape {
   fill: string
 }
 
-export type CustomText = {
-  text: string;
+// Inline formatting carried by every leaf of a paragraph, literal or variable.
+// Factored out so a renderer can style either kind through one code path.
+export interface TextFormatting {
   bold?: boolean;
   underline?: boolean;
   italic?: boolean;
   fontFamily?: string;
   fontSize?: string;
   color?: string;
+}
+
+export type CustomText = TextFormatting & {
+  text: string;
 };
 
-export type VariableElement = {
+export type VariableElement = TextFormatting & {
   type: 'variable';
   variableId: string; // Reference to VariableData._id
-  bold?: boolean;
-  underline?: boolean;
-  italic?: boolean;
-  fontFamily?: string;
-  fontSize?: string;
-  color?: string;
   children: [{ text: '' }]; // Required by Slate for inline elements
 };
 
@@ -108,6 +107,12 @@ export interface ForGroupShape extends BaseShape {
 }
 
 export type ContainerShape = GroupShape | IfGroupShape | ForGroupShape
+
+// Single definition of "is this shape a container?" — the alternative is the
+// three-way `type ===` test rewritten at every recursion site.
+export function isContainerShape(shape: Shape): shape is ContainerShape {
+  return shape.type === 'group' || shape.type === 'if-group' || shape.type === 'for-group'
+}
 
 export type Shape =
   | RectangleShape

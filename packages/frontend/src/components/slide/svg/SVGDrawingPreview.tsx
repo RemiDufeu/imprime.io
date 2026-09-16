@@ -1,11 +1,11 @@
-import { theme } from 'antd'
+import { getDashArray } from '@imprime/sdk'
 import { useEditorStore } from '../../../store/editor/EditorStore'
+import { ContainerFrame } from './ContainerFrame'
 
 export function SVGDrawingPreview() {
     const drawingData = useEditorStore(state => state.drawingData)
     const toolAttributes = useEditorStore(state => state.attributes)
     const selectedTool = useEditorStore(state => state.selectedTool)
-    const { token } = theme.useToken()
 
     if (!drawingData) return null
 
@@ -34,7 +34,7 @@ export function SVGDrawingPreview() {
                     fill={toolAttributes.fillColor}
                     stroke={toolAttributes.strokeColor}
                     strokeWidth={toolAttributes.strokeWidth}
-                    strokeDasharray={toolAttributes.strokeStyle === 'dashed' ? '10,5' : toolAttributes.strokeStyle === 'dotted' ? '2,2' : undefined}
+                    strokeDasharray={getDashArray(toolAttributes.strokeStyle)}
                     rx={toolAttributes.cornerRadius}
                     ry={toolAttributes.cornerRadius}
                     pointerEvents="none"
@@ -56,7 +56,7 @@ export function SVGDrawingPreview() {
                     fill={toolAttributes.fillColor}
                     stroke={toolAttributes.strokeColor}
                     strokeWidth={toolAttributes.strokeWidth}
-                    strokeDasharray={toolAttributes.strokeStyle === 'dashed' ? '10,5' : toolAttributes.strokeStyle === 'dotted' ? '2,2' : undefined}
+                    strokeDasharray={getDashArray(toolAttributes.strokeStyle)}
                     pointerEvents="none"
                 />
             )
@@ -79,26 +79,17 @@ export function SVGDrawingPreview() {
 
         case 'group':
         case 'if-group':
-        case 'for-group': {
-            const stroke = type === 'if-group' ? token.colorInfo
-                : type === 'for-group' ? token.colorWarning
-                : token.colorBorder
+        case 'for-group':
             return (
-                <rect
+                <ContainerFrame
+                    type={type}
                     x={x}
                     y={y}
                     width={width}
                     height={height}
-                    fill={token.colorFillTertiary}
-                    stroke={stroke}
-                    strokeWidth={2}
-                    strokeDasharray="8 6"
-                    rx={4}
-                    ry={4}
                     pointerEvents="none"
                 />
             )
-        }
 
         default:
             return null

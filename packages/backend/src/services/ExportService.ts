@@ -4,15 +4,27 @@ import type {
   Presentation,
   Slide,
   Shape,
+  BaseShape,
   RectangleShape,
   EllipseShape,
   TextBoxShape,
   ImageShape,
   CustomText,
-  VariableElement,
-  VariableValueType
+  TextFormatting,
+  VariableValueType,
+  ResolveContext
 } from '@imprime/common'
-import { SLIDE_WIDTH, SLIDE_HEIGHT, getDashArray, resolveShapes, getEllipseGeometry, getRectangleCornerRadius } from '@imprime/common'
+import {
+  SLIDE_WIDTH,
+  SLIDE_HEIGHT,
+  getDashArray,
+  resolveShapes,
+  resolveVariable,
+  isEmptyVariableValue,
+  stringifyVariableValue,
+  getEllipseGeometry,
+  getRectangleCornerRadius
+} from '@imprime/common'
 import type { ImageService } from './ImageService.js'
 import { AppError, ValidationError } from './errors.js'
 import { normalizeFontFamily, getFontStyleProps, initializeFonts } from '../config/fonts.js'
@@ -21,6 +33,10 @@ import type { Style } from '@react-pdf/types'
 // Initialize fonts on module load
 initializeFonts()
 
+const DEFAULT_FONT_SIZE = 16
+const LINE_HEIGHT = 1.5
+const PARAGRAPH_SPACING = 8
+
 export interface RenderOptions {
   variableValues?: Record<string, VariableValueType>
 }
@@ -28,38 +44,14 @@ export interface RenderOptions {
 export class ExportService {
   constructor(private imageService: ImageService) { }
 
-  private isEmpty(value: VariableValueType | undefined | null): boolean {
-    if (value === undefined || value === null) return true
-    if (typeof value === 'string') return value.trim() === ''
-    if (Array.isArray(value)) return value.length === 0
-    return false
-  }
-
   private validateVariables(presentation: Presentation, variableValues: Record<string, VariableValueType>): void {
     const requiredVariables = presentation.variableData?.filter(v => v.required) || []
 
     for (const variable of requiredVariables) {
-      const value = variableValues[variable.name]
-      if (this.isEmpty(value)) {
+      if (isEmptyVariableValue(variableValues[variable.name])) {
         throw new ValidationError(`Required variable "${variable.name}" is missing`)
       }
     }
-  }
-
-  private stringify(value: VariableValueType | undefined): string {
-    if (value === undefined || value === null) return ''
-    if (typeof value === 'string') return value
-    if (typeof value === 'boolean') return value ? 'true' : 'false'
-    if (Array.isArray(value)) return value.join(', ')
-    return ''
-  }
-
-  private getVariableValue(variableId: string, presentation: Presentation, variableValues: Record<string, VariableValueType>): string {
-    const variablePresentation = presentation.variableData.find(v => v._id == variableId)
-    if (!variablePresentation) return ''
-    const runtime = variableValues[variablePresentation.name]
-    if (!this.isEmpty(runtime)) return this.stringify(runtime)
-    return this.stringify(variablePresentation.default)
   }
 
   private async fetchImageData(resolvedSlides: Slide[]): Promise<Map<string, string>> {
@@ -107,154 +99,113 @@ export class ExportService {
     return imageDataMap
   }
 
-  private renderRectangle(shape: RectangleShape): React.ReactElement {
-    const { x, y, width, height, fill, stroke, strokeWidth, strokeStyle } = shape
-    const cornerRadius = getRectangleCornerRadius(shape)
-    const sw = strokeWidth || 0
+  /**
+   * Wrap one vector shape in its own absolutely-positioned `Svg` layer, clipped
+   * to the page. `draw` receives the layer's origin so it can express the shape
+   * in layer-local coordinates.
+   */
+  private renderInSvgLayer(
+    shape: BaseShape,
+    draw: (origin: { left: number; top: number }) => React.ReactElement
+  ): React.ReactElement {
+    const sw = shape.strokeWidth || 0
+    const left = Math.max(0, shape.x - sw / 2)
+    const top = Math.max(0, shape.y - sw / 2)
+    const width = Math.max(0, Math.min(SLIDE_WIDTH, shape.x + shape.width + sw / 2) - left)
+    const height = Math.max(0, Math.min(SLIDE_HEIGHT, shape.y + shape.height + sw / 2) - top)
 
-    const svgLeft = Math.max(0, x - sw / 2)
-    const svgTop = Math.max(0, y - sw / 2)
-    const svgRight = Math.min(SLIDE_WIDTH, x + width + sw / 2)
-    const svgBottom = Math.min(SLIDE_HEIGHT, y + height + sw / 2)
-    const svgWidth = Math.max(0, svgRight - svgLeft)
-    const svgHeight = Math.max(0, svgBottom - svgTop)
-
-    if (svgWidth <= 0 || svgHeight <= 0) {
+    if (width <= 0 || height <= 0) {
       return React.createElement(View, { key: shape.id })
     }
 
     return React.createElement(Svg, {
       key: shape.id,
-      style: {
-        position: 'absolute',
-        left: svgLeft,
-        top: svgTop,
-        width: svgWidth,
-        height: svgHeight
-      }
-    },
+      style: { position: 'absolute', left, top, width, height }
+    }, draw({ left, top }))
+  }
+
+  private renderRectangle(shape: RectangleShape): React.ReactElement {
+    const fill = this.parseColor(shape.fill, 'none')
+    const stroke = this.parseColor(shape.stroke, 'none')
+    const cornerRadius = getRectangleCornerRadius(shape)
+
+    return this.renderInSvgLayer(shape, ({ left, top }) =>
       React.createElement(Rect, {
-        x: x - svgLeft,
-        y: y - svgTop,
-        width,
-        height,
-        fill: this.parseColor(fill, 'none').color,
-        fillOpacity: this.parseColor(fill, 'none').opacity,
+        x: shape.x - left,
+        y: shape.y - top,
+        width: shape.width,
+        height: shape.height,
+        fill: fill.color,
+        fillOpacity: fill.opacity,
         rx: cornerRadius,
         ry: cornerRadius,
-        stroke: this.parseColor(stroke, 'none').color,
-        strokeOpacity: this.parseColor(stroke, 'none').opacity,
-        strokeWidth: sw,
-        strokeDasharray: getDashArray(strokeStyle)
+        stroke: stroke.color,
+        strokeOpacity: stroke.opacity,
+        strokeWidth: shape.strokeWidth || 0,
+        strokeDasharray: getDashArray(shape.strokeStyle)
       })
     )
   }
 
   private renderEllipse(shape: EllipseShape): React.ReactElement {
-    const { x, y, width, height, fill, stroke, strokeWidth, strokeStyle } = shape
+    const fill = this.parseColor(shape.fill, 'none')
+    const stroke = this.parseColor(shape.stroke, 'none')
     const geometry = getEllipseGeometry(shape)
-    const sw = strokeWidth || 0
 
-    const svgLeft = Math.max(0, x - sw / 2)
-    const svgTop = Math.max(0, y - sw / 2)
-    const svgRight = Math.min(SLIDE_WIDTH, x + width + sw / 2)
-    const svgBottom = Math.min(SLIDE_HEIGHT, y + height + sw / 2)
-    const svgWidth = Math.max(0, svgRight - svgLeft)
-    const svgHeight = Math.max(0, svgBottom - svgTop)
-
-    if (svgWidth <= 0 || svgHeight <= 0) {
-      return React.createElement(View, { key: shape.id })
-    }
-
-    return React.createElement(Svg, {
-      key: shape.id,
-      style: {
-        position: 'absolute',
-        left: svgLeft,
-        top: svgTop,
-        width: svgWidth,
-        height: svgHeight
-      }
-    },
+    return this.renderInSvgLayer(shape, ({ left, top }) =>
       React.createElement(Ellipse, {
-        cx: geometry.cx - svgLeft,
-        cy: geometry.cy - svgTop,
+        cx: geometry.cx - left,
+        cy: geometry.cy - top,
         rx: geometry.rx,
         ry: geometry.ry,
-        fill: this.parseColor(fill, 'none').color,
-        fillOpacity: this.parseColor(fill, 'none').opacity,
-        stroke: this.parseColor(stroke, 'none').color,
-        strokeOpacity: this.parseColor(stroke, 'none').opacity,
-        strokeWidth: sw,
-        strokeDasharray: getDashArray(strokeStyle)
+        fill: fill.color,
+        fillOpacity: fill.opacity,
+        stroke: stroke.color,
+        strokeOpacity: stroke.opacity,
+        strokeWidth: shape.strokeWidth || 0,
+        strokeDasharray: getDashArray(shape.strokeStyle)
       })
     )
   }
 
-  private renderTextBox(
-    shape: TextBoxShape,
-    presentation: Presentation,
-    variableValues: Record<string, VariableValueType>
-  ): React.ReactElement {
-    const { x, y, width, paragraphes } = shape
+  /**
+   * Style of one text run. Literal text and variable runs carry the same
+   * `TextFormatting` props, so both go through here.
+   */
+  private inlineTextStyle(node: TextFormatting): Style {
+    const color = this.parseColor(node.color, '#000000')
 
-    const renderTextSegment = (child: CustomText | VariableElement, pIndex: number, cIndex: number): React.ReactElement => {
-      if ('type' in child && child.type === 'variable') {
-        const varElement = child as VariableElement;
-        // itemPath variables are baked by resolveShapes; only global variableId refs land here.
-        const value = varElement.variableId
-          ? this.getVariableValue(varElement.variableId, presentation, variableValues)
-          : ''
-        const fontFamily = normalizeFontFamily(varElement.fontFamily)
-        const styleProps = getFontStyleProps(varElement.bold, varElement.italic)
+    return {
+      fontFamily: normalizeFontFamily(node.fontFamily),
+      fontSize: node.fontSize ? parseInt(node.fontSize) : DEFAULT_FONT_SIZE,
+      color: color.color,
+      opacity: color.opacity,
+      lineHeight: LINE_HEIGHT,
+      textDecoration: node.underline ? 'underline' : undefined,
+      ...getFontStyleProps(node.bold, node.italic)
+    } as Style
+  }
 
-        const varColor = this.parseColor(varElement.color, '#000000')
+  private renderTextBox(shape: TextBoxShape, ctx: ResolveContext): React.ReactElement {
+    const paragraphElements = shape.paragraphes.map((paragraph, pIndex) => {
+      const textSegments = paragraph.children.map((child, cIndex) => {
+        const content = 'type' in child && child.type === 'variable'
+          ? stringifyVariableValue(resolveVariable(child.variableId, ctx))
+          : (child as CustomText).text
+
         return React.createElement(PDFText, {
           key: `${pIndex}-${cIndex}`,
           fixed: true,
-          style: {
-            fontFamily,
-            fontSize: varElement.fontSize ? parseInt(varElement.fontSize) : 16,
-            color: varColor.color,
-            opacity: varColor.opacity,
-            lineHeight: 1.5,
-            textDecoration: varElement.underline ? 'underline' : undefined,
-            ...styleProps
-          } as Style
-        }, value)
-      } else {
-        const textNode = child as CustomText;
-        const fontFamily = normalizeFontFamily(textNode.fontFamily)
-        const styleProps = getFontStyleProps(textNode.bold, textNode.italic)
-
-        const textColor = this.parseColor(textNode.color, '#000000')
-        return React.createElement(PDFText, {
-          key: `${pIndex}-${cIndex}`,
-          fixed: true,
-          style: {
-            fontFamily,
-            fontSize: textNode.fontSize ? parseInt(textNode.fontSize) : 16,
-            color: textColor.color,
-            opacity: textColor.opacity,
-            lineHeight: 1.5,
-            textDecoration: textNode.underline ? 'underline' : undefined,
-            ...styleProps
-          } as Style
-        }, textNode.text)
-      }
-    }
-
-    const paragraphElements = paragraphes.map((paragraph, pIndex) => {
-      const textSegments = paragraph.children.map((child, cIndex) =>
-        renderTextSegment(child, pIndex, cIndex)
-      )
+          style: this.inlineTextStyle(child)
+        }, content)
+      })
 
       return React.createElement(PDFText, {
         key: pIndex,
         fixed: true,
         style: {
-          marginBottom: pIndex < paragraphes.length - 1 ? 8 : 0,
-          lineHeight: 1.5,
+          marginBottom: pIndex < shape.paragraphes.length - 1 ? PARAGRAPH_SPACING : 0,
+          lineHeight: LINE_HEIGHT,
           ...paragraph.style
         }
       }, textSegments)
@@ -265,9 +216,9 @@ export class ExportService {
       fixed: true,
       style: {
         position: 'absolute',
-        left: x,
-        top: y,
-        width,
+        left: shape.x,
+        top: shape.y,
+        width: shape.width,
       }
     }, paragraphElements)
   }
@@ -313,11 +264,12 @@ export class ExportService {
     })
   }
 
+  // Containers never reach this point: resolveShapes has already flattened the
+  // tree into leaves before rendering starts.
   private renderShape(
     shape: Shape,
     imageDataMap: Map<string, string>,
-    presentation: Presentation,
-    variableValues: Record<string, VariableValueType>
+    ctx: ResolveContext
   ): React.ReactElement {
     switch (shape.type) {
       case 'rectangle':
@@ -325,24 +277,20 @@ export class ExportService {
       case 'ellipse':
         return this.renderEllipse(shape)
       case 'text':
-        return this.renderTextBox(shape, presentation, variableValues)
+        return this.renderTextBox(shape, ctx)
       case 'image':
         return this.renderImage(shape, imageDataMap)
-      default: {
+      default:
         return React.createElement(View, {})
-      }
     }
   }
 
   private renderSlide(
     slide: Slide,
     imageDataMap: Map<string, string>,
-    presentation: Presentation,
-    variableValues: Record<string, VariableValueType>
+    ctx: ResolveContext
   ): React.ReactElement {
-    const shapes = slide.shapes.map(shape =>
-      this.renderShape(shape, imageDataMap, presentation, variableValues)
-    )
+    const shapes = slide.shapes.map(shape => this.renderShape(shape, imageDataMap, ctx))
 
     return React.createElement(Page, {
       key: slide._id,
@@ -362,16 +310,15 @@ export class ExportService {
 
     this.validateVariables(presentation, variableValues)
 
+    const ctx: ResolveContext = { variableValues, presentation }
     const resolvedSlides: Slide[] = presentation.slides.map(slide => ({
       ...slide,
-      shapes: resolveShapes(slide.shapes, { variableValues, presentation })
+      shapes: resolveShapes(slide.shapes, ctx)
         .filter(s => s.y < SLIDE_HEIGHT && s.x < SLIDE_WIDTH),
     }))
 
     const imageDataMap = await this.fetchImageData(resolvedSlides)
-    const pages = resolvedSlides.map(slide =>
-      this.renderSlide(slide, imageDataMap, presentation, variableValues)
-    )
+    const pages = resolvedSlides.map(slide => this.renderSlide(slide, imageDataMap, ctx))
 
     const doc = React.createElement(Document, {}, pages)
 

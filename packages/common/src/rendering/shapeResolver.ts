@@ -1,54 +1,21 @@
-import type { Shape, GroupShape, IfGroupShape, ForGroupShape, Presentation, VariableValueType } from '../types.js'
-import { layoutGroupChildren } from './groupLayout.js'
+import type { Shape, GroupShape, IfGroupShape, ForGroupShape } from '../types.js'
+import { isContainerShape } from '../types.js'
+import { layoutGroupChildren, distributeMainAxis, crossAxisOffset } from './groupLayout.js'
+import { resolveVariable, type ResolveContext } from './variables.js'
+
+export type { ResolveContext }
+
+// Move a set of children from their parent's local space into the parent's own
+// space. Every container expansion needs this, hence the one helper.
+function translate(shapes: Shape[], dx: number, dy: number): Shape[] {
+  return shapes.map(shape => ({ ...shape, x: shape.x + dx, y: shape.y + dy }) as Shape)
+}
 
 function reidShape(shape: Shape, suffix: string): Shape {
-  if (shape.type === 'group' || shape.type === 'if-group' || shape.type === 'for-group') {
-    return {
-      ...shape,
-      id: `${shape.id}::${suffix}`,
-      children: shape.children.map(c => reidShape(c, suffix)),
-    } as Shape
-  }
-  return { ...shape, id: `${shape.id}::${suffix}` } as Shape
-}
-
-// Values are looked up by variable name (that's the surface the export
-// endpoint / UI expose today). The presentation carries the variables so we
-// can fall back to `default` when no runtime value was supplied.
-export interface ResolveContext {
-  variableValues: Record<string, VariableValueType>
-  presentation?: Presentation
-}
-
-function readVariableValue(id: string | undefined, ctx?: ResolveContext): VariableValueType | undefined {
-  if (!id || !ctx) return undefined
-  // conditionVariable / itemsVariable store the variable _id; look up by _id
-  // then read the runtime value by name (or default from the variable).
-  const variable = ctx.presentation?.variableData?.find(v => v._id === id)
-  if (!variable) return undefined
-  const runtime = ctx.variableValues[variable.name]
-  if (runtime !== undefined && runtime !== null) return runtime
-  return variable.default
-}
-
-function expandGroup(group: GroupShape, ctx?: ResolveContext): Shape[] {
-  // When the group has an active layout, recompute children positions from
-  // the layout rules instead of trusting their persisted x/y — the only way
-  // this stays correct once children come from dynamic data.
-  const laidOut = layoutGroupChildren(group)
-  const translated = laidOut.map(child =>
-    ({ ...child, x: child.x + group.x, y: child.y + group.y }) as Shape
-  )
-  return resolveShapes(translated, ctx)
-}
-
-function expandIfGroup(group: IfGroupShape, ctx?: ResolveContext): Shape[] {
-  const value = readVariableValue(group.conditionVariable, ctx)
-  if (value !== true) return []
-  const translated = group.children.map(child =>
-    ({ ...child, x: child.x + group.x, y: child.y + group.y }) as Shape
-  )
-  return resolveShapes(translated, ctx)
+  const id = `${shape.id}::${suffix}`
+  return isContainerShape(shape)
+    ? { ...shape, id, children: shape.children.map(child => reidShape(child, suffix)) } as Shape
+    : { ...shape, id } as Shape
 }
 
 export interface ChildrenBBox {
@@ -73,98 +40,89 @@ export function childrenBBox(children: Shape[]): ChildrenBBox {
   return { minX, minY, width: maxX - minX, height: maxY - minY }
 }
 
-// Computes the per-iteration (x, y) offset relative to the for-group's own
-// origin, given how many iterations to emit.
-function forGroupIterationOffsets(
-  group: ForGroupShape,
-  count: number
-): { xOff: number; yOff: number }[] {
-  if (count <= 0) return []
-  const layout = group.layout ?? 'vertical'
-  const gap = group.gap ?? 0
-  const justify = group.justify ?? 'start'
-  const align = group.align ?? 'start'
-  const isRow = layout === 'horizontal'
+// When the group has an active layout, children positions are recomputed from
+// the layout rules instead of trusting their persisted x/y — the only way this
+// stays correct once children come from dynamic data.
+function expandGroup(group: GroupShape, ctx?: ResolveContext): Shape[] {
+  return resolveShapes(translate(layoutGroupChildren(group), group.x, group.y), ctx)
+}
 
+function expandIfGroup(group: IfGroupShape, ctx?: ResolveContext): Shape[] {
+  // Strictly the boolean `true`: a string or a list is never coerced.
+  if (resolveVariable(group.conditionVariable, ctx) !== true) return []
+  return resolveShapes(translate(group.children, group.x, group.y), ctx)
+}
+
+// Per-iteration (x, y) offset relative to the for-group's own origin. Each
+// iteration occupies the children's tight bbox, so they are laid out as
+// `count` identically-sized items — the same distribution a group applies to
+// its children.
+function forGroupIterationOffsets(group: ForGroupShape, count: number): { xOff: number; yOff: number }[] {
+  if (count <= 0) return []
+
+  const isRow = (group.layout ?? 'vertical') === 'horizontal'
   const bbox = childrenBBox(group.children)
   const iterMain = isRow ? bbox.width : bbox.height
   const iterCross = isRow ? bbox.height : bbox.width
-  const containerMain = isRow ? group.width : group.height
-  const containerCross = isRow ? group.height : group.width
 
-  const contentMain = count * iterMain + gap * Math.max(0, count - 1)
-  const freeSpace = Math.max(0, containerMain - contentMain)
+  const mainOffsets = distributeMainAxis(
+    Array.from({ length: count }, () => iterMain),
+    isRow ? group.width : group.height,
+    group.gap ?? 0,
+    group.justify ?? 'start',
+  )
+  const crossPos = crossAxisOffset(group.align ?? 'start', isRow ? group.height : group.width, iterCross)
 
-  let cursor = 0
-  let itemGap = gap
-  if (justify === 'center') cursor = freeSpace / 2
-  else if (justify === 'end') cursor = freeSpace
-  else if (justify === 'space-between' && count > 1) itemGap = gap + freeSpace / (count - 1)
-  else if (justify === 'space-around') {
-    const around = freeSpace / count
-    cursor = around / 2
-    itemGap = gap + around
-  }
-
-  let crossPos = 0
-  if (align === 'center') crossPos = (containerCross - iterCross) / 2
-  else if (align === 'end') crossPos = containerCross - iterCross
-
-  const out: { xOff: number; yOff: number }[] = []
-  for (let i = 0; i < count; i++) {
-    const mainPos = cursor
-    cursor += iterMain + itemGap
-    out.push({
-      xOff: isRow ? mainPos : crossPos,
-      yOff: isRow ? crossPos : mainPos,
-    })
-  }
-  return out
+  return mainOffsets.map(mainPos => ({
+    xOff: isRow ? mainPos : crossPos,
+    yOff: isRow ? crossPos : mainPos,
+  }))
 }
 
 function expandForGroup(group: ForGroupShape, ctx?: ResolveContext): Shape[] {
-  const value = readVariableValue(group.itemsVariable, ctx)
-  if (!Array.isArray(value)) return []
-  const items = value
-  if (items.length === 0) return []
+  const items = resolveVariable(group.itemsVariable, ctx)
+  if (!Array.isArray(items) || items.length === 0) return []
 
-  // Children's positions are subtracted by the tight bbox origin so each
-  // iteration is placed at (group.x + xOff, group.y + yOff) — otherwise
-  // authored minX/minY get added on top of the layout offset and shift
-  // iterations off-slide (space-around, end, center all break).
+  // Children are shifted by the tight bbox origin so each iteration lands at
+  // (group.x + xOff, group.y + yOff) — otherwise the authored minX/minY get
+  // added on top of the layout offset and push iterations off-slide.
   const bbox = childrenBBox(group.children)
   const offsets = forGroupIterationOffsets(group, items.length)
 
-  // Each iteration reforges ids so React (react-pdf renderer) doesn't see
-  // duplicate keys — the original child.id is only unique for the source tree.
   const out: Shape[] = []
   for (let i = 0; i < items.length; i++) {
     const { xOff, yOff } = offsets[i]
-    const translated = group.children.map(child => {
-      const reided = reidShape(child, `for-${group.id}-${i}`)
-      return {
-        ...reided,
-        x: reided.x - bbox.minX + group.x + xOff,
-        y: reided.y - bbox.minY + group.y + yOff,
-      } as Shape
-    })
-    out.push(...resolveShapes(translated, ctx))
+    // Each iteration reforges ids so the renderer never sees duplicate keys —
+    // the authored child.id is only unique within the source tree.
+    const iteration = group.children.map(child => reidShape(child, `for-${group.id}-${i}`))
+    out.push(...resolveShapes(
+      translate(iteration, group.x + xOff - bbox.minX, group.y + yOff - bbox.minY),
+      ctx,
+    ))
   }
   return out
 }
 
+/**
+ * Flatten a shape tree into absolute-positioned leaves: containers are expanded
+ * (conditions evaluated, iterations materialised), hidden shapes are dropped.
+ */
 export function resolveShapes(shapes: Shape[], ctx?: ResolveContext): Shape[] {
   const out: Shape[] = []
   for (const shape of shapes) {
     if (shape.hidden) continue
-    if (shape.type === 'group') {
-      out.push(...expandGroup(shape, ctx))
-    } else if (shape.type === 'if-group') {
-      out.push(...expandIfGroup(shape, ctx))
-    } else if (shape.type === 'for-group') {
-      out.push(...expandForGroup(shape, ctx))
-    } else {
-      out.push(shape)
+    switch (shape.type) {
+      case 'group':
+        out.push(...expandGroup(shape, ctx))
+        break
+      case 'if-group':
+        out.push(...expandIfGroup(shape, ctx))
+        break
+      case 'for-group':
+        out.push(...expandForGroup(shape, ctx))
+        break
+      default:
+        out.push(shape)
     }
   }
   return out

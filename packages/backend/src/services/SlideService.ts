@@ -4,6 +4,7 @@ import { SlideModel } from '../models/Slide.js'
 import { VariableDataModel } from '../models/VariableData.js'
 import { slideCreateToModel, slideUpdateToModel, toObjectId } from '../models/mappers.js'
 import type { ImageShape, Shape, SlideDTO } from '@imprime/common'
+import { isContainerShape } from '@imprime/common'
 import type { ImageService } from './ImageService.js'
 import { NotFoundError, ValidationError } from './errors.js'
 
@@ -105,7 +106,7 @@ export class SlideService {
             }
           })
         })
-      } else if (shape.type === 'group' || shape.type === 'if-group' || shape.type === 'for-group') {
+      } else if (isContainerShape(shape)) {
         errors.push(...this.validateVariableReferences(shape.children, validVariableIds))
       }
     })
@@ -117,7 +118,7 @@ export class SlideService {
     for (const shape of shapes) {
       if (shape.type === 'image') {
         if (shape.imageId) ids.push(shape.imageId)
-      } else if (shape.type === 'group' || shape.type === 'if-group' || shape.type === 'for-group') {
+      } else if (isContainerShape(shape)) {
         ids.push(...this.collectImageIds(shape.children))
       }
     }

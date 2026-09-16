@@ -1,4 +1,8 @@
-import type { Shape, ContainerShape } from '@imprime/sdk'
+import type { Shape } from '@imprime/sdk'
+import { isContainerShape } from '@imprime/sdk'
+
+// Re-exported so tree helpers and their callers import the guard from one place.
+export { isContainerShape }
 
 export interface ShapeLocation {
   shape: Shape
@@ -6,10 +10,6 @@ export interface ShapeLocation {
   // Absolute top-left of the shape in slide coordinates
   absX: number
   absY: number
-}
-
-export function isContainerShape(shape: Shape): shape is ContainerShape {
-  return shape.type === 'group' || shape.type === 'if-group' || shape.type === 'for-group'
 }
 
 // Locate a shape anywhere in the tree along with its parent group and absolute
