@@ -16,7 +16,7 @@ import { useShapeTreeUI } from '../ShapeTreeUIContext'
 import { SiblingList } from '../SiblingList/SiblingList'
 import { RenameInput } from '../RenameInput/RenameInput'
 import { shapeIcon } from './shapeIcon'
-import { isContainerShape } from '../../../../../../../utils/shapeTree'
+import { isContainerShape, shapeDisplayName } from '../../../../../../../utils/shapeTree'
 
 const INDENT_PX = 14
 const DRAG_MIME = 'application/x-imprime-shape-id'
@@ -181,7 +181,7 @@ export function ShapeRow({
                 <span className="shape-tree-row-icon">{shapeIcon(shape)}</span>
                 {isRenaming ? (
                     <RenameInput
-                        initial={shape.name ?? ''}
+                        initial={shapeDisplayName(shape)}
                         onCommit={(name) => {
                             const trimmed = name.trim()
                             updateShape(shape.id, { name: trimmed.length > 0 ? trimmed : undefined })
@@ -191,7 +191,7 @@ export function ShapeRow({
                     />
                 ) : (
                     <span className="shape-tree-row-label">
-                        {shape.name ?? ''}
+                        {shapeDisplayName(shape)}
                     </span>
                 )}
                 <span

@@ -163,6 +163,12 @@ const TYPE_LABEL: Record<Shape['type'], string> = {
   'for-group': 'For',
 }
 
+// What the layers panel shows for a shape. Shapes created before `name`
+// existed have none, so fall back to their type rather than an empty row.
+export function shapeDisplayName(shape: Shape): string {
+  return shape.name ?? TYPE_LABEL[shape.type]
+}
+
 // Auto-generate a fresh name for a newly-created shape
 export function nextShapeName(shapes: Shape[], type: Shape['type']): string {
   let count = 0

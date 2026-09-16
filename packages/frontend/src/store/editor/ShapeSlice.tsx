@@ -119,7 +119,7 @@ export const createShapeSlice : StateCreator<
         const copy = cloneShapeWithNewIds(loc.shape)
         // Slight offset so the copy is visually distinct from the source.
         const OFFSET = 20
-        const copiedName = loc.shape.name ? `${loc.shape.name} copie` : undefined
+        const copiedName = loc.shape.name ? `${loc.shape.name} copy` : undefined
         const relocated = { ...copy, x: copy.x + OFFSET, y: copy.y + OFFSET, name: copiedName } as Shape
 
         // Insert directly after the source in its parent's children.
@@ -198,7 +198,7 @@ export const createShapeSlice : StateCreator<
         if (!currentSlide) return
         const copy = cloneShapeWithNewIds(clipboardShape)
         const OFFSET = 20
-        const pastedName = clipboardShape.name ? `${clipboardShape.name} copie` : undefined
+        const pastedName = clipboardShape.name ? `${clipboardShape.name} copy` : undefined
         const relocated = { ...copy, x: copy.x + OFFSET, y: copy.y + OFFSET, name: pastedName } as Shape
         const nextShapes = insertShapeAt(currentSlide.shapes, null, currentSlide.shapes.length, relocated)
         updateSlideShapes(currentSlide._id, nextShapes)

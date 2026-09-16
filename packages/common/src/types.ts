@@ -75,7 +75,8 @@ export interface GroupShape extends BaseShape {
   type: 'group'
   children: Shape[]
   // Flexbox-like auto-layout for children. Defaults to 'none' (free-form
-  // positioning, children keep their own x/y) when unset — existing groups
+  // positioning, children keep their own x/y) when unset, so groups saved
+  // before auto-layout existed keep rendering exactly as they did.
   layout?: GroupLayoutDirection
   justify?: GroupJustify
   align?: GroupAlign
@@ -83,8 +84,10 @@ export interface GroupShape extends BaseShape {
 }
 
 // Conditional container: children only appear in the exported output when
-// the referenced variable evaluates to a truthy value (case-insensitive
-// "true" for the V1 string-typed variable system).
+// the referenced variable holds the boolean `true`. Only a `boolean` variable
+// is accepted — a string or a list is never coerced, so `"true"` or a non-empty
+// list renders nothing. The editor's picker filters to boolean variables for
+// the same reason.
 export interface IfGroupShape extends BaseShape {
   type: 'if-group'
   children: Shape[]

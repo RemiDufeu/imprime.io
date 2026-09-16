@@ -70,7 +70,9 @@ export const createSlideSlice: StateCreator<
     updateSlideShapes: (slideId: string, shapes: Shape[]) => {
         const { presentation, _saveSlide } = get()
         if (!presentation) return
-        // shape positions (rendering, hit-testing, selection).
+        // Groups with an active layout are re-laid-out before the write, so
+        // every consumer downstream reads final, real shape positions
+        // (rendering, hit-testing, selection).
         const reflowed = reflowGroups(shapes)
 
         set({

@@ -328,8 +328,6 @@ export class ExportService {
         return this.renderTextBox(shape, presentation, variableValues)
       case 'image':
         return this.renderImage(shape, imageDataMap)
-      case 'group':
-        return React.createElement(View, { key: shape.id })
       default: {
         return React.createElement(View, {})
       }
