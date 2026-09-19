@@ -2,20 +2,41 @@ import { Input, Button, Form, Switch, Select } from 'antd'
 import { ArrowLeftOutlined } from '@ant-design/icons'
 import { useState } from 'react'
 import { useEditorStore } from '../../../../../../../store/editor/EditorStore'
-import type { VariableData, VariableType, VariableValueType } from '@imprime/sdk'
+import type { VariableData, VariableItemField, VariableType, VariableValueType } from '@imprime/sdk'
+import { ItemListInput } from '../../../../../../../components/common'
+import { ItemFieldsEditor, ITEM_FIELD_NAME_PATTERN } from './ItemFieldsEditor'
 
 interface VariableFormData {
   name: string
   type: VariableType
   defaultValue?: VariableValueType
   required?: boolean
+  itemFields?: VariableItemField[]
 }
 
-const TYPE_OPTIONS: { value: VariableType; label: string }[] = [
-  { value: 'string', label: 'String' },
-  { value: 'boolean', label: 'Boolean' },
-  { value: 'string-list', label: 'List of strings' },
-]
+// A Record rather than an array of options, so the next VariableType member
+// fails to compile here instead of quietly missing from the picker.
+const TYPE_LABEL: Record<VariableType, string> = {
+  'string': 'String',
+  'boolean': 'Boolean',
+  'object-list': 'List',
+}
+
+const TYPE_OPTIONS = (Object.keys(TYPE_LABEL) as VariableType[]).map(value => ({
+  value,
+  label: TYPE_LABEL[value],
+}))
+
+// Every declared field needs a usable name before the variable can be created:
+// the name is half of the path a text run stores.
+function areItemFieldsValid(fields: VariableItemField[] | undefined): boolean {
+  if (!fields || fields.length === 0) return false
+  return fields.every(
+    field =>
+      ITEM_FIELD_NAME_PATTERN.test(field.name) &&
+      (field.type !== 'object-list' || areItemFieldsValid(field.itemFields))
+  )
+}
 
 interface VariableCreationFormProps {
   // Called with the freshly created variable, so the caller can decide what to
@@ -31,6 +52,10 @@ export function VariableCreationForm({ onCreated, onCancel, lockedType }: Variab
   const [isRequired, setIsRequired] = useState(false)
   const [selectedType, setSelectedType] = useState<VariableType>(lockedType ?? 'string')
   const [isFormValid, setIsFormValid] = useState(false)
+
+  // The declared schema drives the default-value hint, so the form has to read
+  // its own field back.
+  const itemFields = Form.useWatch('itemFields', form)
 
   const createVariable = useEditorStore(state => state.createVariable)
   const isLoadingVariables = useEditorStore(state => state.isLoadingVariables)
@@ -53,6 +78,7 @@ export function VariableCreationForm({ onCreated, onCancel, lockedType }: Variab
         default: values.defaultValue,
         required: values.required || false,
         type: values.type,
+        itemFields: values.type === 'object-list' ? values.itemFields : undefined,
       })
 
       const newVariable = newVariables[newVariables.length - 1]
@@ -75,19 +101,14 @@ export function VariableCreationForm({ onCreated, onCancel, lockedType }: Variab
         </Form.Item>
       )
     }
-    if (selectedType === 'string-list') {
+    if (selectedType === 'object-list') {
       return (
         <Form.Item
           label="Default Value"
           name="defaultValue"
-          tooltip={isRequired ? 'Disabled when variable is required' : 'Press enter to add an item'}
+          tooltip={isRequired ? 'Disabled when variable is required' : 'A JSON array of objects'}
         >
-          <Select
-            mode="tags"
-            disabled={isRequired}
-            placeholder="Add items..."
-            tokenSeparators={[',']}
-          />
+          <ItemListInput disabled={isRequired} itemFields={itemFields} />
         </Form.Item>
       )
     }
@@ -114,6 +135,7 @@ export function VariableCreationForm({ onCreated, onCancel, lockedType }: Variab
         layout="vertical"
         className="variable-form"
         initialValues={{ type: lockedType ?? 'string' }}
+        onValuesChange={validateForm}
       >
         <Form.Item
           label="Name"
@@ -123,7 +145,7 @@ export function VariableCreationForm({ onCreated, onCancel, lockedType }: Variab
             { pattern: /^[a-zA-Z_][a-zA-Z0-9_]*$/, message: 'Must start with letter/underscore' },
           ]}
         >
-          <Input placeholder="e.g., userName" onChange={validateForm} />
+          <Input placeholder="e.g., userName" />
         </Form.Item>
 
         <Form.Item label="Type" name="type">
@@ -145,6 +167,24 @@ export function VariableCreationForm({ onCreated, onCancel, lockedType }: Variab
             }}
           />
         </Form.Item>
+
+        {selectedType === 'object-list' && (
+          <Form.Item
+            label="Item Fields"
+            name="itemFields"
+            tooltip="Declared once, then offered by the pickers inside a for group"
+            rules={[
+              {
+                validator: (_, value) =>
+                  areItemFieldsValid(value)
+                    ? Promise.resolve()
+                    : Promise.reject(new Error('Every field needs a name of letters, digits or underscore')),
+              },
+            ]}
+          >
+            <ItemFieldsEditor />
+          </Form.Item>
+        )}
 
         {renderDefaultInput()}
 

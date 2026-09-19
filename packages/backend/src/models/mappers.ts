@@ -29,6 +29,7 @@ export function variableToDTO(doc: VariableDataDocument): VariableData {
     name: doc.name,
     default: doc.default,
     required: doc.required,
+    itemFields: doc.itemFields,
   }
 }
 
@@ -87,24 +88,26 @@ export function slidesReorderToOrderUpdates(
 export function variableCreateToModel(
   presentationId: Types.ObjectId,
   dto: VariableDTO.Create
-): Pick<IVariableData, 'presentationId' | 'type' | 'name' | 'default' | 'required'> {
+): Pick<IVariableData, 'presentationId' | 'type' | 'name' | 'default' | 'required' | 'itemFields'> {
   return {
     presentationId,
     type: dto.type,
     name: dto.name,
     default: dto.default,
     required: dto.required ?? false,
+    itemFields: dto.itemFields,
   }
 }
 
 export function variableUpdateToModel(
   dto: VariableDTO.Update
-): Partial<Pick<IVariableData, 'type' | 'name' | 'default' | 'required'>> {
-  const update: Partial<Pick<IVariableData, 'type' | 'name' | 'default' | 'required'>> = {}
+): Partial<Pick<IVariableData, 'type' | 'name' | 'default' | 'required' | 'itemFields'>> {
+  const update: Partial<Pick<IVariableData, 'type' | 'name' | 'default' | 'required' | 'itemFields'>> = {}
   if (dto.type !== undefined) update.type = dto.type
   if (dto.name !== undefined) update.name = dto.name
   if (dto.default !== undefined) update.default = dto.default
   if (dto.required !== undefined) update.required = dto.required
+  if (dto.itemFields !== undefined) update.itemFields = dto.itemFields
   return update
 }
 

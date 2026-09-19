@@ -1,4 +1,4 @@
-import type { Shape } from '@imprime/sdk'
+import type { ContainerShape, Shape } from '@imprime/sdk'
 import { isContainerShape } from '@imprime/sdk'
 
 // Re-exported so tree helpers and their callers import the guard from one place.
@@ -27,6 +27,24 @@ export function findShapeById(
     }
     if (isContainerShape(s)) {
       const found = findShapeById(s.children, id, s.id, offX + s.x, offY + s.y)
+      if (found) return found
+    }
+  }
+  return null
+}
+
+// The containers enclosing a shape, outermost first. Recursive like every other
+// helper here rather than backed by an id index — a flat id → location map was
+// tried for this tree and rolled back.
+export function findAncestorPath(
+  shapes: Shape[],
+  id: string,
+  trail: ContainerShape[] = [],
+): ContainerShape[] | null {
+  for (const s of shapes) {
+    if (s.id === id) return trail
+    if (isContainerShape(s)) {
+      const found = findAncestorPath(s.children, id, [...trail, s])
       if (found) return found
     }
   }

@@ -71,6 +71,13 @@ anything visual.
 | `/update-docs` | sync README and `.env.example` from the code |
 | `/pr` | verify, review, and write a description that says what to check by hand |
 
+## Adding to the harness
+
+`AUTHORING.md` holds the conventions these files follow — the skill description
+formula, the body shape of each kind of file, the argument and verdict
+conventions, templates and smell tests. Read it before adding a skill, a command
+or an agent, and add the new file to the right table above.
+
 ## Why this shape
 
 Three properties of this repository drove the selection:

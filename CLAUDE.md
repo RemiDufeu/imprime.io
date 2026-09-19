@@ -98,7 +98,8 @@ generating a PDF, never by typecheck alone.
 ## Harness
 
 `.claude/` holds this project's agents, skills and commands. `.claude/README.md`
-lists them. Start with `/verify`, `/parity`, `/feature`, `/new-shape`.
+lists them; `.claude/AUTHORING.md` says how to write a new one. Start with
+`/verify`, `/parity`, `/feature`, `/new-shape`.
 
 Frontend work is covered by four skills: `frontend-stack` (the libraries and
 their configuration), `frontend-structure` (where files go), `frontend-styling`

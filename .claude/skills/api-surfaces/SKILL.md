@@ -100,9 +100,6 @@ field (that text is what the agent reads), `assertOwnsPresentation` first,
 `toolError(...)` on failure rather than a thrown exception, and both
 `content` (human-readable) and `structuredContent` (machine-readable) on success.
 `exportPresentation.ts` is the reference implementation, including the
-`@ts-ignore TS2589` on `registerTool` — a known upstream regression, with the
-issue link and a recheck condition in the comment. Match that form if you need
-another suppression.
 
 Binary results are not returned inline: the PDF goes into `pdfDownloadStore`
 and the tool returns a single-use URL with a 10-minute TTL.

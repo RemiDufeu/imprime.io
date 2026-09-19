@@ -1,6 +1,10 @@
-import { useMemo } from 'react'
 import { Button, Dropdown, type MenuProps } from 'antd'
-import { useEditorStore } from '../../../../../../../store/editor/EditorStore'
+import { useCurrentSlide, useEditorStore } from '../../../../../../../store/editor/EditorStore'
+import {
+    decodeItemFieldValue,
+    encodeItemFieldValue,
+    itemFieldsInScope,
+} from '../../../../../../../utils/variableScope'
 
 const EMPTY_KEY = '__none__'
 
@@ -8,20 +12,32 @@ const EMPTY_KEY = '__none__'
 // offered here — that belongs to the Variables button in the header.
 export function InsertVariableButton() {
     const variables = useEditorStore(state => state.presentation?.variableData)
+    const selectedShapeId = useEditorStore(state => state.selectedShape?.id)
     const insertVariable = useEditorStore(state => state.insertVariable)
+    const currentSlide = useCurrentSlide()
 
-    // Only string variables can be inlined into text.
-    const items: MenuProps['items'] = useMemo(() => {
-        const textVariables = (variables ?? []).filter(v => v.type === 'string')
-        if (textVariables.length === 0) {
-            return [{ key: EMPTY_KEY, label: 'No text variables', disabled: true }]
-        }
-        return textVariables.map(v => ({ key: v._id, label: v.name }))
-    }, [variables])
+    // Only strings can be inlined into text: a presentation-wide string
+    // variable, or a string field of an item an enclosing for-group iterates.
+    const textVariables = (variables ?? [])
+        .filter(v => v.type === 'string')
+        .map(v => ({ key: encodeItemFieldValue(v._id, ''), label: v.name }))
+
+    const scopedFields = selectedShapeId
+        ? itemFieldsInScope(currentSlide?.shapes ?? [], selectedShapeId, variables ?? [], 'string').map(
+            option => ({ key: encodeItemFieldValue(option.variableId, option.itemPath), label: option.label })
+        )
+        : []
+
+    const entries = [...textVariables, ...scopedFields]
+    const items: MenuProps['items'] = entries.length === 0
+        ? [{ key: EMPTY_KEY, label: 'No text variables', disabled: true }]
+        : entries
 
     const handleSelect: MenuProps['onClick'] = ({ key }) => {
         if (key === EMPTY_KEY) return
-        insertVariable(key)
+        const decoded = decodeItemFieldValue(key)
+        if (!decoded) return
+        insertVariable(decoded.variableId, decoded.itemPath === '' ? undefined : decoded.itemPath)
     }
 
     return (

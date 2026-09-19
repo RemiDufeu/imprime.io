@@ -2,6 +2,11 @@ import { Select, InputNumber, Divider } from 'antd'
 import type { GroupAlign, GroupJustify, GroupLayoutDirection } from '@imprime/sdk'
 import { useCurrentSlide, useEditorStore } from '../../../../../../store/editor/EditorStore'
 import { findShapeById } from '../../../../../../utils/shapeTree'
+import {
+  decodeItemFieldValue,
+  encodeItemFieldValue,
+  itemFieldsInScope,
+} from '../../../../../../utils/variableScope'
 
 const LAYOUT_OPTIONS: { value: GroupLayoutDirection; label: string }[] = [
   { value: 'horizontal', label: 'Horizontal' },
@@ -35,9 +40,30 @@ export function ForGroupContextBar() {
   if (!loc || loc.shape.type !== 'for-group') return null
   const group = loc.shape
 
-  const options = variables
-    .filter(v => v.type === 'string-list')
-    .map(v => ({ value: v._id, label: v.name }))
+  // Two ways to bind a repeat: a list variable, or a list field of an item an
+  // enclosing for-group is already iterating. The second is what makes nesting
+  // possible, so both sit in one picker.
+  const options = [
+    ...variables
+      .filter(v => v.type === 'object-list')
+      .map(v => ({ value: encodeItemFieldValue(v._id, ''), label: v.name })),
+    ...itemFieldsInScope(currentSlide?.shapes ?? [], group.id, variables, 'object-list').map(
+      option => ({ value: encodeItemFieldValue(option.variableId, option.itemPath), label: option.label })
+    ),
+  ]
+
+  // '' encodes "the variable itself", which is `itemPath` left unset.
+  const selected = group.itemsVariable
+    ? encodeItemFieldValue(group.itemsVariable, group.itemPath ?? '')
+    : undefined
+
+  const handleSelect = (value: string | undefined) => {
+    const decoded = decodeItemFieldValue(value)
+    updateShape(group.id, {
+      itemsVariable: decoded?.variableId,
+      itemPath: decoded?.itemPath === '' ? undefined : decoded?.itemPath,
+    })
+  }
 
   const layout = group.layout ?? 'vertical'
   const justify = group.justify ?? 'start'
@@ -49,8 +75,8 @@ export function ForGroupContextBar() {
       <div className="toolbar-item">
         <span className="toolbar-label">Repeat for each</span>
         <Select
-          value={group.itemsVariable}
-          onChange={(value: string | undefined) => updateShape(group.id, { itemsVariable: value })}
+          value={selected}
+          onChange={handleSelect}
           size="small"
           style={{ width: 200 }}
           placeholder="Select a list variable"

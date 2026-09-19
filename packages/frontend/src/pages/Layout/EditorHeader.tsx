@@ -2,10 +2,11 @@ import { DownloadOutlined, LeftOutlined, ThunderboltFilled } from "@ant-design/i
 import { useNavigate } from "react-router-dom"
 import { useState, useEffect } from "react";
 import { presentationsAPI } from "../../api/api";
-import { Button, Input, message, Modal, Form, Switch, Select, Dropdown } from "antd";
+import { Button, Input, message, Modal, Form, Switch, Dropdown } from "antd";
 import type { VariableValueType } from "@imprime/sdk";
 import "./EditorHeader.css";
 import { useEditorStore } from "../../store/editor/EditorStore";
+import { ItemListInput } from "../../components/common";
 import { DropdownVariablesContent } from "../EditorPage/components/SlideEditor/TopBar/Context-toolbar/DropdownVariablesContent/DropdownVariablesContent";
 
 export default function EditorHeader() {
@@ -155,7 +156,7 @@ export default function EditorHeader() {
         >
             {presentation?.variableData?.map(variable => {
                 const defaultHint = variable.default !== undefined && variable.default !== null
-                    ? `Default: ${Array.isArray(variable.default) ? variable.default.join(', ') : String(variable.default)}`
+                    ? `Default: ${Array.isArray(variable.default) ? `${variable.default.length} items` : String(variable.default)}`
                     : 'None';
 
                 let input: React.ReactNode;
@@ -163,15 +164,8 @@ export default function EditorHeader() {
                 if (variable.type === 'boolean') {
                     input = <Switch />;
                     valuePropName = 'checked';
-                } else if (variable.type === 'string-list') {
-                    input = (
-                        <Select
-                            mode="tags"
-                            placeholder="Add items..."
-                            tokenSeparators={[',']}
-                            style={{ width: '100%' }}
-                        />
-                    );
+                } else if (variable.type === 'object-list') {
+                    input = <ItemListInput itemFields={variable.itemFields} />;
                 } else {
                     input = <Input placeholder={typeof variable.default === 'string' ? variable.default : `Enter ${variable.name}`} />;
                 }

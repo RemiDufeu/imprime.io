@@ -1,0 +1,13 @@
+.item-list-input {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.item-list-input .ant-input {
+  font-family: var(--ant-font-family-code);
+}
+
+.item-list-input .item-list-hint {
+  font-size: var(--ant-font-size-sm);
+}

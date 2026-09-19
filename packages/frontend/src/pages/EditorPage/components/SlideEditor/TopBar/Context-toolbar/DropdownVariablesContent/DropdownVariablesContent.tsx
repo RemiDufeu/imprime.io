@@ -2,14 +2,22 @@ import { Input, Button, List, Popconfirm } from 'antd'
 import { PlusOutlined, SearchOutlined, DeleteOutlined } from '@ant-design/icons'
 import { useState, useMemo } from 'react'
 import { useEditorStore } from '../../../../../../../store/editor/EditorStore'
-import type { VariableType } from '@imprime/sdk'
+import type { VariableData, VariableType } from '@imprime/sdk'
 import { VariableCreationForm } from './VariableCreationForm'
 import './DropdownVariablesContent.css'
 
 const TYPE_BADGE_LABEL: Record<VariableType, string> = {
   'string': 'string',
   'boolean': 'boolean',
-  'string-list': 'list',
+  'object-list': 'list',
+}
+
+// A list's default is a row of objects — summarise it rather than stringify it,
+// which would print '[object Object]'.
+function formatDefault(variable: VariableData): string {
+  const value = variable.default
+  if (Array.isArray(value)) return `${value.length} item${value.length === 1 ? '' : 's'}`
+  return String(value)
 }
 
 // Presentation-wide variable management: create, review and delete. Inserting a
@@ -74,7 +82,7 @@ export function DropdownVariablesContent() {
                     </div>
                     <div className="variable-sub">
                       {variable.default !== undefined && variable.default !== null && variable.default !== '' && (
-                        <>Default: <span className="default-value">{String(variable.default)}</span></>
+                        <>Default: <span className="default-value">{formatDefault(variable)}</span></>
                       )}
                       {variable.required && (
                         <>Required</>
