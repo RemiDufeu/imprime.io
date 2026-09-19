@@ -17,6 +17,8 @@ const VariableDataSchema = new Schema<IVariableData>({
   required: { type: Boolean, default: false },
 })
 
+VariableDataSchema.index({ presentationId: 1, name: 1 }, { unique: true })
+
 export type VariableDataDocument = HydratedDocument<IVariableData>
 
 export const VariableDataModel = model<IVariableData>('VariableData', VariableDataSchema)

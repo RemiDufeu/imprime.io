@@ -146,9 +146,9 @@ those areas, say which other agent should also run.
   here by design. Flag a *new* service that departs from it, not the pattern.
 - **The absence of transactions** on an existing multi-collection operation.
   Flag it only if a new operation's partial-failure state is actively harmful.
-- The pre-existing gaps already documented in the skills (unscoped images,
-  non-recursive `collectImageIds` in `PresentationService`, duplicated
-  `touchPresentation`, dead `VariableData.value`) unless the diff touches them.
+- The two pre-existing gaps still documented in the skills — unscoped images,
+  and the non-recursive `collectImageIds` in `PresentationService` — unless the
+  diff touches them. Both are known and deliberately deferred.
 
 ## Output
 

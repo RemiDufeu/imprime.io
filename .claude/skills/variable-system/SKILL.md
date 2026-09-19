@@ -11,7 +11,7 @@ A variable is what turns a document into a template. Definitions live on the
 presentation; values arrive at export time.
 
 ```ts
-VariableData  { _id, type, name, value?, default?, required? }
+VariableData  { _id, type, name, default?, required? }
 VariableType  'string' | 'boolean' | 'string-list'
 VariableValueType  string | boolean | string[]
 ```
@@ -89,13 +89,17 @@ empty child is required by Slate for inline void elements; do not remove it.
 
 Enforced in `packages/backend/src/services/VariableService.ts`:
 
-- **Names are unique per presentation** — `create` and `update` both throw
-  `ConflictError('VARIABLE_NAME_EXISTS')`. The uniqueness is what makes the
+- **Names are unique per presentation**, enforced twice: `create` and `update`
+  check first and throw `ConflictError('VARIABLE_NAME_EXISTS')`, and a unique
+  index on `{ presentationId, name }` catches the race between two concurrent
+  writers, mapped back to the same error. The uniqueness is what makes the
   name-keyed payload unambiguous.
+- **A variable has no stored value.** `default` is the only value on the
+  definition; runtime values arrive per export and never persist.
 - **A variable in use cannot be deleted** — `ValidationError('VARIABLE_IN_USE')`.
   The frontend special-cases this code in `VariableSlice.deleteVariable` to show
   "Variable used in the template".
-- Every mutation `touchPresentation()`s so `updatedAt` reflects variable edits,
+- Every mutation calls `touchPresentation()` so `updatedAt` reflects variable edits,
   and returns the **full refreshed list**, which the store swaps into
   `presentation.variableData` wholesale.
 

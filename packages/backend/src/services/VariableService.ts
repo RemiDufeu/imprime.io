@@ -7,9 +7,16 @@ import {
   variableToDTO,
   variableUpdateToModel,
 } from '../models/mappers.js'
-import type { Types } from 'mongoose'
 import type { VariableDTO, VariableData } from '@imprime/common'
+import { touchPresentation } from './PresentationService.js'
 import { NotFoundError, ConflictError, ValidationError } from './errors.js'
+
+const nameConflict = () =>
+  new ConflictError('Variable name already exists in this presentation', 'VARIABLE_NAME_EXISTS')
+
+function isDuplicateName(err: unknown): boolean {
+  return typeof err === 'object' && err !== null && (err as { code?: number }).code === 11000
+}
 
 export class VariableService {
   public async create(presentationId: string, data: VariableDTO.Create): Promise<VariableData[]> {
@@ -23,14 +30,16 @@ export class VariableService {
       name: data.name,
     })
     if (exists) {
-      throw new ConflictError(
-        'Variable name already exists in this presentation',
-        'VARIABLE_NAME_EXISTS'
-      )
+      throw nameConflict()
     }
 
-    await VariableDataModel.create(variableCreateToModel(presentation._id, data))
-    await this.touchPresentation(presentation._id)
+    try {
+      await VariableDataModel.create(variableCreateToModel(presentation._id, data))
+    } catch (err) {
+      if (isDuplicateName(err)) throw nameConflict()
+      throw err
+    }
+    await touchPresentation(presentation._id)
     return await this.list(presentation._id.toString())
   }
 
@@ -54,16 +63,18 @@ export class VariableService {
         _id: { $ne: variable._id },
       })
       if (conflict) {
-        throw new ConflictError(
-          'Variable name already exists in this presentation',
-          'VARIABLE_NAME_EXISTS'
-        )
+        throw nameConflict()
       }
     }
 
     Object.assign(variable, variableUpdateToModel(data))
-    await variable.save()
-    await this.touchPresentation(variable.presentationId)
+    try {
+      await variable.save()
+    } catch (err) {
+      if (isDuplicateName(err)) throw nameConflict()
+      throw err
+    }
+    await touchPresentation(variable.presentationId)
 
     return await this.list(presentationId)
   }
@@ -86,7 +97,7 @@ export class VariableService {
     }
 
     await variable.deleteOne()
-    await this.touchPresentation(variable.presentationId)
+    await touchPresentation(variable.presentationId)
     return await this.list(presentationId)
   }
 
@@ -97,13 +108,6 @@ export class VariableService {
     return variables.map(variableToDTO)
   }
 
-  private async touchPresentation(presentationId: Types.ObjectId): Promise<unknown> {
-    return PresentationModel.updateOne(
-      { _id: presentationId },
-      { $currentDate: { updatedAt: true } }
-    )
-  }
-  
   private async isVariableInUse(presentationId: string, variableId: string): Promise<boolean> {
     const slides = await SlideModel.find({
       presentationId: toObjectId(presentationId),

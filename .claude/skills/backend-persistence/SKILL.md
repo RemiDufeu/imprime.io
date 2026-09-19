@@ -45,9 +45,20 @@ Schema conventions in use:
 
 - **Index every foreign key**: `presentationId` and `ownerId` are both
   `index: true`. Queries filter on them constantly.
+- **Declare an index a business rule depends on.** `VariableData` carries
+  `index({ presentationId: 1, name: 1 }, { unique: true })` because name
+  uniqueness is what makes the name-keyed export payload unambiguous — the
+  service's `exists()` pre-check alone cannot survive two concurrent writers.
+  When you add one, map the resulting E11000 back to the service's own error so
+  the client contract does not change. Note that Mongoose builds indexes on
+  startup and only *creates* them: a unique index will fail to build (logged on
+  the connection, the app keeps running unguarded) if the collection already
+  holds duplicates, and removing the declaration will not drop an index already
+  in the database.
 - **`timestamps: true`** everywhere except `VariableData`, which has none — so a
-  variable edit cannot be dated. `touchPresentation()` exists to compensate by
-  bumping the parent's `updatedAt`.
+  variable edit cannot be dated. `touchPresentation()` (exported from
+  `PresentationService.ts`) exists to compensate by bumping the parent's
+  `updatedAt`.
 - **`enum` on constrained strings**: `VariableData.type` is
   `enum: ['string', 'boolean', 'string-list']`, matching `VariableType` in
   `common`. Extending the union means extending the enum in the same change, or
@@ -195,17 +206,11 @@ Verify these still hold before relying on them:
    level only, while `SlideService.collectImageIds` walks the tree via
    `isContainerShape`. Deleting a presentation therefore orphans every image
    nested inside a group.
-2. **`variableToDTO` never maps `value`.** `VariableData` in `common` declares
-   `value?`, and `IVariableData` has no such field — so it is dead on both the
-   read and the write path. Either remove it from the type or implement it.
-3. **Variable name uniqueness is enforced only in service code**, with no unique
-   index on `{ presentationId, name }`. Two concurrent creates can both pass the
-   `exists()` check.
-4. **`touchPresentation` is duplicated** — identical private method in
-   `SlideService` and `VariableService`.
-5. **Images are unscoped.** No `ownerId`, no `presentationId`, and the routes do
+2. **Images are unscoped.** No `ownerId`, no `presentationId`, and the routes do
    not check ownership, so any authenticated user can read or delete any image
-   by id. → skill `backend-routes`
+   by id. Closing it needs ownership at the model level plus a decision about
+   images already stored without an owner — deliberately left open for now.
+   → skill `backend-routes`
 
 ## Related
 

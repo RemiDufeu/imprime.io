@@ -1,4 +1,3 @@
-import type { Types } from 'mongoose'
 import { PresentationModel } from '../models/Presentation.js'
 import { SlideModel } from '../models/Slide.js'
 import { VariableDataModel } from '../models/VariableData.js'
@@ -6,6 +5,7 @@ import { slideCreateToModel, slideUpdateToModel, toObjectId } from '../models/ma
 import type { ImageShape, Shape, SlideDTO } from '@imprime/common'
 import { isContainerShape } from '@imprime/common'
 import type { ImageService } from './ImageService.js'
+import { touchPresentation } from './PresentationService.js'
 import { NotFoundError, ValidationError } from './errors.js'
 
 export class SlideService {
@@ -18,7 +18,7 @@ export class SlideService {
     }
     const order = await SlideModel.countDocuments({ presentationId: presentation._id })
     await SlideModel.create(slideCreateToModel(presentation._id, order))
-    await this.touchPresentation(presentation._id)
+    await touchPresentation(presentation._id)
   }
 
   async updateShapes(
@@ -58,7 +58,7 @@ export class SlideService {
 
     Object.assign(slide, slideUpdateToModel(data))
     await slide.save()
-    await this.touchPresentation(slide.presentationId)
+    await touchPresentation(slide.presentationId)
   }
 
   async delete(presentationId: string, slideId: string): Promise<void> {
@@ -80,14 +80,7 @@ export class SlideService {
     }
 
     await slide.deleteOne()
-    await this.touchPresentation(slide.presentationId)
-  }
-
-  private async touchPresentation(presentationId: Types.ObjectId): Promise<unknown> {
-    return PresentationModel.updateOne(
-      { _id: presentationId },
-      { $currentDate: { updatedAt: true } }
-    )
+    await touchPresentation(slide.presentationId)
   }
 
   private validateVariableReferences(shapes: Shape[], validVariableIds: Set<string>): string[] {

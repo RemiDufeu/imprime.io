@@ -12,9 +12,17 @@ import {
   toObjectId,
   variableToDTO,
 } from '../models/mappers.js'
+import type { Types } from 'mongoose'
 import type { ImageShape, Presentation, PresentationDTO, PresentationSummary, Shape } from '@imprime/common'
 import type { ImageService } from './ImageService.js'
 import { NotFoundError } from './errors.js'
+
+export function touchPresentation(presentationId: Types.ObjectId): Promise<unknown> {
+  return PresentationModel.updateOne(
+    { _id: presentationId },
+    { $currentDate: { updatedAt: true } }
+  )
+}
 
 function collectImageIds(shapes: Shape[]): string[] {
   return shapes

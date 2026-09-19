@@ -155,7 +155,6 @@ export interface VariableData {
   _id: string
   type: VariableType
   name: string
-  value?: VariableValueType
   default?: VariableValueType
   required?: boolean
 }
@@ -200,7 +199,6 @@ export namespace VariableDTO {
   export interface Create {
     type: VariableType
     name: string
-    value?: VariableValueType
     default?: VariableValueType
     required?: boolean
   }
@@ -208,7 +206,6 @@ export namespace VariableDTO {
   export interface Update {
     type?: VariableType
     name?: string
-    value?: VariableValueType
     default?: VariableValueType
     required?: boolean
   }

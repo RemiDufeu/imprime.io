@@ -116,13 +116,17 @@ Slides and variables bump the presentation's `updatedAt` so the home page sorts
 correctly:
 
 ```ts
-private async touchPresentation(presentationId: Types.ObjectId) {
+// PresentationService.ts — module-level, exported
+export function touchPresentation(presentationId: Types.ObjectId): Promise<unknown> {
   return PresentationModel.updateOne({ _id: presentationId }, { $currentDate: { updatedAt: true } })
 }
 ```
 
-Identical in `SlideService` and `VariableService` — duplicated, and a reasonable
-thing to factor out if you are already in both files.
+It lives in `PresentationService.ts` because the presentation owns the
+timestamp, and `SlideService` / `VariableService` import the function. This is
+the shape to copy when two services need the same helper: a module-level export
+from the file that owns the concept — **not** a private method copied into both,
+and not a cross-service singleton import.
 
 ### Validate the tree before writing it
 
@@ -154,10 +158,13 @@ object back rather than a patch it has to merge.
 
 ### Private helpers stay private
 
-`touchPresentation`, `validateVariableReferences`, `collectImageIds` are
-`private` methods. A helper needed by two services becomes a module-level
-function in the file that owns the concept, or moves to `packages/common` if the
-frontend needs it too.
+`validateVariableReferences` and `collectImageIds` are `private` methods,
+because only their own service calls them. A helper needed by **two** services
+becomes a module-level function in the file that owns the concept — as
+`touchPresentation` did — or moves to `packages/common` if the frontend needs it
+too. `VariableService` also keeps two module-level helpers of its own
+(`nameConflict`, `isDuplicateName`) so the name-clash error has one definition
+across the pre-check and the index race.
 
 ## Adding a service
 
