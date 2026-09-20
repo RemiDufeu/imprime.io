@@ -105,7 +105,7 @@ export function variableUpdateToModel(
   const update: Partial<Pick<IVariableData, 'type' | 'name' | 'default' | 'required' | 'itemFields'>> = {}
   if (dto.type !== undefined) update.type = dto.type
   if (dto.name !== undefined) update.name = dto.name
-  if (dto.default !== undefined) update.default = dto.default
+  if (dto.default !== undefined) update.default = dto.default ?? undefined
   if (dto.required !== undefined) update.required = dto.required
   if (dto.itemFields !== undefined) update.itemFields = dto.itemFields
   return update

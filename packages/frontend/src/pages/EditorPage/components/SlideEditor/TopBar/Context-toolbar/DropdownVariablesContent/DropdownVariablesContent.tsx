@@ -1,9 +1,8 @@
-import { Input, Button, List, Popconfirm } from 'antd'
-import { PlusOutlined, SearchOutlined, DeleteOutlined } from '@ant-design/icons'
+import { Input, Button, List, Popconfirm, Tooltip } from 'antd'
+import { PlusOutlined, SearchOutlined, DeleteOutlined, EditOutlined } from '@ant-design/icons'
 import { useState, useMemo } from 'react'
 import { useEditorStore } from '../../../../../../../store/editor/EditorStore'
 import type { VariableData, VariableType } from '@imprime/sdk'
-import { VariableCreationForm } from './VariableCreationForm'
 import './DropdownVariablesContent.css'
 
 const TYPE_BADGE_LABEL: Record<VariableType, string> = {
@@ -20,15 +19,17 @@ function formatDefault(variable: VariableData): string {
   return String(value)
 }
 
-// Presentation-wide variable management: create, review and delete. Inserting a
-// variable into a text lives with the text controls instead — see
-// InsertVariableButton — so this list shows every type, not just strings.
+// Presentation-wide variable management: browse and delete, plus the entry
+// points into the edit form, which opens as a modal outside this popup — see
+// VariableFormModal. Inserting a variable into a text lives with the text
+// controls instead (InsertVariableButton), so this list shows every type, not
+// just strings.
 export function DropdownVariablesContent() {
   const [searchText, setSearchText] = useState('')
-  const [isCreation, setCreation] = useState(false)
 
   const variables = useEditorStore(state => state.presentation?.variableData)
   const deleteVariable = useEditorStore(state => state.deleteVariable)
+  const openVariableForm = useEditorStore(state => state.openVariableForm)
 
   const filteredVariables = useMemo(() => {
     const all = variables ?? []
@@ -44,17 +45,6 @@ export function DropdownVariablesContent() {
     } catch (error) {
       console.error('Failed to delete variable:', error)
     }
-  }
-
-  if (isCreation) {
-    return (
-      <div className="dropdown-variables-content">
-        <VariableCreationForm
-          onCancel={() => setCreation(false)}
-          onCreated={() => setCreation(false)}
-        />
-      </div>
-    )
   }
 
   return (
@@ -89,24 +79,38 @@ export function DropdownVariablesContent() {
                       )}
                     </div>
                   </div>
-                  <Popconfirm
-                    title="Delete variable"
-                    description="Are you sure you want to delete this variable?"
-                    onConfirm={(e) => handleDeleteVariable(variable._id, e!)}
-                    onCancel={(e) => e?.stopPropagation()}
-                    okText="Delete"
-                    cancelText="Cancel"
-                    placement="left"
-                  >
-                    <Button
-                      type="text"
-                      size="small"
-                      danger
-                      icon={<DeleteOutlined />}
-                      onClick={(e) => e.stopPropagation()}
-                      className="action-button"
-                    />
-                  </Popconfirm>
+                  <div className="variable-actions">
+                    <Tooltip title="Edit variable">
+                      <Button
+                        type="text"
+                        size="small"
+                        icon={<EditOutlined />}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          openVariableForm({ mode: 'edit', variableId: variable._id })
+                        }}
+                        className="action-button"
+                      />
+                    </Tooltip>
+                    <Popconfirm
+                      title="Delete variable"
+                      description="Are you sure you want to delete this variable?"
+                      onConfirm={(e) => handleDeleteVariable(variable._id, e!)}
+                      onCancel={(e) => e?.stopPropagation()}
+                      okText="Delete"
+                      cancelText="Cancel"
+                      placement="left"
+                    >
+                      <Button
+                        type="text"
+                        size="small"
+                        danger
+                        icon={<DeleteOutlined />}
+                        onClick={(e) => e.stopPropagation()}
+                        className="action-button"
+                      />
+                    </Popconfirm>
+                  </div>
                 </div>
               </List.Item>
             )}
@@ -121,7 +125,7 @@ export function DropdownVariablesContent() {
       <Button
         type="dashed"
         icon={<PlusOutlined />}
-        onClick={() => setCreation(true)}
+        onClick={() => openVariableForm({ mode: 'create' })}
         block>
         Add Variable
       </Button>

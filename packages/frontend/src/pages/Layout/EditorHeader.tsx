@@ -8,6 +8,7 @@ import "./EditorHeader.css";
 import { useEditorStore } from "../../store/editor/EditorStore";
 import { ItemListInput } from "../../components/common";
 import { DropdownVariablesContent } from "../EditorPage/components/SlideEditor/TopBar/Context-toolbar/DropdownVariablesContent/DropdownVariablesContent";
+import { VariableFormModal } from "../EditorPage/components/SlideEditor/TopBar/Context-toolbar/DropdownVariablesContent/VariableFormModal";
 
 export default function EditorHeader() {
     const navigate = useNavigate();
@@ -16,8 +17,12 @@ export default function EditorHeader() {
     const [localTitle, setLocalTitle] = useState(presentation?.title ?? '');
     const [isExporting, setIsExporting] = useState(false);
     const [isVariableModalOpen, setIsVariableModalOpen] = useState(false);
-    const [isVariablesDropdownOpen, setIsVariablesDropdownOpen] = useState(false);
     const [form] = Form.useForm();
+
+    // In the store rather than here: opening the edit form has to close this
+    // panel, and the panel itself is what triggers it.
+    const isVariablesDropdownOpen = useEditorStore(state => state.variablesPanelOpen);
+    const setVariablesPanelOpen = useEditorStore(state => state.setVariablesPanelOpen);
 
     useEffect(() => {
         if (presentation?.title !== undefined) {
@@ -117,10 +122,11 @@ export default function EditorHeader() {
             <Dropdown
                 menu={{ items: [] }}
                 popupRender={() => <DropdownVariablesContent />}
+                destroyOnHidden
                 trigger={["click"]}
                 placement="bottomRight"
                 open={isVariablesDropdownOpen}
-                onOpenChange={setIsVariablesDropdownOpen}>
+                onOpenChange={setVariablesPanelOpen}>
                 <Button
                     size="large"
                     icon={<ThunderboltFilled />}>
@@ -190,6 +196,8 @@ export default function EditorHeader() {
             })}
         </Form>
     </Modal>
+
+    <VariableFormModal />
     </>
     )
 }

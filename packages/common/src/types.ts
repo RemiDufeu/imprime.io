@@ -242,7 +242,7 @@ export namespace VariableDTO {
   export interface Update {
     type?: VariableType
     name?: string
-    default?: VariableValueType
+    default?: VariableValueType | null
     required?: boolean
     itemFields?: VariableItemField[]
   }

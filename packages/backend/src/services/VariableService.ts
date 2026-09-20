@@ -67,7 +67,19 @@ export class VariableService {
       }
     }
 
+    const previousType = variable.type
     Object.assign(variable, variableUpdateToModel(data))
+
+    if (variable.type !== 'object-list') {
+      variable.itemFields = undefined
+    }
+    if (data.type !== undefined && data.type !== previousType && data.default === undefined) {
+      variable.default = undefined
+    }
+    if (data.required === true && data.default === undefined) {
+      variable.default = undefined
+    }
+
     try {
       await variable.save()
     } catch (err) {

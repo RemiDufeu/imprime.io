@@ -15,18 +15,36 @@ export interface ItemFieldOption {
   label: string
 }
 
-// Walk a dotted path through a variable's declared item schema. Stops at
-// anything that is not a declared `object-list`, which is what a path pointing
-// at a field that no longer exists looks like.
-function fieldsAtPath(variable: VariableData, path: string): VariableItemField[] {
-  let fields = variable.itemFields ?? []
-  if (path === '') return fields
+/**
+ * Walk a dotted path through a declared item schema and return the field it
+ * names, or `undefined` when any segment is missing — which is exactly what a
+ * path pointing at a field that no longer exists looks like.
+ *
+ * The empty path names no field: it addresses the variable itself, whose type
+ * lives on the definition rather than in the schema.
+ */
+export function itemFieldAtPath(
+  fields: VariableItemField[] | undefined,
+  path: string,
+): VariableItemField | undefined {
+  if (path === '') return undefined
+
+  let current = fields ?? []
+  let field: VariableItemField | undefined
   for (const segment of path.split(ITEM_PATH_SEPARATOR)) {
-    const field = fields.find(f => f.name === segment)
-    if (!field || field.type !== 'object-list') return []
-    fields = field.itemFields ?? []
+    field = current.find(f => f.name === segment)
+    if (!field) return undefined
+    current = field.itemFields ?? []
   }
-  return fields
+  return field
+}
+
+// The fields declared *inside* the path, i.e. the ones an iteration over it
+// would expose. Only an `object-list` has any.
+function fieldsAtPath(variable: VariableData, path: string): VariableItemField[] {
+  if (path === '') return variable.itemFields ?? []
+  const field = itemFieldAtPath(variable.itemFields, path)
+  return field?.type === 'object-list' ? field.itemFields ?? [] : []
 }
 
 /**
