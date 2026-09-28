@@ -148,18 +148,24 @@ await client.addEllipse('674abc123def456', 'slide-123', {
 ```
 
 #### `addText(presentationId, slideId, options)`
-Add a text box to a slide.
+Add a text box to a slide. Each line of `text` (split on `
+`) becomes a
+paragraph; the formatting options apply to all of them.
 
 ```typescript
 await client.addText('674abc123def456', 'slide-123', {
   x: 50,
   y: 50,
-  text: 'Hello World',
-  width: 200,         // optional, default: 200
-  height: 50,         // optional, default: 50
-  fontSize: 24,       // optional, default: 16
-  fontFamily: 'Arial', // optional, default: 'Arial, sans-serif'
-  color: '#000000'    // optional, default: '#000000'
+  text: 'Hello World
+Second paragraph',
+  width: 200,              // optional, default: 200
+  height: 50,              // optional, default: 50
+  fontSize: 24,            // optional, default: 16
+  fontFamily: 'Roboto',    // optional, default: 'Roboto'; unknown fonts fall back to it
+  color: '#000000',        // optional, default: '#000000'
+  align: 'center',         // optional: 'left' | 'center' | 'right' | 'justify', default: 'left'
+  lineHeight: 1.15,        // optional, multiplier of the font size, default: 1.5
+  verticalAlign: 'middle'  // optional: 'top' | 'middle' | 'bottom', default: 'top'
 })
 ```
 

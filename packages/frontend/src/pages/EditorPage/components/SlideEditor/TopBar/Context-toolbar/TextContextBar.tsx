@@ -1,9 +1,20 @@
+import type { ReactNode } from 'react'
 import { Select, Button } from 'antd'
 import {
   BoldOutlined,
   ItalicOutlined,
   UnderlineOutlined,
+  StrikethroughOutlined,
+  AlignLeftOutlined,
+  AlignCenterOutlined,
+  AlignRightOutlined,
+  MenuOutlined,
+  LineHeightOutlined,
+  VerticalAlignTopOutlined,
+  VerticalAlignMiddleOutlined,
+  VerticalAlignBottomOutlined,
 } from '@ant-design/icons'
+import type { TextAlign, TextVerticalAlign } from '@imprime/sdk'
 import { useEditorStore } from '../../../../../../store/editor/EditorStore'
 import { DebouncedColorPicker } from '../../../../../../components/common'
 import { InsertVariableButton } from './InsertVariableButton/InsertVariableButton'
@@ -20,6 +31,22 @@ const FONT_FAMILIES = [
 
 const FONT_SIZES = [8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 64, 72, 96]
 
+const LINE_HEIGHTS = [1, 1.15, 1.5, 2, 2.5, 3]
+
+// antd has no "justify" icon; MenuOutlined's four equal lines read as one.
+const TEXT_ALIGNS: { value: TextAlign; icon: ReactNode; title: string }[] = [
+  { value: 'left', icon: <AlignLeftOutlined />, title: 'Align left' },
+  { value: 'center', icon: <AlignCenterOutlined />, title: 'Align center' },
+  { value: 'right', icon: <AlignRightOutlined />, title: 'Align right' },
+  { value: 'justify', icon: <MenuOutlined />, title: 'Justify' },
+]
+
+const VERTICAL_ALIGNS: { value: TextVerticalAlign; icon: ReactNode; title: string }[] = [
+  { value: 'top', icon: <VerticalAlignTopOutlined />, title: 'Align top' },
+  { value: 'middle', icon: <VerticalAlignMiddleOutlined />, title: 'Align middle' },
+  { value: 'bottom', icon: <VerticalAlignBottomOutlined />, title: 'Align bottom' },
+]
+
 export function TextContextBar() {
 
   const attributes = useEditorStore(state => state.attributes)
@@ -29,6 +56,13 @@ export function TextContextBar() {
   const setBold = useEditorStore(state => state.setBold)
   const setItalic = useEditorStore(state => state.setItalic)
   const setUnderline = useEditorStore(state => state.setUnderline)
+  const setStrikethrough = useEditorStore(state => state.setStrikethrough)
+  const setUppercase = useEditorStore(state => state.setUppercase)
+  const setTextAlign = useEditorStore(state => state.setTextAlign)
+  const setLineHeight = useEditorStore(state => state.setLineHeight)
+  const setVerticalAlign = useEditorStore(state => state.setVerticalAlign)
+  const selectedShape = useEditorStore(state => state.selectedShape)
+  const updateShape = useEditorStore(state => state.updateShape)
 
   const handleFontFamilyChange = (value: string) => {
     setFontFamily(value)
@@ -52,6 +86,23 @@ export function TextContextBar() {
 
   const handleUnderlineToggle = () => {
     setUnderline(!attributes.underline)
+  }
+
+  const handleStrikethroughToggle = () => {
+    setStrikethrough(!attributes.strikethrough)
+  }
+
+  const handleUppercaseToggle = () => {
+    setUppercase(!attributes.uppercase)
+  }
+
+  // Box-level, so written to the shape directly rather than through the
+  // editor sync that carries run and paragraph formatting.
+  const handleVerticalAlignChange = (value: TextVerticalAlign) => {
+    setVerticalAlign(value)
+    if (selectedShape?.type === 'text') {
+      updateShape(selectedShape.id, { verticalAlign: value })
+    }
   }
 
   return (
@@ -133,6 +184,80 @@ export function TextContextBar() {
               handleUnderlineToggle()
             }}
           />
+          <Button
+            type={attributes.strikethrough ? 'primary' : 'text'}
+            size="small"
+            icon={<StrikethroughOutlined />}
+            title="Strikethrough"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={(e) => {
+              e.preventDefault()
+              handleStrikethroughToggle()
+            }}
+          />
+          <Button
+            type={attributes.uppercase ? 'primary' : 'text'}
+            size="small"
+            title="Uppercase"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={(e) => {
+              e.preventDefault()
+              handleUppercaseToggle()
+            }}
+          >
+            AA
+          </Button>
+        </div>
+
+        <div className="toolbar-divider" />
+
+        <div className="toolbar-item">
+          {TEXT_ALIGNS.map(({ value, icon, title }) => (
+            <Button
+              key={value}
+              type={attributes.textAlign === value ? 'primary' : 'text'}
+              size="small"
+              icon={icon}
+              title={title}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={(e) => {
+                e.preventDefault()
+                setTextAlign(value)
+              }}
+            />
+          ))}
+        </div>
+
+        <div className="toolbar-item">
+          <span className="toolbar-label" title="Line height"><LineHeightOutlined /></span>
+          <div onMouseDown={(e) => e.preventDefault()}>
+            <Select
+              value={attributes.lineHeight}
+              onChange={setLineHeight}
+              size="small"
+              style={{ width: '70px' }}
+              options={LINE_HEIGHTS.map(lineHeight => ({ value: lineHeight, label: lineHeight.toString() }))}
+            />
+          </div>
+        </div>
+
+        <div className="toolbar-divider" />
+
+        <div className="toolbar-item">
+          {VERTICAL_ALIGNS.map(({ value, icon, title }) => (
+            <Button
+              key={value}
+              type={attributes.verticalAlign === value ? 'primary' : 'text'}
+              size="small"
+              icon={icon}
+              title={title}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={(e) => {
+                e.preventDefault()
+                handleVerticalAlignChange(value)
+              }}
+            />
+          ))}
         </div>
 
         <div className="toolbar-divider" />

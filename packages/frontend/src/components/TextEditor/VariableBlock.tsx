@@ -1,5 +1,6 @@
 import type { CustomRenderElementProps } from "./TextBoxEditor";
 import type { VariableElement } from "@imprime/sdk";
+import { getTextDecoration, getTextTransform } from "@imprime/sdk";
 import { useEditorStore } from "../../store/editor/EditorStore";
 import { theme } from 'antd';
 import { ThunderboltFilled } from '@ant-design/icons';
@@ -19,10 +20,12 @@ export const VariableBlock = ({ attributes, children, element } : VariableBlockP
   // 'pokemonList.name' is distinguishable from 'pokemonList'.
   const label = element.itemPath ? `${variableName}.${element.itemPath}` : variableName;
 
-  const textStyle: React.CSSProperties = {};
+  const textStyle: React.CSSProperties = {
+    textDecoration: getTextDecoration(element),
+    textTransform: getTextTransform(element),
+  };
   if (element.bold) textStyle.fontWeight = 'bold';
   if (element.italic) textStyle.fontStyle = 'italic';
-  if (element.underline) textStyle.textDecoration = 'underline';
   if (element.fontFamily) textStyle.fontFamily = element.fontFamily;
   if (element.fontSize) textStyle.fontSize = element.fontSize;
   if (element.color) textStyle.color = element.color;

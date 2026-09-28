@@ -23,7 +23,12 @@ import {
   isEmptyVariableValue,
   stringifyVariableValue,
   getEllipseGeometry,
-  getRectangleCornerRadius
+  getRectangleCornerRadius,
+  getParagraphStyle,
+  getTextDecoration,
+  getTextTransform,
+  getVerticalJustify,
+  PARAGRAPH_SPACING
 } from '@imprime/common'
 import type { ImageService } from './ImageService.js'
 import { AppError, ValidationError } from './errors.js'
@@ -34,8 +39,6 @@ import type { Style } from '@react-pdf/types'
 initializeFonts()
 
 const DEFAULT_FONT_SIZE = 16
-const LINE_HEIGHT = 1.5
-const PARAGRAPH_SPACING = 8
 
 export interface RenderOptions {
   variableValues?: Record<string, VariableValueType>
@@ -171,8 +174,13 @@ export class ExportService {
   /**
    * Style of one text run. Literal text and variable runs carry the same
    * `TextFormatting` props, so both go through here.
+   *
+   * `lineHeight` is the enclosing paragraph's and must be set on every run:
+   * react-pdf multiplies a unitless line height by the font size of the element
+   * that declares it and passes the product down, so a run left to inherit the
+   * paragraph's would get a height computed from the default font size.
    */
-  private inlineTextStyle(node: TextFormatting): Style {
+  private inlineTextStyle(node: TextFormatting, lineHeight: number): Style {
     const color = this.parseColor(node.color, '#000000')
 
     return {
@@ -180,14 +188,17 @@ export class ExportService {
       fontSize: node.fontSize ? parseInt(node.fontSize) : DEFAULT_FONT_SIZE,
       color: color.color,
       opacity: color.opacity,
-      lineHeight: LINE_HEIGHT,
-      textDecoration: node.underline ? 'underline' : undefined,
+      lineHeight,
+      textDecoration: getTextDecoration(node),
+      textTransform: getTextTransform(node),
       ...getFontStyleProps(node.bold, node.italic)
     } as Style
   }
 
   private renderTextBox(shape: TextBoxShape, ctx: ResolveContext): React.ReactElement {
     const paragraphElements = shape.paragraphes.map((paragraph, pIndex) => {
+      const paragraphStyle = getParagraphStyle(paragraph)
+
       const textSegments = paragraph.children.map((child, cIndex) => {
         const content = 'type' in child && child.type === 'variable'
           ? stringifyVariableValue(resolveVariable(child.variableId, ctx))
@@ -196,7 +207,7 @@ export class ExportService {
         return React.createElement(PDFText, {
           key: `${pIndex}-${cIndex}`,
           fixed: true,
-          style: this.inlineTextStyle(child)
+          style: this.inlineTextStyle(child, paragraphStyle.lineHeight)
         }, content)
       })
 
@@ -205,12 +216,17 @@ export class ExportService {
         fixed: true,
         style: {
           marginBottom: pIndex < shape.paragraphes.length - 1 ? PARAGRAPH_SPACING : 0,
-          lineHeight: LINE_HEIGHT,
-          ...paragraph.style
+          ...paragraphStyle
         }
       }, textSegments)
     })
 
+    // The outer View is the box and places the text vertically; the inner one
+    // holds the text. The inner View is absolute and has no height on purpose:
+    // react-pdf truncates (with an ellipsis) any text taller than the height it
+    // is measured against, whereas an absolute child is measured unconstrained
+    // and still positioned by the parent's `justifyContent`. Text taller than
+    // the box therefore overflows it, as the editor's flex column does.
     return React.createElement(View, {
       key: shape.id,
       fixed: true,
@@ -219,8 +235,17 @@ export class ExportService {
         left: shape.x,
         top: shape.y,
         width: shape.width,
+        height: shape.height,
+        justifyContent: getVerticalJustify(shape.verticalAlign),
       }
-    }, paragraphElements)
+    }, React.createElement(View, {
+      fixed: true,
+      style: {
+        position: 'absolute',
+        left: 0,
+        width: shape.width,
+      }
+    }, paragraphElements))
   }
 
   private renderImage(shape: ImageShape, imageDataMap: Map<string, string>): React.ReactElement {

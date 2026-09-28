@@ -34,10 +34,17 @@ export interface TextFormatting {
   bold?: boolean;
   underline?: boolean;
   italic?: boolean;
+  strikethrough?: boolean;
+  // Rendered upper-case by both renderers (CSS / react-pdf `textTransform`);
+  // the stored text keeps its original case.
+  uppercase?: boolean;
   fontFamily?: string;
   fontSize?: string;
   color?: string;
 }
+
+export type TextAlign = 'left' | 'center' | 'right' | 'justify'
+export type TextVerticalAlign = 'top' | 'middle' | 'bottom'
 
 export type CustomText = TextFormatting & {
   text: string;
@@ -57,13 +64,24 @@ export type VariableElement = TextFormatting & {
 
 export interface Paragraph {
   type: 'paragraph';
-  style?: Record<string, string | number>; // CSS styles
+  // Stored documents may still carry a free-form `style` object from an
+  // earlier API; no renderer reads it any more. The typed fields below replace
+  // it, so both renderers agree on every paragraph property.
+  //
+  // Block-level formatting. Unset means 'left' and DEFAULT_LINE_HEIGHT, which
+  // is how every paragraph rendered before these fields existed. Read them
+  // through `getParagraphStyle`, which also sanitises values written via the API.
+  align?: TextAlign;
+  lineHeight?: number; // unitless multiplier of each run's font size
   children: (CustomText | VariableElement)[];
 }
 
 export interface TextBoxShape extends BaseShape {
   type: 'text'
   paragraphes: Paragraph[]
+  // Position of the paragraph stack inside the box. Unset means 'top', the
+  // only behaviour text boxes had before this field existed.
+  verticalAlign?: TextVerticalAlign
 }
 
 export interface ImageShape extends BaseShape {

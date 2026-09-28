@@ -1,7 +1,19 @@
-import { Editor, Transforms, type BaseSelection, Element } from "slate";
+import { Editor, Transforms, type BaseSelection, Element, type Node } from "slate";
 import type { StateCreator } from "zustand";
 import type { ToolAttributesSlice } from "./ToolAttributeSlice";
-import type { CustomText, VariableElement } from "@imprime/sdk";
+import type { CustomText, Paragraph, VariableElement } from "@imprime/sdk";
+import { getParagraphStyle } from "@imprime/sdk";
+
+const isParagraph = (n: Node): n is Paragraph => Element.isElement(n) && n.type === 'paragraph';
+
+// Paragraph formatting is shown for, and diffed against, the first paragraph
+// of the selection. Diffing against the same paragraph that was read means an
+// unrelated change (a mark) on a selection spanning differently-aligned
+// paragraphs leaves their alignment alone.
+function firstSelectedParagraph(editor: Editor): Paragraph | undefined {
+    const [entry] = Editor.nodes(editor, { match: isParagraph, mode: 'lowest' });
+    return entry?.[0];
+}
 
 export interface RichTextEditorSlice {
     editor: Editor | null;
@@ -33,13 +45,17 @@ export const createRichTextEditorSlice: StateCreator<
             const { editor, setTextAttributes } = get();
             if (!editor || !editor.selection) return;
             const marks = Editor.marks(editor);
+            const paragraph = firstSelectedParagraph(editor);
             setTextAttributes({
                 bold: marks?.bold === true,
                 italic: marks?.italic === true,
                 underline: marks?.underline === true,
+                strikethrough: marks?.strikethrough === true,
+                uppercase: marks?.uppercase === true,
                 textColor: (marks?.color as string) || '#000000',
                 fontSize: marks?.fontSize ? parseInt(marks.fontSize as string) : 16,
                 fontFamily: (marks?.fontFamily as string) || 'Roboto',
+                ...(paragraph ? getParagraphStyle(paragraph) : {}),
             });
             set({ syncSelection : false })
         },
@@ -69,6 +85,18 @@ export const createRichTextEditorSlice: StateCreator<
                 Editor.removeMark(editor, 'underline');
             }
 
+            if (attributes.strikethrough && !marks?.strikethrough) {
+                Editor.addMark(editor, 'strikethrough', true);
+            } else if (!attributes.strikethrough && marks?.strikethrough) {
+                Editor.removeMark(editor, 'strikethrough');
+            }
+
+            if (attributes.uppercase && !marks?.uppercase) {
+                Editor.addMark(editor, 'uppercase', true);
+            } else if (!attributes.uppercase && marks?.uppercase) {
+                Editor.removeMark(editor, 'uppercase');
+            }
+
             if (attributes.textColor && marks?.color !== attributes.textColor) {
                 Editor.addMark(editor, 'color', attributes.textColor);
             } else if (!attributes.textColor && marks?.color) {
@@ -88,6 +116,20 @@ export const createRichTextEditorSlice: StateCreator<
                 Editor.removeMark(editor, 'fontFamily');
             }
 
+            // Apply paragraph formatting to every paragraph in the selection.
+            // Not gated on `syncSelection`: when syncing from the editor the
+            // values were just read from this paragraph, so nothing differs.
+            const paragraph = firstSelectedParagraph(editor);
+            if (paragraph) {
+                const current = getParagraphStyle(paragraph);
+                if (current.textAlign !== attributes.textAlign) {
+                    Transforms.setNodes(editor, { align: attributes.textAlign }, { match: isParagraph, mode: 'lowest' });
+                }
+                if (current.lineHeight !== attributes.lineHeight) {
+                    Transforms.setNodes(editor, { lineHeight: attributes.lineHeight }, { match: isParagraph, mode: 'lowest' });
+                }
+            }
+
             // Apply styles to variable nodes in selection
             if(syncSelection) return;
             Transforms.setNodes(
@@ -96,6 +138,8 @@ export const createRichTextEditorSlice: StateCreator<
                     bold: attributes.bold,
                     italic: attributes.italic,
                     underline: attributes.underline,
+                    strikethrough: attributes.strikethrough,
+                    uppercase: attributes.uppercase,
                     color: attributes.textColor,
                     fontSize: fontSize,
                     fontFamily: attributes.fontFamily,
@@ -122,6 +166,8 @@ export const createRichTextEditorSlice: StateCreator<
                 bold: marks?.bold === true,
                 italic: marks?.italic === true,
                 underline: marks?.underline === true,
+                strikethrough: marks?.strikethrough === true,
+                uppercase: marks?.uppercase === true,
                 fontFamily: marks?.fontFamily as string | undefined,
                 fontSize: marks?.fontSize as string | undefined,
                 color: marks?.color as string | undefined,

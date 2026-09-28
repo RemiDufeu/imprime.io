@@ -33,7 +33,7 @@ Anything where "the editor and the PDF must agree" is the requirement:
 | `groupLayout.ts` | `distributeMainAxis`, `crossAxisOffset`, `layoutGroupChildren` — the flexbox subset |
 | `shapeResolver.ts` | `resolveShapes`, `childrenBBox` — container expansion |
 | `variables.ts` | `resolveVariable`, `isEmptyVariableValue`, `stringifyVariableValue` |
-| `slideContentStyles.ts` | `getSlideContentWrapperStyles` — text box content styling |
+| `slideContentStyles.ts` | text formatting: `getSlideContentWrapperStyles` (box, vertical alignment), `getParagraphStyle` (alignment, line height, sanitised), `getTextDecoration`, `getTextTransform`, `DEFAULT_LINE_HEIGHT`, `PARAGRAPH_SPACING` |
 
 Everything exported here is re-exported from `packages/common/src/rendering/index.ts`
 and reachable as `@imprime/common` (backend) or `@imprime/sdk` (frontend).
@@ -117,9 +117,21 @@ check both call sites still agree.
 - **Colour with alpha.** `@react-pdf/renderer` parses neither `#RRGGBBAA` nor
   `rgba()`; `ExportService.parseColor` splits them into `color` + `opacity`.
   Any new colour-carrying property must go through it.
-- **Paragraph spacing and line height.** Hard-coded in `ExportService`
-  (`LINE_HEIGHT`, `PARAGRAPH_SPACING`, `DEFAULT_FONT_SIZE`) with no counterpart
-  in the editor's CSS. Changing one without the other widens the gap.
+- **Line height is per run in the PDF.** react-pdf multiplies a unitless
+  `lineHeight` by the declaring element's own font size and passes the product
+  down, so `ExportService.inlineTextStyle` sets the paragraph's line height on
+  every run — CSS inherits the multiplier instead, and that is what keeps the
+  two in step with mixed font sizes.
+- **Never give the PDF text a height.** react-pdf truncates (with an ellipsis)
+  text taller than the height it is measured against. The text box is an outer
+  View with the box height (for vertical alignment) around an *absolute* inner
+  View with none, which is measured unconstrained, so overflowing text spills
+  out as it does in the editor.
+- **Hyphenation.** react-pdf hyphenates long words by default; the browser
+  does not. Line breaks differ on long text even with identical metrics.
+- **Paragraph spacing.** `PARAGRAPH_SPACING` is shared, and applies between
+  paragraphs only. The editor enforces "not after the last" in CSS
+  (`TextBoxEditor.css`, `:last-child`) because Slate memoises element renders.
 
 ## Related
 

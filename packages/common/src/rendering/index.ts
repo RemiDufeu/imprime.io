@@ -12,4 +12,13 @@ export { resolveShapes, childrenBBox } from './shapeResolver.js'
 export type { ChildrenBBox } from './shapeResolver.js'
 export { resolveVariable, isEmptyVariableValue, stringifyVariableValue, joinItemPath, ITEM_PATH_SEPARATOR } from './variables.js'
 export type { ResolveContext, VariableScope, VariableScopeFrame } from './variables.js'
-export { getSlideContentWrapperStyles } from './slideContentStyles.js'
+export {
+  getSlideContentWrapperStyles,
+  getParagraphStyle,
+  getTextDecoration,
+  getTextTransform,
+  getVerticalJustify,
+  DEFAULT_LINE_HEIGHT,
+  PARAGRAPH_SPACING,
+} from './slideContentStyles.js'
+export type { ParagraphStyle } from './slideContentStyles.js'

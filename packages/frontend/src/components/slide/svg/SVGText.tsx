@@ -30,6 +30,7 @@ export function SVGText({ shape, readonly }: SVGTextProps) {
 
   const isSelected = selectedShape?.id === shape.id
   const isReadOnly = readonly || currentEditor !== localEditor || !isSelected;
+  const isTopAligned = (shape.verticalAlign ?? 'top') === 'top';
   const wasActiveRef = useRef(false);
 
   // Auto-activate editor when text shape becomes selected without an active editor (e.g. right after creation)
@@ -89,6 +90,16 @@ export function SVGText({ shape, readonly }: SVGTextProps) {
     e.stopPropagation()
     setEditor(localEditor)
     syncEditorToAttributes()
+    // A middle- or bottom-aligned editable does not fill the box, so a click
+    // in the empty part blurs it; give focus back, at the last selection.
+    // No-op when the click landed in the text and the editor is focused.
+    if (!isTopAligned) {
+      try {
+        ReactEditor.focus(localEditor)
+      } catch (err) {
+        console.error('Failed to focus editor:', err)
+      }
+    }
   }) : undefined
 
   const handleEditorChange = () => {
@@ -118,10 +129,11 @@ export function SVGText({ shape, readonly }: SVGTextProps) {
         pointerEvents: isInteracting ? 'none' : 'auto',
         userSelect: isInteracting ? 'none' : 'auto',
       }}>
-      <div style={getSlideContentWrapperStyles()}>
+      <div style={getSlideContentWrapperStyles(shape.verticalAlign)}>
         <TextBoxEditor
           editor={localEditor}
           readonly={isReadOnly}
+          fillHeight={isTopAligned}
           initialContent={shape.paragraphes}
           onChange={handleEditorChange}
           onFocus={handleEditorFocus}

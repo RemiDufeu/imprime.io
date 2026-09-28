@@ -1,0 +1,11 @@
+/* Paragraph spacing is set here rather than inline because "is the last
+   paragraph" cannot be known at render time: Slate memoises element renders,
+   so a paragraph does not re-render when a sibling is appended after it. The
+   PDF export applies the same rule (spacing between paragraphs only). */
+.text-box-paragraph {
+    margin: 0 0 var(--paragraph-spacing, 0) 0;
+}
+
+.text-box-paragraph:last-child {
+    margin-bottom: 0;
+}

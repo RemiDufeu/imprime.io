@@ -1,8 +1,10 @@
 import type { CustomText, Paragraph, VariableElement } from '@imprime/sdk';
+import { getParagraphStyle, getTextDecoration, getTextTransform, PARAGRAPH_SPACING } from '@imprime/sdk';
 import { useCallback } from 'react';
 import { Editor, type BaseEditor, type Descendant } from 'slate';
 import { Slate, Editable, ReactEditor, type RenderLeafProps, type RenderElementProps } from 'slate-react';
 import { VariableBlock } from './VariableBlock';
+import './TextBoxEditor.css';
 
 export type CustomElement = VariableElement | Paragraph;
 
@@ -26,12 +28,16 @@ export type VariableEditorProps = {
   initialContent?: Descendant[];
   editor: Editor;
   readonly?: boolean;
+  // Stretch the editable to the full box. Only a top-aligned box can: in a
+  // middle- or bottom-aligned one the editable must shrink to its content so
+  // the enclosing flex column can place it.
+  fillHeight?: boolean;
   onValueChange?: (descendants: Descendant[]) => void;
   onChange?: (descendants: Descendant[]) => void;
   onFocus?: () => void
 };
 
-export const TextBoxEditor = ({ initialContent, editor, readonly, onValueChange, onChange, onFocus }: VariableEditorProps) => {
+export const TextBoxEditor = ({ initialContent, editor, readonly, fillHeight = true, onValueChange, onChange, onFocus }: VariableEditorProps) => {
 
   const initialValue: Descendant[] = initialContent?.length ? initialContent : [
     {
@@ -44,8 +50,10 @@ export const TextBoxEditor = ({ initialContent, editor, readonly, onValueChange,
     switch (props.element.type) {
       case 'variable':
         return <VariableBlock {...props} element={props.element as VariableElement}/>;
-      default:
-        return <p {...props.attributes} style={{ margin: 0, marginBottom: 8 }}>{props.children}</p>;
+      default: {
+        const { textAlign, lineHeight } = getParagraphStyle(props.element);
+        return <p {...props.attributes} className="text-box-paragraph" style={{ textAlign, lineHeight }}>{props.children}</p>;
+      }
     }
   }, []);
 
@@ -60,11 +68,10 @@ export const TextBoxEditor = ({ initialContent, editor, readonly, onValueChange,
       children = <em>{children}</em>;
     }
 
-    if (props.leaf.underline) {
-      children = <u>{children}</u>;
-    }
-
-    const style: React.CSSProperties = {};
+    const style: React.CSSProperties = {
+      textDecoration: getTextDecoration(props.leaf),
+      textTransform: getTextTransform(props.leaf),
+    };
     if (props.leaf.color) {
       style.color = props.leaf.color;
     }
@@ -102,8 +109,10 @@ export const TextBoxEditor = ({ initialContent, editor, readonly, onValueChange,
       <Editable
         style={{
           width: '100%',
-          height: '100%',
+          height: fillHeight ? '100%' : 'auto',
           outline: 'none',
+          // Read by `.text-box-paragraph`; the constant is shared with the PDF export.
+          ['--paragraph-spacing' as string]: `${PARAGRAPH_SPACING}px`,
         }}
         readOnly={readonly}
         onFocus={() => {onFocus?.()}}
