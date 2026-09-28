@@ -51,7 +51,6 @@ export function registerExportPresentation(server: McpServer, ownerId: string): 
   // registerTool's generic inference triggers TS2589 when both inputSchema
   // and outputSchema are provided. Recheck this directive after SDK upgrades.
   // https://github.com/modelcontextprotocol/typescript-sdk/issues/1180
-  // @ts-expect-error TS2589 — see comment above
   server.registerTool(
     'export_presentation',
     {
@@ -61,6 +60,8 @@ export function registerExportPresentation(server: McpServer, ownerId: string): 
       inputSchema,
       outputSchema,
     },
+    // TS reports the error on the handler, not on the call — keep the directive here.
+    // @ts-expect-error TS2589 — see comment above
     async ({
       presentationId,
       variableValues,
