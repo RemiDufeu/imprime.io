@@ -19,11 +19,13 @@ If Imprime is useful to you, the best way to support the project is to use it, s
 # Features
 
 ## A full-featured document editor
-At its core, Imprime is a powerful document editor. It ships with everything you'd expect from a modern editing experience: rich text formatting, shapes, images, and more — all in an intuitive visual interface.
+At its core, Imprime is a powerful document editor. It ships with everything you'd expect from a modern editing experience: rich text formatting, shapes, images, groups with auto-layout, copy / paste / duplicate shortcuts, and more — all in an intuitive visual interface.
 ![editor](./doc/editor.png)
 
 ## Dynamic variables
 Turn any document into a reusable template. Drop variables anywhere in your design, then generate finished documents on demand by injecting the data of your choice — perfect for invoices, contracts, reports, and any document you produce more than once.
+
+Go further with **conditional** blocks (`if`) that only show a section when a boolean is true, and **iteration** blocks (`for`) that repeat their content for each item of a list — lists can be nested to build tables and sub-lists.
 ![variable](./doc/variable.png)
 
 ## Built for automation
@@ -70,12 +72,11 @@ Both paths land on the same server and expose the same tools — plug Imprime in
 Imprime is currently under active development. Here are the main planned updates:
 
 ## Block enhancements
-- **Conditional logic** blocks (`if / else`) to dynamically display sections based on the data provided
-- **Iteration** blocks (`for`) to generate lists, tables or repetitions from a data array
+- **`else`** branch for conditional blocks
 - **Rich media** blocks (dynamic images, QR codes...)
 
 ## Editor usability
-- Comprehensive keyboard shortcuts: **copy / paste / cut / duplicate / undo / redo**
+- Remaining keyboard shortcuts: **cut / undo / redo**
 - Multiple block selection and grouped operations
 
 ## Document format

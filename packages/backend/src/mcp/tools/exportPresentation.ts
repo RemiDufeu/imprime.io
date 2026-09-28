@@ -47,6 +47,11 @@ const outputSchema = {
 }
 
 export function registerExportPresentation(server: McpServer, ownerId: string): void {
+  // Known regression in @modelcontextprotocol/sdk ≥1.23 (Zod v4 support):
+  // registerTool's generic inference triggers TS2589 when both inputSchema
+  // and outputSchema are provided. Recheck this directive after SDK upgrades.
+  // https://github.com/modelcontextprotocol/typescript-sdk/issues/1180
+  // @ts-expect-error TS2589 — see comment above
   server.registerTool(
     'export_presentation',
     {
@@ -56,13 +61,6 @@ export function registerExportPresentation(server: McpServer, ownerId: string): 
       inputSchema,
       outputSchema,
     },
-    // Widening variableValues pushes the same inference past the limit a second
-    // time, now on the handler argument: without the annotation the params come
-    // back as implicit `any`, with it the instantiation blows up. Same upstream
-    // issue as the directive above. `@ts-expect-error` rather than `@ts-ignore`
-    // so the recheck is the compiler's job: this fails the build the day the SDK
-    // stops triggering it, instead of silently outliving its reason.
-    // @ts-expect-error TS2589 — see comment above
     async ({
       presentationId,
       variableValues,
