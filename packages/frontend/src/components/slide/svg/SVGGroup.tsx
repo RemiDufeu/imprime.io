@@ -1,30 +1,20 @@
-import type { GroupShape } from '@imprime/sdk'
-import { theme } from 'antd'
+import type { ContainerShape } from '@imprime/sdk'
 import { SVGShape } from './SVGShape'
 import { SVGSelectionWrapper } from './SVGSelectionWrapper'
+import { ContainerFrame } from './ContainerFrame'
 
 interface SVGGroupProps {
-    shape: GroupShape
+    shape: ContainerShape
     readonly?: boolean
 }
 
-// Renders a group as a dashed box. Children are drawn in the
 export function SVGGroup({ shape, readonly = false }: SVGGroupProps) {
-    const { token } = theme.useToken()
-
     return (
         <g transform={`translate(${shape.x} ${shape.y})`}>
-            <rect
-                x={0}
-                y={0}
+            <ContainerFrame
+                type={shape.type}
                 width={shape.width}
                 height={shape.height}
-                fill={token.colorFillTertiary}
-                stroke={token.colorBorder}
-                strokeWidth={2}
-                strokeDasharray="8 6"
-                rx={4}
-                ry={4}
                 pointerEvents="all"
             />
             {shape.children.map(child => (

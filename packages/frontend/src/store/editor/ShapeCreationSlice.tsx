@@ -50,7 +50,9 @@ export const createShapeCreationSlice: StateCreator<
                 selectedTool !== 'rectangle' &&
                 selectedTool !== 'ellipse' &&
                 selectedTool !== 'text' &&
-                selectedTool !== 'group'
+                selectedTool !== 'group' &&
+                selectedTool !== 'if-group' &&
+                selectedTool !== 'for-group'
             ) {
                 return
             }
@@ -129,6 +131,22 @@ export const createShapeCreationSlice: StateCreator<
                     x, y, width, height,
                     children: [],
                 }
+            } else if (selectedTool === 'if-group') {
+                newShape = {
+                    id: shapeId,
+                    type: 'if-group',
+                    name: nextShapeName(currentSlide.shapes, 'if-group'),
+                    x, y, width, height,
+                    children: [],
+                }
+            } else if (selectedTool === 'for-group') {
+                newShape = {
+                    id: shapeId,
+                    type: 'for-group',
+                    name: nextShapeName(currentSlide.shapes, 'for-group'),
+                    x, y, width, height,
+                    children: [],
+                }
             } else if (selectedTool === 'ellipse') {
                 newShape = {
                     id: shapeId,
@@ -154,16 +172,16 @@ export const createShapeCreationSlice: StateCreator<
                 }
             }
 
+            // Drawing over a container drops the shape inside it, with the
+            // rect converted into that container's local coordinate space.
             const parent = findInnermostGroupAt(currentSlide.shapes, x, y)
-            if (parent) {
-                const nested = { ...newShape, x: x - parent.absX, y: y - parent.absY } as Shape
-                const nextShapes = insertShape(currentSlide.shapes, parent.id, nested)
-                updateSlideShapes(currentSlide._id, nextShapes)
-                selectShape(parent.id)
-            } else {
-                updateSlideShapes(currentSlide._id, [...currentSlide.shapes, newShape])
-                selectShape(shapeId)
-            }
+            const nextShapes = parent
+                ? insertShape(currentSlide.shapes, parent.id,
+                    { ...newShape, x: x - parent.absX, y: y - parent.absY } as Shape)
+                : [...currentSlide.shapes, newShape]
+
+            updateSlideShapes(currentSlide._id, nextShapes)
+            selectShape(shapeId)
             get().setTool('move')
             cancelDrawing()
         },

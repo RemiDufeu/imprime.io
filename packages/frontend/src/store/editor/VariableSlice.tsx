@@ -2,14 +2,29 @@ import { variablesAPI } from '../../api/api'
 import type { VariableData, VariableDTO } from '@imprime/sdk'
 import type { StateCreator } from 'zustand'
 import type { PresentationSlice } from './PresentationSlice'
+import { parseApiError } from '../../utils/apiError'
 import { message } from 'antd'
+
+// Which definition the create/edit form is open on.
+export type VariableFormTarget = { mode: 'create' } | { mode: 'edit'; variableId: string }
 
 export interface VariableSlice {
   isLoadingVariables: boolean
   variableError: string | null
 
+  // The browse panel and the form are two surfaces, and the form outlives the
+  // panel: it is a modal owned by the header, because rc-dropdown closes its
+  // popup on Tab (`hooks/useAccessibility`) and took a half-typed definition
+  // with it. Both flags live here so neither surface has to be handed a
+  // callback to drive the other.
+  variablesPanelOpen: boolean
+  variableForm: VariableFormTarget | null
+  setVariablesPanelOpen: (open: boolean) => void
+  openVariableForm: (target: VariableFormTarget) => void
+  closeVariableForm: () => void
+
   createVariable: (variable: VariableDTO.Create) => Promise<VariableData[]>
-  updateVariable: (variableId: string, updates: VariableDTO.Update) => Promise<void>
+  updateVariable: (variableId: string, updates: VariableDTO.Update) => Promise<VariableData[]>
   deleteVariable: (variableId: string) => Promise<void>
 }
 
@@ -23,6 +38,17 @@ export const createVariableSlice: StateCreator<
 > = (set, get) => ({
   isLoadingVariables: false,
   variableError: null,
+
+  variablesPanelOpen: false,
+  variableForm: null,
+
+  setVariablesPanelOpen: (open) => set({ variablesPanelOpen: open }),
+
+  // One action for the whole transition, so no caller can open the form and
+  // leave the panel sitting behind the modal's mask.
+  openVariableForm: (target) => set({ variableForm: target, variablesPanelOpen: false }),
+
+  closeVariableForm: () => set({ variableForm: null }),
 
   createVariable: async (variable) => {
     const { presentation } = get()
@@ -52,7 +78,7 @@ export const createVariableSlice: StateCreator<
 
   updateVariable: async (variableId: string, updates: VariableDTO.Update) => {
     const { presentation } = get()
-    if (!presentation) return
+    if (!presentation) return []
 
     set({ isLoadingVariables: true, variableError: null })
 
@@ -65,8 +91,11 @@ export const createVariableSlice: StateCreator<
           variableData: result.variables,
         },
       })
+      return result.variables
     } catch (err) {
-      set({ variableError: 'Failed to update variable' })
+      // Rethrown so the form can attach a name conflict to its own field
+      // instead of showing it as a detached toast.
+      set({ variableError: parseApiError(err).message ?? 'Failed to update variable' })
       throw err
     } finally {
       set({ isLoadingVariables: false })
@@ -88,26 +117,12 @@ export const createVariableSlice: StateCreator<
           variableData: result.variables,
         },
       })
-    } catch (err : any) {
-      let errorCode: string | undefined
-      let errorMessage = 'Failed to delete variable'
+    } catch (err) {
+      const { code, message: detail } = parseApiError(err)
 
-      if (err?.message) {
-        try {
-          const jsonMatch = err.message.match(/\{.*\}/)
-          if (jsonMatch) {
-            const errorData = JSON.parse(jsonMatch[0])
-            errorCode = errorData.code
-            errorMessage = errorData.error || errorMessage
-          }
-        } catch (parseError) {
-          errorMessage = err.message
-        }
-      }
+      set({ variableError: detail ?? 'Failed to delete variable' })
 
-      set({ variableError: errorMessage })
-
-      if (errorCode === 'VARIABLE_IN_USE') {
+      if (code === 'VARIABLE_IN_USE') {
         message.error('Variable used in the template')
       } else {
         message.error('Failed to delete variable')

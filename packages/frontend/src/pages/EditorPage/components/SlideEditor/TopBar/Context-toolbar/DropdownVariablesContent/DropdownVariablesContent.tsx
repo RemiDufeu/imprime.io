@@ -1,46 +1,42 @@
-import { Input, Button, List, Form, Switch, Popconfirm } from 'antd'
-import { ArrowLeftOutlined, PlusOutlined, SearchOutlined, DeleteOutlined } from '@ant-design/icons'
+import { Input, Button, List, Popconfirm, Tooltip } from 'antd'
+import { PlusOutlined, SearchOutlined, DeleteOutlined, EditOutlined } from '@ant-design/icons'
 import { useState, useMemo } from 'react'
 import { useEditorStore } from '../../../../../../../store/editor/EditorStore'
-import type { VariableData } from '@imprime/sdk'
+import type { VariableData, VariableType } from '@imprime/sdk'
 import './DropdownVariablesContent.css'
 
-interface VariableFormData {
-  name: string
-  defaultValue?: string
-  required?: boolean
+const TYPE_BADGE_LABEL: Record<VariableType, string> = {
+  'string': 'string',
+  'boolean': 'boolean',
+  'object-list': 'list',
 }
 
-interface DropdownVariablesContentProps {
-  onClose?: () => void
+// A list's default is a row of objects — summarise it rather than stringify it,
+// which would print '[object Object]'.
+function formatDefault(variable: VariableData): string {
+  const value = variable.default
+  if (Array.isArray(value)) return `${value.length} item${value.length === 1 ? '' : 's'}`
+  return String(value)
 }
 
-export function DropdownVariablesContent({ onClose }: DropdownVariablesContentProps) {
+// Presentation-wide variable management: browse and delete, plus the entry
+// points into the edit form, which opens as a modal outside this popup — see
+// VariableFormModal. Inserting a variable into a text lives with the text
+// controls instead (InsertVariableButton), so this list shows every type, not
+// just strings.
+export function DropdownVariablesContent() {
   const [searchText, setSearchText] = useState('')
-  const [isCreation, setCreation] = useState(false)
-  const [form] = Form.useForm<VariableFormData>()
-  const [isRequired, setIsRequired] = useState(false)
-  const [isFormValid, setIsFormValid] = useState(false)
-  const presentation = useEditorStore(state => state.presentation)
 
-  const variables = presentation?.variableData || []
+  const variables = useEditorStore(state => state.presentation?.variableData)
+  const deleteVariable = useEditorStore(state => state.deleteVariable)
+  const openVariableForm = useEditorStore(state => state.openVariableForm)
 
   const filteredVariables = useMemo(() => {
-    if (!searchText.trim()) return variables
-
-    const searchLower = searchText.toLowerCase()
-    return variables.filter(variable =>
-      variable.name.toLowerCase().includes(searchLower)
-    )
+    const all = variables ?? []
+    const search = searchText.trim().toLowerCase()
+    if (!search) return all
+    return all.filter(variable => variable.name.toLowerCase().includes(search))
   }, [variables, searchText])
-
-  const deleteVariable = useEditorStore(state => state.deleteVariable)
-  const insertVariable = useEditorStore(state => state.insertVariable)
-
-  const handleVariableClick = (variable: VariableData) => {
-    insertVariable(variable._id)
-    onClose?.()
-  }
 
   const handleDeleteVariable = async (variableId: string, e: React.MouseEvent) => {
     e.stopPropagation()
@@ -51,123 +47,8 @@ export function DropdownVariablesContent({ onClose }: DropdownVariablesContentPr
     }
   }
 
-  const handleAddVariable = () => {
-    setCreation(true);
-  }
-
-  const exitCreation = () => {
-    setCreation(false);
-    form.resetFields();
-    setIsRequired(false);
-    setIsFormValid(false);
-  }
-
-  const validateForm = async () => {
-    try {
-      await form.validateFields();
-      setIsFormValid(true);
-    } catch {
-      setIsFormValid(false);
-    }
-  }
-
-  const createVariable = useEditorStore(state => state.createVariable)
-  const isLoadingVariables = useEditorStore(state => state.isLoadingVariables)
-
-  const handleCreateVariable = async () => {
-    try {
-      const values = await form.validateFields();
-
-      const newVariables = await createVariable({
-        name: values.name,
-        default: values.defaultValue,
-        required: values.required || false,
-        type: 'string'
-      });
-
-      const newVariable = newVariables[newVariables.length - 1];
-
-      if (newVariable) {
-        insertVariable(newVariable._id);
-
-        onClose?.();
-      }
-
-      exitCreation();
-    } catch (error) {
-      console.error('Failed to create variable:', error);
-    }
-  }
-
   return (
     <div className="dropdown-variables-content">
-      {isCreation ?
-      <div className="variable-creation-form">
-        <div className="creation-header">
-          <Button icon={<ArrowLeftOutlined/>} type='text' onClick={exitCreation}/>
-          <h3>Create Variable</h3>
-        </div>
-
-        <Form
-          form={form}
-          layout="vertical"
-          className="variable-form"
-        >
-          <Form.Item
-            label="Name"
-            name="name"
-            rules={[
-              { required: true, message: 'Required' },
-              { pattern: /^[a-zA-Z_][a-zA-Z0-9_]*$/, message: 'Must start with letter/underscore' }
-            ]}
-          >
-            <Input
-              placeholder="e.g., userName"
-              onChange={validateForm}
-            />
-          </Form.Item>
-
-          <Form.Item
-            label="Required"
-            name="required"
-            valuePropName="checked"
-            initialValue={false}
-          >
-            <Switch onChange={(checked) => {
-              setIsRequired(checked);
-              if (checked) {
-                form.setFieldValue('defaultValue', undefined);
-              }
-            }} />
-          </Form.Item>
-
-          <Form.Item
-            label="Default Value"
-            name="defaultValue"
-            tooltip={isRequired ? "Disabled when variable is required" : undefined}
-          >
-            <Input
-              placeholder="Optional"
-              disabled={isRequired}
-            />
-          </Form.Item>
-
-          <div className='fill-space'/>
-
-          <Form.Item>
-            <Button
-              type="primary"
-              onClick={handleCreateVariable}
-              disabled={!isFormValid || isLoadingVariables}
-              loading={isLoadingVariables}
-              block
-            >
-              Create
-            </Button>
-          </Form.Item>
-        </Form>
-      </div>
-      : <>
       <Input
         placeholder="Search variables..."
         prefix={<SearchOutlined />}
@@ -175,48 +56,61 @@ export function DropdownVariablesContent({ onClose }: DropdownVariablesContentPr
         onChange={(e) => setSearchText(e.target.value)}
         allowClear
       />
+
       <div className="variables-list-container">
         {filteredVariables.length > 0 ? (
           <List
             size="small"
             dataSource={filteredVariables}
             renderItem={(variable) => (
-              <List.Item
-                className="variable-list-item"
-                onClick={() => handleVariableClick(variable)}
-              >
+              <List.Item className="variable-list-item is-static">
                 <div className="variable-item-content">
                   <div className="variable-main">
                     <div className="variable-name-row">
                       <span className="variable-name">{variable.name}</span>
+                      <span className="variable-type-badge">{TYPE_BADGE_LABEL[variable.type]}</span>
                     </div>
                     <div className="variable-sub">
                       {variable.default !== undefined && variable.default !== null && variable.default !== '' && (
-                        <>Default: <span className="default-value">{variable.default}</span></>
+                        <>Default: <span className="default-value">{formatDefault(variable)}</span></>
                       )}
                       {variable.required && (
                         <>Required</>
                       )}
                     </div>
                   </div>
-                  <Popconfirm
-                    title="Delete variable"
-                    description="Are you sure you want to delete this variable?"
-                    onConfirm={(e) => handleDeleteVariable(variable._id, e!)}
-                    onCancel={(e) => e?.stopPropagation()}
-                    okText="Delete"
-                    cancelText="Cancel"
-                    placement="left"
-                  >
-                    <Button
-                      type="text"
-                      size="small"
-                      danger
-                      icon={<DeleteOutlined />}
-                      onClick={(e) => e.stopPropagation()}
-                      className="action-button"
-                    />
-                  </Popconfirm>
+                  <div className="variable-actions">
+                    <Tooltip title="Edit variable">
+                      <Button
+                        type="text"
+                        size="small"
+                        icon={<EditOutlined />}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          openVariableForm({ mode: 'edit', variableId: variable._id })
+                        }}
+                        className="action-button"
+                      />
+                    </Tooltip>
+                    <Popconfirm
+                      title="Delete variable"
+                      description="Are you sure you want to delete this variable?"
+                      onConfirm={(e) => handleDeleteVariable(variable._id, e!)}
+                      onCancel={(e) => e?.stopPropagation()}
+                      okText="Delete"
+                      cancelText="Cancel"
+                      placement="left"
+                    >
+                      <Button
+                        type="text"
+                        size="small"
+                        danger
+                        icon={<DeleteOutlined />}
+                        onClick={(e) => e.stopPropagation()}
+                        className="action-button"
+                      />
+                    </Popconfirm>
+                  </div>
                 </div>
               </List.Item>
             )}
@@ -231,11 +125,10 @@ export function DropdownVariablesContent({ onClose }: DropdownVariablesContentPr
       <Button
         type="dashed"
         icon={<PlusOutlined />}
-        onClick={handleAddVariable}
+        onClick={() => openVariableForm({ mode: 'create' })}
         block>
         Add Variable
       </Button>
-      </>}
     </div>
   )
 }

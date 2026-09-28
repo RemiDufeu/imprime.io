@@ -1,5 +1,5 @@
 import { ImprimeClient } from '@imprime/sdk'
-import type { Presentation, PresentationSummary, Shape, ImageDTO, VariableDTO } from '@imprime/sdk'
+import type { Presentation, PresentationSummary, Shape, ImageDTO, VariableDTO, VariableValueType } from '@imprime/sdk'
 import { API_BASE } from '../config'
 
 // Create a single SDK client instance
@@ -46,11 +46,11 @@ export const presentationsAPI = {
     return client.deleteSlide(presentationId, slideId)
   },
 
-  async exportToPDF(presentationId: string, variableValues?: Record<string, string>): Promise<Blob> {
+  async exportToPDF(presentationId: string, variableValues?: Record<string, VariableValueType>): Promise<Blob> {
     return client.exportToPDF(presentationId, variableValues)
   },
 
-  async downloadPDF(presentationId: string, filename?: string, variableValues?: Record<string, string>): Promise<void> {
+  async downloadPDF(presentationId: string, filename?: string, variableValues?: Record<string, VariableValueType>): Promise<void> {
     return client.downloadPDF(presentationId, filename, variableValues)
   },
 }

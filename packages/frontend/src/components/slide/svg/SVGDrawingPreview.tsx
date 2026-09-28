@@ -1,4 +1,6 @@
+import { getDashArray } from '@imprime/sdk'
 import { useEditorStore } from '../../../store/editor/EditorStore'
+import { ContainerFrame } from './ContainerFrame'
 
 export function SVGDrawingPreview() {
     const drawingData = useEditorStore(state => state.drawingData)
@@ -32,7 +34,7 @@ export function SVGDrawingPreview() {
                     fill={toolAttributes.fillColor}
                     stroke={toolAttributes.strokeColor}
                     strokeWidth={toolAttributes.strokeWidth}
-                    strokeDasharray={toolAttributes.strokeStyle === 'dashed' ? '10,5' : toolAttributes.strokeStyle === 'dotted' ? '2,2' : undefined}
+                    strokeDasharray={getDashArray(toolAttributes.strokeStyle)}
                     rx={toolAttributes.cornerRadius}
                     ry={toolAttributes.cornerRadius}
                     pointerEvents="none"
@@ -54,7 +56,7 @@ export function SVGDrawingPreview() {
                     fill={toolAttributes.fillColor}
                     stroke={toolAttributes.strokeColor}
                     strokeWidth={toolAttributes.strokeWidth}
-                    strokeDasharray={toolAttributes.strokeStyle === 'dashed' ? '10,5' : toolAttributes.strokeStyle === 'dotted' ? '2,2' : undefined}
+                    strokeDasharray={getDashArray(toolAttributes.strokeStyle)}
                     pointerEvents="none"
                 />
             )
@@ -76,18 +78,15 @@ export function SVGDrawingPreview() {
             )
 
         case 'group':
+        case 'if-group':
+        case 'for-group':
             return (
-                <rect
+                <ContainerFrame
+                    type={type}
                     x={x}
                     y={y}
                     width={width}
                     height={height}
-                    fill="rgba(148, 163, 184, 0.04)"
-                    stroke="#94a3b8"
-                    strokeWidth={2}
-                    strokeDasharray="8 6"
-                    rx={4}
-                    ry={4}
                     pointerEvents="none"
                 />
             )

@@ -1,4 +1,5 @@
 import { z } from 'zod/v3'
+import type { VariableItem, VariableValueType } from '@imprime/common'
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { presentationService, exportService } from '../../services/index.js'
 import { putPdf } from '../../services/pdfDownloadStore.js'
@@ -15,12 +16,28 @@ function getApiBaseUrl(): string {
   return url.replace(/\/$/, '')
 }
 
+// Hand-written mirror of VariableValueType from @imprime/common: `common` has
+// no zod dependency to generate it from, so a change to that union has to be
+// repeated here — nothing makes the compiler ask for it. Annotating against the
+// domain type is the closest thing to a guard: a drift shows up as an assignment
+// error on this line.
+const variableItemSchema: z.ZodType<VariableItem> = z.lazy(() =>
+  z.record(z.union([z.string(), z.boolean(), z.array(variableItemSchema)]))
+)
+
+// Annotated flat so registerTool's generic inference never unfolds the
+// recursion above — left inline it compounds the TS2589 noted below.
+const variableValuesSchema: z.ZodType<Record<string, VariableValueType>> = z.record(
+  z.union([z.string(), z.boolean(), z.array(variableItemSchema)])
+)
+
 const inputSchema = {
   presentationId: z.string().describe('ID of the presentation to export'),
-  variableValues: z
-    .record(z.string())
+  variableValues: variableValuesSchema
     .optional()
-    .describe('Optional map of variable id → value for substitution'),
+    .describe(
+      'Optional map of variable name → value for substitution. Accepts string, boolean, or a list of objects whose properties are strings, booleans or nested lists'
+    ),
 }
 
 const outputSchema = {
@@ -34,7 +51,6 @@ export function registerExportPresentation(server: McpServer, ownerId: string): 
   // registerTool's generic inference triggers TS2589 when both inputSchema
   // and outputSchema are provided. Recheck this directive after SDK upgrades.
   // https://github.com/modelcontextprotocol/typescript-sdk/issues/1180
-  // @ts-ignore TS2589 — see comment above
   server.registerTool(
     'export_presentation',
     {
@@ -44,7 +60,15 @@ export function registerExportPresentation(server: McpServer, ownerId: string): 
       inputSchema,
       outputSchema,
     },
-    async ({ presentationId, variableValues }) => {
+    // TS reports the error on the handler, not on the call — keep the directive here.
+    // @ts-expect-error TS2589 — see comment above
+    async ({
+      presentationId,
+      variableValues,
+    }: {
+      presentationId: string
+      variableValues?: Record<string, VariableValueType>
+    }) => {
       try {
         await assertOwnsPresentation(presentationId, ownerId)
         const presentation = await presentationService.getById(presentationId)

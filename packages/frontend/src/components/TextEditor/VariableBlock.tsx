@@ -14,6 +14,10 @@ export const VariableBlock = ({ attributes, children, element } : VariableBlockP
 
   const variable = presentation?.variableData?.find(v => v._id === element.variableId);
   const variableName = variable?.name || 'Unknown Variable';
+  // The chip names what is plugged in, never what it will evaluate to — the
+  // editor shows the authored tree. An item-scoped run names its field too, so
+  // 'pokemonList.name' is distinguishable from 'pokemonList'.
+  const label = element.itemPath ? `${variableName}.${element.itemPath}` : variableName;
 
   const textStyle: React.CSSProperties = {};
   if (element.bold) textStyle.fontWeight = 'bold';
@@ -48,7 +52,7 @@ export const VariableBlock = ({ attributes, children, element } : VariableBlockP
     }}>
       <span {...attributes} contentEditable={false} style={containerStyle}>
         <ThunderboltFilled style={iconStyle} />
-        {variableName}
+        {label}
         {children}
       </span>
     </span>

@@ -13,7 +13,7 @@ export interface RichTextEditorSlice {
     setLastSelection: (selection: BaseSelection) => void;
     syncEditorToAttributes: () => void;
     syncAttributesToEditor: () => void;
-    insertVariable: (variableId: string) => void;
+    insertVariable: (variableId: string, itemPath?: string) => void;
 };
 
 export const createRichTextEditorSlice: StateCreator<
@@ -107,7 +107,7 @@ export const createRichTextEditorSlice: StateCreator<
             );
         },
 
-        insertVariable: (variableId: string) => {
+        insertVariable: (variableId: string, itemPath?: string) => {
             const { editor, lastSelection } = get();
             if (!editor) return;
 
@@ -131,6 +131,9 @@ export const createRichTextEditorSlice: StateCreator<
                 ...markStyles,
                 type: 'variable',
                 variableId: variableId,
+                // Left unset for a presentation-wide reference, which is what
+                // resolves against the variable's own value at export.
+                ...(itemPath !== undefined ? { itemPath } : {}),
                 children: [{ text: '' }],
             };
             const textNode: CustomText = { 

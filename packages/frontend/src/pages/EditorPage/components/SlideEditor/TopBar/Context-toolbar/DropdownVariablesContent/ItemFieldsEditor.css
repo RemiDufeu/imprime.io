@@ -1,0 +1,34 @@
+.item-fields-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+/* Nested declarations are indented and ruled so the tree reads at a glance. */
+.item-fields-editor[data-depth="0"] {
+  margin-left: 0;
+  padding-left: 0;
+  border-left: none;
+}
+
+.item-fields-editor:not([data-depth="0"]) {
+  margin-top: var(--space-xs);
+  margin-left: var(--space-s);
+  padding-left: var(--space-s);
+  border-left: 1px solid var(--ant-color-border);
+}
+
+.item-field-row-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.item-field-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.item-field-row .item-field-type {
+  min-width: 96px;
+}

@@ -57,7 +57,9 @@ export function SlideCanvas({
         if (selectedTool === 'rectangle' ||
             selectedTool === 'ellipse' ||
             selectedTool === 'text' ||
-            selectedTool === 'group') {
+            selectedTool === 'group' ||
+            selectedTool === 'if-group' ||
+            selectedTool === 'for-group') {
             startDrawing(coords.x, coords.y)
         } else if (clickedOnEmpty) {
             // Deselect shapes only if clicked on empty area

@@ -15,6 +15,7 @@ import {
     cloneShapeWithNewIds,
     isDescendantOf,
     getSiblingList,
+    isContainerShape,
 } from '../../utils/shapeTree'
 import { selectCurrentSlide } from './selectors'
 
@@ -68,12 +69,16 @@ export const createShapeSlice : StateCreator<
         // Update context bar type based on selected shape and tool
         if (selectedTool === 'move') {
             if(selectedShape) {
-                 if (selectedShape.type === 'rectangle' || selectedShape.type === 'ellipse') {
+                if (selectedShape.type === 'rectangle' || selectedShape.type === 'ellipse') {
                     contextBarType = 'shape'
                 } else if (selectedShape.type === 'text') {
                     contextBarType = 'text'
                 } else if (selectedShape.type === 'group') {
                     contextBarType = 'group'
+                } else if (selectedShape.type === 'if-group') {
+                    contextBarType = 'if-group'
+                } else if (selectedShape.type === 'for-group') {
+                    contextBarType = 'for-group'
                 }
             } else {
                 contextBarType = 'none'
@@ -114,7 +119,7 @@ export const createShapeSlice : StateCreator<
         const copy = cloneShapeWithNewIds(loc.shape)
         // Slight offset so the copy is visually distinct from the source.
         const OFFSET = 20
-        const copiedName = loc.shape.name ? `${loc.shape.name} copie` : undefined
+        const copiedName = loc.shape.name ? `${loc.shape.name} copy` : undefined
         const relocated = { ...copy, x: copy.x + OFFSET, y: copy.y + OFFSET, name: copiedName } as Shape
 
         // Insert directly after the source in its parent's children.
@@ -174,7 +179,7 @@ export const createShapeSlice : StateCreator<
         if (!currentSlide) return
 
         const target = findShapeById(currentSlide.shapes, targetGroupId)?.shape
-        if (target?.type !== 'group') return
+        if (!target || !isContainerShape(target)) return
         moveShape(id, targetGroupId, target.children.length)
     },
     copyShape: (id: string) => {
@@ -193,7 +198,7 @@ export const createShapeSlice : StateCreator<
         if (!currentSlide) return
         const copy = cloneShapeWithNewIds(clipboardShape)
         const OFFSET = 20
-        const pastedName = clipboardShape.name ? `${clipboardShape.name} copie` : undefined
+        const pastedName = clipboardShape.name ? `${clipboardShape.name} copy` : undefined
         const relocated = { ...copy, x: copy.x + OFFSET, y: copy.y + OFFSET, name: pastedName } as Shape
         const nextShapes = insertShapeAt(currentSlide.shapes, null, currentSlide.shapes.length, relocated)
         updateSlideShapes(currentSlide._id, nextShapes)
@@ -208,7 +213,7 @@ export const createShapeSlice : StateCreator<
         if (!loc || loc.parentGroupId === null) return
 
         const parentLoc = findShapeById(currentSlide.shapes, loc.parentGroupId)
-        if (!parentLoc || parentLoc.shape.type !== 'group') return
+        if (!parentLoc || !isContainerShape(parentLoc.shape)) return
         const group = parentLoc.shape
 
         const relocated = { ...loc.shape, x: loc.shape.x + group.x, y: loc.shape.y + group.y } as Shape

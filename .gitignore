@@ -27,3 +27,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Claude Code harness — machine-local state (checkpoints, session notes)
+.claude/local/
+.claude/settings.local.json
