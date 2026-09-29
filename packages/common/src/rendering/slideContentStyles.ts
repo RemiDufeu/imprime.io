@@ -13,6 +13,8 @@
 import type { CSSProperties } from 'react'
 import type { Paragraph, TextAlign, TextFormatting, TextVerticalAlign } from '../types.js'
 
+// Font size, in px, of a run with no `fontSize`.
+export const DEFAULT_FONT_SIZE = 16
 // Line height of a paragraph with no `lineHeight`, as a multiplier of each
 // run's font size.
 export const DEFAULT_LINE_HEIGHT = 1.5
@@ -42,6 +44,15 @@ export function getParagraphStyle(paragraph: Paragraph): ParagraphStyle {
       ? lineHeight
       : DEFAULT_LINE_HEIGHT,
   }
+}
+
+/**
+ * A run's `fontSize` (a CSS length such as '28px', as the editor stores it) in
+ * px. Unset or unparsable falls back to DEFAULT_FONT_SIZE.
+ */
+export function parseFontSize(fontSize: string | undefined): number {
+  const size = fontSize ? parseInt(fontSize) : NaN
+  return Number.isFinite(size) && size > 0 ? size : DEFAULT_FONT_SIZE
 }
 
 /**

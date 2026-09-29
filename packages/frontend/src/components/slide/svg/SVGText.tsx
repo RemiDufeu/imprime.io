@@ -3,6 +3,7 @@ import { getSlideContentWrapperStyles } from '@imprime/sdk'
 import TextBoxEditor from '../../TextEditor/TextBoxEditor'
 import { useMemo, useEffect, useRef } from 'react';
 import { withVariables } from '../../TextEditor/withVariables';
+import { withLists } from '../../TextEditor/withLists';
 import { withReact, ReactEditor } from 'slate-react';
 import { createEditor } from 'slate';
 import { useEditorStore } from '../../../store/editor/EditorStore';
@@ -13,7 +14,7 @@ interface SVGTextProps {
 }
 
 export function SVGText({ shape, readonly }: SVGTextProps) {
-  const localEditor = useMemo(() => withVariables(withReact(createEditor())), []);
+  const localEditor = useMemo(() => withLists(withVariables(withReact(createEditor()))), []);
 
   const currentEditor = useEditorStore(state => state.editor)
   const setEditor = useEditorStore(state => state.setEditor)

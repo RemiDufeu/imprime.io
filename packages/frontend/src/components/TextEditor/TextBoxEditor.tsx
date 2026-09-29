@@ -1,9 +1,12 @@
 import type { CustomText, Paragraph, VariableElement } from '@imprime/sdk';
-import { getParagraphStyle, getTextDecoration, getTextTransform, PARAGRAPH_SPACING } from '@imprime/sdk';
+import { getTextDecoration, getTextTransform, PARAGRAPH_SPACING } from '@imprime/sdk';
 import { useCallback } from 'react';
 import { Editor, type BaseEditor, type Descendant } from 'slate';
 import { Slate, Editable, ReactEditor, type RenderLeafProps, type RenderElementProps } from 'slate-react';
 import { VariableBlock } from './VariableBlock';
+import { ParagraphElement } from './ParagraphElement';
+import { ListMarkersProvider } from './ListMarkersProvider';
+import { selectionHasListItem, shiftListIndent } from '../../utils/paragraphs';
 import './TextBoxEditor.css';
 
 export type CustomElement = VariableElement | Paragraph;
@@ -50,10 +53,8 @@ export const TextBoxEditor = ({ initialContent, editor, readonly, fillHeight = t
     switch (props.element.type) {
       case 'variable':
         return <VariableBlock {...props} element={props.element as VariableElement}/>;
-      default: {
-        const { textAlign, lineHeight } = getParagraphStyle(props.element);
-        return <p {...props.attributes} className="text-box-paragraph" style={{ textAlign, lineHeight }}>{props.children}</p>;
-      }
+      default:
+        return <ParagraphElement {...props} element={props.element}/>;
     }
   }, []);
 
@@ -106,20 +107,29 @@ export const TextBoxEditor = ({ initialContent, editor, readonly, fillHeight = t
         onValueChange?.(newValue);
       }}
     >
-      <Editable
-        style={{
-          width: '100%',
-          height: fillHeight ? '100%' : 'auto',
-          outline: 'none',
-          // Read by `.text-box-paragraph`; the constant is shared with the PDF export.
-          ['--paragraph-spacing' as string]: `${PARAGRAPH_SPACING}px`,
-        }}
-        readOnly={readonly}
-        onFocus={() => {onFocus?.()}}
-        renderElement={renderElement}
-        renderLeaf={renderLeaf}
-        placeholder="Insert some text"
-      />
+      <ListMarkersProvider>
+        <Editable
+          style={{
+            width: '100%',
+            height: fillHeight ? '100%' : 'auto',
+            outline: 'none',
+            // Read by `.text-box-paragraph`; the constant is shared with the PDF export.
+            ['--paragraph-spacing' as string]: `${PARAGRAPH_SPACING}px`,
+          }}
+          readOnly={readonly}
+          onFocus={() => {onFocus?.()}}
+          onKeyDown={(event) => {
+            // Tab nests list items; outside a list it keeps its default.
+            if (!readonly && event.key === 'Tab' && selectionHasListItem(editor)) {
+              event.preventDefault();
+              shiftListIndent(editor, event.shiftKey ? -1 : 1);
+            }
+          }}
+          renderElement={renderElement}
+          renderLeaf={renderLeaf}
+          placeholder="Insert some text"
+        />
+      </ListMarkersProvider>
     </Slate>
   );
 };

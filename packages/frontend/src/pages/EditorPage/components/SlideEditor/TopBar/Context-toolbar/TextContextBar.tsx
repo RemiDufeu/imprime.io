@@ -13,8 +13,12 @@ import {
   VerticalAlignTopOutlined,
   VerticalAlignMiddleOutlined,
   VerticalAlignBottomOutlined,
+  UnorderedListOutlined,
+  OrderedListOutlined,
+  MenuFoldOutlined,
+  MenuUnfoldOutlined,
 } from '@ant-design/icons'
-import type { TextAlign, TextVerticalAlign } from '@imprime/sdk'
+import type { ListType, TextAlign, TextVerticalAlign } from '@imprime/sdk'
 import { useEditorStore } from '../../../../../../store/editor/EditorStore'
 import { DebouncedColorPicker } from '../../../../../../components/common'
 import { InsertVariableButton } from './InsertVariableButton/InsertVariableButton'
@@ -41,6 +45,17 @@ const TEXT_ALIGNS: { value: TextAlign; icon: ReactNode; title: string }[] = [
   { value: 'justify', icon: <MenuOutlined />, title: 'Justify' },
 ]
 
+const LIST_TYPES: { value: ListType; icon: ReactNode; title: string }[] = [
+  { value: 'bullet', icon: <UnorderedListOutlined />, title: 'Bulleted list' },
+  { value: 'number', icon: <OrderedListOutlined />, title: 'Numbered list' },
+]
+
+// antd's menu fold/unfold glyphs are the usual outdent/indent icons.
+const LIST_INDENTS: { delta: number; icon: ReactNode; title: string }[] = [
+  { delta: -1, icon: <MenuFoldOutlined />, title: 'Decrease indent (Shift+Tab)' },
+  { delta: 1, icon: <MenuUnfoldOutlined />, title: 'Increase indent (Tab)' },
+]
+
 const VERTICAL_ALIGNS: { value: TextVerticalAlign; icon: ReactNode; title: string }[] = [
   { value: 'top', icon: <VerticalAlignTopOutlined />, title: 'Align top' },
   { value: 'middle', icon: <VerticalAlignMiddleOutlined />, title: 'Align middle' },
@@ -61,6 +76,8 @@ export function TextContextBar() {
   const setTextAlign = useEditorStore(state => state.setTextAlign)
   const setLineHeight = useEditorStore(state => state.setLineHeight)
   const setVerticalAlign = useEditorStore(state => state.setVerticalAlign)
+  const setListType = useEditorStore(state => state.setListType)
+  const changeListIndent = useEditorStore(state => state.changeListIndent)
   const selectedShape = useEditorStore(state => state.selectedShape)
   const updateShape = useEditorStore(state => state.updateShape)
 
@@ -239,6 +256,40 @@ export function TextContextBar() {
               options={LINE_HEIGHTS.map(lineHeight => ({ value: lineHeight, label: lineHeight.toString() }))}
             />
           </div>
+        </div>
+
+        <div className="toolbar-divider" />
+
+        <div className="toolbar-item">
+          {LIST_TYPES.map(({ value, icon, title }) => (
+            <Button
+              key={value}
+              type={attributes.listType === value ? 'primary' : 'text'}
+              size="small"
+              icon={icon}
+              title={title}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={(e) => {
+                e.preventDefault()
+                setListType(attributes.listType === value ? 'none' : value)
+              }}
+            />
+          ))}
+          {LIST_INDENTS.map(({ delta, icon, title }) => (
+            <Button
+              key={delta}
+              type="text"
+              size="small"
+              icon={icon}
+              title={title}
+              disabled={attributes.listType === 'none'}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={(e) => {
+                e.preventDefault()
+                changeListIndent(delta)
+              }}
+            />
+          ))}
         </div>
 
         <div className="toolbar-divider" />

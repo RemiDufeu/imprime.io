@@ -165,7 +165,8 @@ Second paragraph',
   color: '#000000',        // optional, default: '#000000'
   align: 'center',         // optional: 'left' | 'center' | 'right' | 'justify', default: 'left'
   lineHeight: 1.15,        // optional, multiplier of the font size, default: 1.5
-  verticalAlign: 'middle'  // optional: 'top' | 'middle' | 'bottom', default: 'top'
+  verticalAlign: 'middle', // optional: 'top' | 'middle' | 'bottom', default: 'top'
+  list: 'bullet'           // optional: 'bullet' | 'number', makes each line a list item
 })
 ```
 

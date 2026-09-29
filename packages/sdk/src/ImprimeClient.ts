@@ -9,6 +9,7 @@ import type {
   Paragraph,
   TextAlign,
   TextVerticalAlign,
+  ListType,
   ImageShape,
   ImageDTO,
   PresentationDTO,
@@ -269,8 +270,8 @@ export class ImprimeClient {
   }
 
   /**
-   * Add a text box to a slide. Each line of `text` becomes a paragraph; the
-   * formatting options apply to all of them.
+   * Add a text box to a slide. Each line of `text` becomes a paragraph (a list
+   * item when `list` is set); the formatting options apply to all of them.
    */
   async addText(
     presentationId: string,
@@ -287,12 +288,14 @@ export class ImprimeClient {
       align?: TextAlign
       lineHeight?: number
       verticalAlign?: TextVerticalAlign
+      list?: ListType
     }
   ): Promise<void> {
     const paragraphes: Paragraph[] = options.text.split('\n').map(line => ({
       type: 'paragraph',
       align: options.align,
       lineHeight: options.lineHeight,
+      list: options.list,
       children: [{
         text: line,
         fontSize: options.fontSize !== undefined ? `${options.fontSize}px` : undefined,
@@ -304,7 +307,7 @@ export class ImprimeClient {
     const shape: TextBoxShape = {
       id: `text-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       type: 'text',
-      x: options.x,
+      x: options.x, 
       y: options.y,
       width: options.width || 200,
       height: options.height || 50,

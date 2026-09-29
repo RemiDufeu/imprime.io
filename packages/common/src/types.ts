@@ -45,6 +45,7 @@ export interface TextFormatting {
 
 export type TextAlign = 'left' | 'center' | 'right' | 'justify'
 export type TextVerticalAlign = 'top' | 'middle' | 'bottom'
+export type ListType = 'bullet' | 'number'
 
 export type CustomText = TextFormatting & {
   text: string;
@@ -73,6 +74,13 @@ export interface Paragraph {
   // through `getParagraphStyle`, which also sanitises values written via the API.
   align?: TextAlign;
   lineHeight?: number; // unitless multiplier of each run's font size
+  // List membership. Lists are flat: an item is a paragraph carrying `list`,
+  // and nesting is its `indent` level (0 to MAX_LIST_LEVEL), ignored outside a
+  // list. Unset `list` is a plain paragraph, which every paragraph was before
+  // lists existed. Numbering is derived from the surrounding paragraphs by
+  // `getListMarkers`, never stored. Read through `getListStyle`.
+  list?: ListType;
+  indent?: number;
   children: (CustomText | VariableElement)[];
 }
 

@@ -1,19 +1,9 @@
-import { Editor, Transforms, type BaseSelection, Element, type Node } from "slate";
+import { Editor, Transforms, type BaseSelection, Element } from "slate";
 import type { StateCreator } from "zustand";
 import type { ToolAttributesSlice } from "./ToolAttributeSlice";
-import type { CustomText, Paragraph, VariableElement } from "@imprime/sdk";
-import { getParagraphStyle } from "@imprime/sdk";
-
-const isParagraph = (n: Node): n is Paragraph => Element.isElement(n) && n.type === 'paragraph';
-
-// Paragraph formatting is shown for, and diffed against, the first paragraph
-// of the selection. Diffing against the same paragraph that was read means an
-// unrelated change (a mark) on a selection spanning differently-aligned
-// paragraphs leaves their alignment alone.
-function firstSelectedParagraph(editor: Editor): Paragraph | undefined {
-    const [entry] = Editor.nodes(editor, { match: isParagraph, mode: 'lowest' });
-    return entry?.[0];
-}
+import type { CustomText, VariableElement } from "@imprime/sdk";
+import { getListStyle, getParagraphStyle } from "@imprime/sdk";
+import { firstSelectedParagraph, isParagraph, setParagraphList, shiftListIndent } from "../../utils/paragraphs";
 
 export interface RichTextEditorSlice {
     editor: Editor | null;
@@ -26,6 +16,9 @@ export interface RichTextEditorSlice {
     syncEditorToAttributes: () => void;
     syncAttributesToEditor: () => void;
     insertVariable: (variableId: string, itemPath?: string) => void;
+    // A command rather than an attribute: the level is relative, and each
+    // selected item moves from its own.
+    changeListIndent: (delta: number) => void;
 };
 
 export const createRichTextEditorSlice: StateCreator<
@@ -55,7 +48,10 @@ export const createRichTextEditorSlice: StateCreator<
                 textColor: (marks?.color as string) || '#000000',
                 fontSize: marks?.fontSize ? parseInt(marks.fontSize as string) : 16,
                 fontFamily: (marks?.fontFamily as string) || 'Roboto',
-                ...(paragraph ? getParagraphStyle(paragraph) : {}),
+                ...(paragraph ? {
+                    ...getParagraphStyle(paragraph),
+                    listType: getListStyle(paragraph)?.list ?? 'none',
+                } : {}),
             });
             set({ syncSelection : false })
         },
@@ -128,6 +124,10 @@ export const createRichTextEditorSlice: StateCreator<
                 if (current.lineHeight !== attributes.lineHeight) {
                     Transforms.setNodes(editor, { lineHeight: attributes.lineHeight }, { match: isParagraph, mode: 'lowest' });
                 }
+                const currentList = getListStyle(paragraph)?.list ?? 'none';
+                if (currentList !== attributes.listType) {
+                    setParagraphList(editor, attributes.listType === 'none' ? null : attributes.listType);
+                }
             }
 
             // Apply styles to variable nodes in selection
@@ -188,5 +188,11 @@ export const createRichTextEditorSlice: StateCreator<
             };
 
             Transforms.insertNodes(editor, [variable, textNode]);
+        },
+
+        changeListIndent: (delta: number) => {
+            const { editor } = get();
+            if (!editor || !editor.selection) return;
+            shiftListIndent(editor, delta);
         }
     });

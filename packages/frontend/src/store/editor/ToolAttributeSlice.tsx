@@ -1,5 +1,5 @@
 
-import type { Shape, RectangleShape, EllipseShape, TextBoxShape, TextAlign, TextVerticalAlign } from '@imprime/sdk'
+import type { Shape, RectangleShape, EllipseShape, TextBoxShape, TextAlign, TextVerticalAlign, ListType } from '@imprime/sdk'
 import { DEFAULT_LINE_HEIGHT } from '@imprime/sdk'
 import type { StateCreator } from 'zustand'
 
@@ -45,6 +45,7 @@ interface TextAttributes {
     // Paragraph-level: shown for, and applied to, the paragraphs in the selection.
     textAlign: TextAlign
     lineHeight: number
+    listType: ListType | 'none'
     // Box-level: applied to the selected text shape, not through the editor.
     verticalAlign: TextVerticalAlign
 }
@@ -71,6 +72,7 @@ export interface ToolAttributesSlice {
     setUppercase: (uppercase: boolean) => void
     setTextAlign: (textAlign: TextAlign) => void
     setLineHeight: (lineHeight: number) => void
+    setListType: (listType: ListType | 'none') => void
     setVerticalAlign: (verticalAlign: TextVerticalAlign) => void
 
     setShapeAttributes: (attrs: Partial<ShapeAttributes>) => void
@@ -95,6 +97,7 @@ const initialAttributes: ToolAttributes = {
     uppercase: false,
     textAlign: 'left',
     lineHeight: DEFAULT_LINE_HEIGHT,
+    listType: 'none',
     verticalAlign: 'top',
 }
 
@@ -182,6 +185,11 @@ export const createToolAttributesSlice: StateCreator<
             attributes: { ...state.attributes, lineHeight },
         })),
 
+    setListType: (listType) =>
+        set((state) => ({
+            attributes: { ...state.attributes, listType },
+        })),
+
     setVerticalAlign: (verticalAlign) =>
         set((state) => ({
             attributes: { ...state.attributes, verticalAlign },
@@ -234,6 +242,7 @@ export function textBoxToAttributes(shape: TextBoxShape): Partial<TextAttributes
         uppercase: false,
         textAlign: 'left',
         lineHeight: DEFAULT_LINE_HEIGHT,
+        listType: 'none',
         verticalAlign: shape.verticalAlign ?? 'top',
     }
 }

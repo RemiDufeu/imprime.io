@@ -18,7 +18,18 @@ export {
   getTextDecoration,
   getTextTransform,
   getVerticalJustify,
+  parseFontSize,
+  DEFAULT_FONT_SIZE,
   DEFAULT_LINE_HEIGHT,
   PARAGRAPH_SPACING,
 } from './slideContentStyles.js'
 export type { ParagraphStyle } from './slideContentStyles.js'
+export {
+  getListStyle,
+  getListMarkers,
+  getListMarkerFormatting,
+  getListLayout,
+  getBulletBox,
+  MAX_LIST_LEVEL,
+} from './listStyles.js'
+export type { ListStyle, ListMarker, BulletShape, ListLayout, BulletBox } from './listStyles.js'

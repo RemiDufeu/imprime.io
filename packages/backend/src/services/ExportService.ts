@@ -10,6 +10,9 @@ import type {
   TextBoxShape,
   ImageShape,
   CustomText,
+  Paragraph,
+  ListStyle,
+  ListMarker,
   TextFormatting,
   VariableValueType,
   ResolveContext
@@ -28,6 +31,12 @@ import {
   getTextDecoration,
   getTextTransform,
   getVerticalJustify,
+  getListStyle,
+  getListMarkers,
+  getListMarkerFormatting,
+  getListLayout,
+  getBulletBox,
+  parseFontSize,
   PARAGRAPH_SPACING
 } from '@imprime/common'
 import type { ImageService } from './ImageService.js'
@@ -37,8 +46,6 @@ import type { Style } from '@react-pdf/types'
 
 // Initialize fonts on module load
 initializeFonts()
-
-const DEFAULT_FONT_SIZE = 16
 
 export interface RenderOptions {
   variableValues?: Record<string, VariableValueType>
@@ -185,7 +192,7 @@ export class ExportService {
 
     return {
       fontFamily: normalizeFontFamily(node.fontFamily),
-      fontSize: node.fontSize ? parseInt(node.fontSize) : DEFAULT_FONT_SIZE,
+      fontSize: parseFontSize(node.fontSize),
       color: color.color,
       opacity: color.opacity,
       lineHeight,
@@ -195,7 +202,69 @@ export class ExportService {
     } as Style
   }
 
+  /**
+   * A list item: a box padded to the item's text indent, holding the text and,
+   * absolutely positioned in that padding, the marker — the geometry
+   * `getListLayout` describes, which the editor builds the same way.
+   */
+  private renderListItem(
+    key: number,
+    paragraph: Paragraph,
+    style: ListStyle,
+    marker: ListMarker,
+    marginBottom: number,
+    text: React.ReactElement
+  ): React.ReactElement {
+    const layout = getListLayout(paragraph, style)
+    const formatting = getListMarkerFormatting(paragraph)
+    const color = this.parseColor(formatting.color, '#000000')
+
+    let markerElement: React.ReactElement
+    if (marker.kind === 'bullet') {
+      const bullet = getBulletBox(marker.shape, layout)
+      markerElement = React.createElement(View, {
+        key: 'marker',
+        fixed: true,
+        style: {
+          position: 'absolute',
+          left: bullet.left,
+          top: bullet.top,
+          width: bullet.size,
+          height: bullet.size,
+          borderRadius: bullet.borderRadius,
+          borderWidth: bullet.borderWidth,
+          borderColor: color.color,
+          backgroundColor: bullet.filled ? color.color : undefined,
+          opacity: color.opacity,
+        }
+      })
+    } else {
+      markerElement = React.createElement(PDFText, {
+        key: 'marker',
+        fixed: true,
+        style: {
+          position: 'absolute',
+          left: layout.markerLeft,
+          top: 0,
+          fontFamily: normalizeFontFamily(formatting.fontFamily),
+          fontSize: layout.fontSize,
+          lineHeight: layout.lineHeight,
+          color: color.color,
+          opacity: color.opacity,
+        }
+      }, marker.text)
+    }
+
+    return React.createElement(View, {
+      key,
+      fixed: true,
+      style: { paddingLeft: layout.textIndent, marginBottom }
+    }, [text, markerElement])
+  }
+
   private renderTextBox(shape: TextBoxShape, ctx: ResolveContext): React.ReactElement {
+    const markers = getListMarkers(shape.paragraphes)
+
     const paragraphElements = shape.paragraphes.map((paragraph, pIndex) => {
       const paragraphStyle = getParagraphStyle(paragraph)
 
@@ -211,14 +280,25 @@ export class ExportService {
         }, content)
       })
 
-      return React.createElement(PDFText, {
-        key: pIndex,
+      const marginBottom = pIndex < shape.paragraphes.length - 1 ? PARAGRAPH_SPACING : 0
+      const listStyle = getListStyle(paragraph)
+      const marker = markers[pIndex]
+
+      if (!listStyle || !marker) {
+        return React.createElement(PDFText, {
+          key: pIndex,
+          fixed: true,
+          style: { marginBottom, ...paragraphStyle }
+        }, textSegments)
+      }
+
+      const text = React.createElement(PDFText, {
+        key: 'text',
         fixed: true,
-        style: {
-          marginBottom: pIndex < shape.paragraphes.length - 1 ? PARAGRAPH_SPACING : 0,
-          ...paragraphStyle
-        }
+        style: { ...paragraphStyle }
       }, textSegments)
+
+      return this.renderListItem(pIndex, paragraph, listStyle, marker, marginBottom, text)
     })
 
     // The outer View is the box and places the text vertically; the inner one
