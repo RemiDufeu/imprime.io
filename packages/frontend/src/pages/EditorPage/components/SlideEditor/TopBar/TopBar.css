@@ -11,4 +11,8 @@
     display: flex;
     flex: 1;
     gap: var(--space-m);
+    /* One line when it fits; on a narrow window the context bar drops below
+       the tool bar instead of pushing the "Shape tree" trigger off screen. */
+    flex-wrap: wrap;
+    min-width: 0;
 }

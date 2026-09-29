@@ -1,4 +1,5 @@
 import { Button, Dropdown, type MenuProps } from 'antd'
+import { ThunderboltFilled } from '@ant-design/icons'
 import { useCurrentSlide, useEditorStore } from '../../../../../../../store/editor/EditorStore'
 import {
     decodeItemFieldValue,
@@ -50,13 +51,15 @@ export function InsertVariableButton() {
                 style: { maxHeight: 320, overflowY: 'auto' },
             }}
         >
-            {/* Keep the caret in the Slate editor: insertion restores the stored
-                selection, but not stealing focus avoids a visible caret flicker. */}
             <Button
+                color="primary"
+                variant="filled"
                 size="small"
+                icon={<ThunderboltFilled />}
+                title="Insert a variable at the caret"
                 onMouseDown={(e) => e.preventDefault()}
             >
-                Insert variable
+                Variable
             </Button>
         </Dropdown>
     )

@@ -22,6 +22,7 @@ import type { ListType, TextAlign, TextVerticalAlign } from '@imprime/sdk'
 import { useEditorStore } from '../../../../../../store/editor/EditorStore'
 import { DebouncedColorPicker } from '../../../../../../components/common'
 import { InsertVariableButton } from './InsertVariableButton/InsertVariableButton'
+import { IconMenuButton, type IconMenuOption } from './IconMenuButton/IconMenuButton'
 
 const FONT_FAMILIES = [
   { value: 'Roboto', label: 'Roboto' },
@@ -38,7 +39,7 @@ const FONT_SIZES = [8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 64, 72, 96]
 const LINE_HEIGHTS = [1, 1.15, 1.5, 2, 2.5, 3]
 
 // antd has no "justify" icon; MenuOutlined's four equal lines read as one.
-const TEXT_ALIGNS: { value: TextAlign; icon: ReactNode; title: string }[] = [
+const TEXT_ALIGNS: IconMenuOption<TextAlign>[] = [
   { value: 'left', icon: <AlignLeftOutlined />, title: 'Align left' },
   { value: 'center', icon: <AlignCenterOutlined />, title: 'Align center' },
   { value: 'right', icon: <AlignRightOutlined />, title: 'Align right' },
@@ -56,7 +57,7 @@ const LIST_INDENTS: { delta: number; icon: ReactNode; title: string }[] = [
   { delta: 1, icon: <MenuUnfoldOutlined />, title: 'Increase indent (Tab)' },
 ]
 
-const VERTICAL_ALIGNS: { value: TextVerticalAlign; icon: ReactNode; title: string }[] = [
+const VERTICAL_ALIGNS: IconMenuOption<TextVerticalAlign>[] = [
   { value: 'top', icon: <VerticalAlignTopOutlined />, title: 'Align top' },
   { value: 'middle', icon: <VerticalAlignMiddleOutlined />, title: 'Align middle' },
   { value: 'bottom', icon: <VerticalAlignBottomOutlined />, title: 'Align bottom' },
@@ -126,41 +127,30 @@ export function TextContextBar() {
     <>
       <div className="toolbar-container context-toolbar">
         <div className="toolbar-item">
-          <span className="toolbar-label">Font</span>
-          <div onMouseDown={(e) => e.preventDefault()}>
+          <div title="Font" onMouseDown={(e) => e.preventDefault()}>
             <Select
               value={attributes.fontFamily}
               onChange={handleFontFamilyChange}
               size="small"
-              style={{ width: '150px' }}
+              style={{ width: '140px' }}
               options={FONT_FAMILIES}
             />
           </div>
-        </div>
-
-        <div className="toolbar-item">
-          <span className="toolbar-label">Size</span>
-          <div onMouseDown={(e) => e.preventDefault()}>
+          <div title="Font size" onMouseDown={(e) => e.preventDefault()}>
             <Select
               value={attributes.fontSize}
               onChange={handleFontSizeChange}
               size="small"
-              style={{ width: '80px' }}
+              style={{ width: '64px' }}
               options={FONT_SIZES.map(size => ({ value: size, label: size.toString() }))}
             />
           </div>
-        </div>
-
-        <div className="toolbar-divider" />
-
-        <div className="toolbar-item">
-          <span className="toolbar-label">Text Color</span>
-          <div onMouseDown={(e) => e.preventDefault()}>
+          <div title="Text color" onMouseDown={(e) => e.preventDefault()}>
             <DebouncedColorPicker
               value={attributes.textColor}
               onChange={handleTextColorChange}
               size="small"
-              showText
+              showText={false}
             />
           </div>
         </div>
@@ -229,30 +219,25 @@ export function TextContextBar() {
         <div className="toolbar-divider" />
 
         <div className="toolbar-item">
-          {TEXT_ALIGNS.map(({ value, icon, title }) => (
-            <Button
-              key={value}
-              type={attributes.textAlign === value ? 'primary' : 'text'}
-              size="small"
-              icon={icon}
-              title={title}
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={(e) => {
-                e.preventDefault()
-                setTextAlign(value)
-              }}
-            />
-          ))}
-        </div>
-
-        <div className="toolbar-item">
-          <span className="toolbar-label" title="Line height"><LineHeightOutlined /></span>
-          <div onMouseDown={(e) => e.preventDefault()}>
+          <IconMenuButton
+            options={TEXT_ALIGNS}
+            value={attributes.textAlign}
+            title="Text alignment"
+            onChange={setTextAlign}
+          />
+          <IconMenuButton
+            options={VERTICAL_ALIGNS}
+            value={attributes.verticalAlign}
+            title="Vertical alignment"
+            onChange={handleVerticalAlignChange}
+          />
+          <div title="Line height" onMouseDown={(e) => e.preventDefault()}>
             <Select
               value={attributes.lineHeight}
               onChange={setLineHeight}
               size="small"
-              style={{ width: '70px' }}
+              style={{ width: '80px' }}
+              prefix={<LineHeightOutlined />}
               options={LINE_HEIGHTS.map(lineHeight => ({ value: lineHeight, label: lineHeight.toString() }))}
             />
           </div>
@@ -287,25 +272,6 @@ export function TextContextBar() {
               onClick={(e) => {
                 e.preventDefault()
                 changeListIndent(delta)
-              }}
-            />
-          ))}
-        </div>
-
-        <div className="toolbar-divider" />
-
-        <div className="toolbar-item">
-          {VERTICAL_ALIGNS.map(({ value, icon, title }) => (
-            <Button
-              key={value}
-              type={attributes.verticalAlign === value ? 'primary' : 'text'}
-              size="small"
-              icon={icon}
-              title={title}
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={(e) => {
-                e.preventDefault()
-                handleVerticalAlignChange(value)
               }}
             />
           ))}

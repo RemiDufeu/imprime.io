@@ -62,7 +62,7 @@ export function ShapeContextBar() {
           value={attributes.fillColor}
           onChange={handleColorChange}
           size="small"
-          showText
+          showText={false}
         />
       </div>
 
@@ -76,7 +76,7 @@ export function ShapeContextBar() {
             value={attributes.strokeColor}
             onChange={handleStrokeColorChange}
             size="small"
-            showText
+            showText={false}
           />
           <InputNumber
             min={0}
