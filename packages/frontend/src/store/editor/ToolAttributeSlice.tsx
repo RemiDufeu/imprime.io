@@ -1,6 +1,6 @@
 
 import type { Shape, RectangleShape, EllipseShape, TextBoxShape, TextAlign, TextVerticalAlign, ListType } from '@imprime/sdk'
-import { DEFAULT_LINE_HEIGHT } from '@imprime/sdk'
+import { DEFAULT_FONT_SIZE, DEFAULT_LINE_HEIGHT } from '@imprime/sdk'
 import type { StateCreator } from 'zustand'
 
 export interface ActiveStyles {
@@ -17,7 +17,7 @@ export const DEFAULT_STYLE: ActiveStyles = {
     italic: false,
     underline: false,
     color: '#000000',
-    fontSize: 16,
+    fontSize: DEFAULT_FONT_SIZE,
     fontFamily: 'Roboto',
 }
 

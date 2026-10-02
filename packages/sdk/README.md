@@ -160,7 +160,7 @@ await client.addText('674abc123def456', 'slide-123', {
 Second paragraph',
   width: 200,              // optional, default: 200
   height: 50,              // optional, default: 50
-  fontSize: 24,            // optional, default: 16
+  fontSize: 24,            // optional, default: 24
   fontFamily: 'Roboto',    // optional, default: 'Roboto'; unknown fonts fall back to it
   color: '#000000',        // optional, default: '#000000'
   align: 'center',         // optional: 'left' | 'center' | 'right' | 'justify', default: 'left'

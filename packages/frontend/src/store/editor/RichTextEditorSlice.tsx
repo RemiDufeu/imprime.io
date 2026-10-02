@@ -2,7 +2,7 @@ import { Editor, Transforms, type BaseSelection, Element } from "slate";
 import type { StateCreator } from "zustand";
 import type { ToolAttributesSlice } from "./ToolAttributeSlice";
 import type { CustomText, VariableElement } from "@imprime/sdk";
-import { getListStyle, getParagraphStyle } from "@imprime/sdk";
+import { DEFAULT_FONT_SIZE, getListStyle, getParagraphStyle } from "@imprime/sdk";
 import { firstSelectedParagraph, isParagraph, setParagraphList, shiftListIndent } from "../../utils/paragraphs";
 
 export interface RichTextEditorSlice {
@@ -46,7 +46,7 @@ export const createRichTextEditorSlice: StateCreator<
                 strikethrough: marks?.strikethrough === true,
                 uppercase: marks?.uppercase === true,
                 textColor: (marks?.color as string) || '#000000',
-                fontSize: marks?.fontSize ? parseInt(marks.fontSize as string) : 16,
+                fontSize: marks?.fontSize ? parseInt(marks.fontSize as string) : DEFAULT_FONT_SIZE,
                 fontFamily: (marks?.fontFamily as string) || 'Roboto',
                 ...(paragraph ? {
                     ...getParagraphStyle(paragraph),

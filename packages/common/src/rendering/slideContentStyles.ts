@@ -14,7 +14,7 @@ import type { CSSProperties } from 'react'
 import type { Paragraph, TextAlign, TextFormatting, TextVerticalAlign } from '../types.js'
 
 // Font size, in px, of a run with no `fontSize`.
-export const DEFAULT_FONT_SIZE = 16
+export const DEFAULT_FONT_SIZE = 24
 // Line height of a paragraph with no `lineHeight`, as a multiplier of each
 // run's font size.
 export const DEFAULT_LINE_HEIGHT = 1.5
@@ -97,6 +97,7 @@ export function getSlideContentWrapperStyles(verticalAlign?: TextVerticalAlign):
   return {
     // Reset and typography
     fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif",
+    fontSize: DEFAULT_FONT_SIZE,
     lineHeight: DEFAULT_LINE_HEIGHT,
     letterSpacing: 'normal',
     color: '#000000',
