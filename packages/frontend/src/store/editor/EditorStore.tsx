@@ -11,6 +11,7 @@ import { createLayeringSlice, type LayeringSlice } from "./LayeringSlice"
 import { createShapeCreationSlice, type ShapeCreationSlice } from "./ShapeCreationSlice"
 import { createRichTextEditorSlice, type RichTextEditorSlice } from "./RichTextEditorSlice"
 import { createVariableSlice, type VariableSlice } from "./VariableSlice"
+import { createFontSlice, type FontSlice } from "./FontSlice"
 import { selectCurrentSlide } from "./selectors"
 
 type BaseEditorStore = PresentationSlice &
@@ -23,7 +24,8 @@ type BaseEditorStore = PresentationSlice &
     LayeringSlice &
     ShapeCreationSlice &
     RichTextEditorSlice &
-    VariableSlice
+    VariableSlice &
+    FontSlice
 
 export const useEditorStore = create<BaseEditorStore>()(
     subscribeWithSelector(
@@ -39,7 +41,8 @@ export const useEditorStore = create<BaseEditorStore>()(
                 ...createLayeringSlice(...args),
                 ...createShapeCreationSlice(...args),
                 ...createRichTextEditorSlice(...args),
-                ...createVariableSlice(...args)
+                ...createVariableSlice(...args),
+                ...createFontSlice(...args)
             }),
             {
                 name: 'editor-store',

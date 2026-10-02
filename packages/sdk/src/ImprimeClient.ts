@@ -12,6 +12,8 @@ import type {
   ListType,
   ImageShape,
   ImageDTO,
+  FontDTO,
+  FontVariant,
   PresentationDTO,
   VariableDTO,
   VariableValueType,
@@ -411,6 +413,69 @@ export class ImprimeClient {
       alt: options.alt,
     }
     return this.addShape(presentationId, slideId, shape)
+  }
+
+  // ============================================
+  // Font Operations
+  // ============================================
+
+  /**
+   * List the font families imported into the instance. A text run uses one by
+   * setting `fontFamily` to its `family`.
+   */
+  async listFonts(): Promise<FontDTO.Response[]> {
+    return this.request<FontDTO.Response[]>('/fonts')
+  }
+
+  /**
+   * Import a font family with its regular face. Admin only.
+   * @param family - Name runs will refer to it by; unique in the instance and
+   *   distinct from the built-in fonts
+   * @param regular - Base64 TrueType (.ttf) or OpenType (.otf) file
+   */
+  async createFont(family: string, regular: FontDTO.FaceUpload): Promise<FontDTO.Response> {
+    return this.request<FontDTO.Response>('/fonts', {
+      method: 'POST',
+      body: JSON.stringify({ family, regular }),
+    })
+  }
+
+  /**
+   * Add or replace one face of an imported family. Admin only.
+   * @param variant - 'regular' | 'bold' | 'italic' | 'boldItalic'
+   */
+  async setFontFace(fontId: string, variant: FontVariant, face: FontDTO.FaceUpload): Promise<FontDTO.Response> {
+    return this.request<FontDTO.Response>(`/fonts/${fontId}/faces/${variant}`, {
+      method: 'PUT',
+      body: JSON.stringify(face),
+    })
+  }
+
+  /**
+   * Get the file of one face, base64-encoded
+   */
+  async getFontFace(fontId: string, variant: FontVariant): Promise<FontDTO.FaceData> {
+    return this.request<FontDTO.FaceData>(`/fonts/${fontId}/faces/${variant}`)
+  }
+
+  /**
+   * Remove an optional face; runs asking for it fall back to the closest face
+   * left. The regular face cannot be removed. Admin only.
+   */
+  async deleteFontFace(fontId: string, variant: Exclude<FontVariant, 'regular'>): Promise<FontDTO.Response> {
+    return this.request<FontDTO.Response>(`/fonts/${fontId}/faces/${variant}`, {
+      method: 'DELETE',
+    })
+  }
+
+  /**
+   * Delete an imported family. Text using it, in every presentation, is drawn
+   * in the default font. Admin only.
+   */
+  async deleteFont(fontId: string): Promise<void> {
+    return this.request<void>(`/fonts/${fontId}`, {
+      method: 'DELETE',
+    })
   }
 
   // ============================================

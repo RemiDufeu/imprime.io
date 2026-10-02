@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { Select, Button } from 'antd'
+import type { SelectProps } from 'antd'
 import {
   BoldOutlined,
   ItalicOutlined,
@@ -18,21 +19,29 @@ import {
   MenuFoldOutlined,
   MenuUnfoldOutlined,
 } from '@ant-design/icons'
-import type { ListType, TextAlign, TextVerticalAlign } from '@imprime/sdk'
+import type { FontCatalog, FontCatalogEntry, ListType, TextAlign, TextVerticalAlign } from '@imprime/sdk'
+import { DEFAULT_FONT, resolveFontVariant } from '@imprime/sdk'
 import { useEditorStore } from '../../../../../../store/editor/EditorStore'
 import { DebouncedColorPicker } from '../../../../../../components/common'
 import { InsertVariableButton } from './InsertVariableButton/InsertVariableButton'
 import { IconMenuButton, type IconMenuOption } from './IconMenuButton/IconMenuButton'
 
-const FONT_FAMILIES = [
-  { value: 'Roboto', label: 'Roboto' },
-  { value: 'Comic Neue', label: 'Comic Neue' },
-  { value: 'Courier Prime', label: 'Courier Prime' },
-  { value: 'Anton', label: 'Anton' },
-  { value: 'Open Sans', label: 'Open Sans' },
-  { value: 'Crimson Text', label: 'Crimson Text' },
-  { value: 'Merriweather', label: 'Merriweather' },
-]
+// Each family's name is shown in the family itself.
+function fontOption(entry: FontCatalogEntry) {
+  return {
+    value: entry.family,
+    label: <span style={{ fontFamily: entry.registeredFamily }}>{entry.family}</span>,
+  }
+}
+
+function fontOptions(catalog: FontCatalog): SelectProps['options'] {
+  const entries = [...catalog.values()]
+  const builtin = entries.filter(entry => !entry.imported).map(fontOption)
+  const imported = entries.filter(entry => entry.imported).map(fontOption)
+  return imported.length === 0
+    ? builtin
+    : [{ label: 'Built-in', options: builtin }, { label: 'Imported', options: imported }]
+}
 
 const FONT_SIZES = [8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 64, 72, 96]
 
@@ -81,6 +90,17 @@ export function TextContextBar() {
   const changeListIndent = useEditorStore(state => state.changeListIndent)
   const selectedShape = useEditorStore(state => state.selectedShape)
   const updateShape = useEditorStore(state => state.updateShape)
+  const fontCatalog = useEditorStore(state => state.fontCatalog)
+  const loadFonts = useEditorStore(state => state.loadFonts)
+
+  // Bold or italic only changes the face if the family has one for it; both
+  // renderers draw the closest face otherwise. A mark already set can still
+  // be cleared.
+  const fontVariants = (fontCatalog.get(attributes.fontFamily) ?? fontCatalog.get(DEFAULT_FONT))?.variants ?? []
+  const boldAvailable = resolveFontVariant(fontVariants, true, attributes.italic)
+    !== resolveFontVariant(fontVariants, false, attributes.italic)
+  const italicAvailable = resolveFontVariant(fontVariants, attributes.bold, true)
+    !== resolveFontVariant(fontVariants, attributes.bold, false)
 
   const handleFontFamilyChange = (value: string) => {
     setFontFamily(value)
@@ -133,7 +153,9 @@ export function TextContextBar() {
               onChange={handleFontFamilyChange}
               size="small"
               style={{ width: '140px' }}
-              options={FONT_FAMILIES}
+              options={fontOptions(fontCatalog)}
+              // Picks up fonts an admin imported since the editor opened.
+              onOpenChange={(open) => { if (open) void loadFonts() }}
             />
           </div>
           <div title="Font size" onMouseDown={(e) => e.preventDefault()}>
@@ -162,7 +184,8 @@ export function TextContextBar() {
             type={attributes.bold ? 'primary' : 'text'}
             size="small"
             icon={<BoldOutlined />}
-            title="Bold"
+            title={boldAvailable || attributes.bold ? 'Bold' : 'Bold (not available in this font)'}
+            disabled={!boldAvailable && !attributes.bold}
             onMouseDown={(e) => e.preventDefault()}
             onClick={(e) => {
               e.preventDefault()
@@ -173,7 +196,8 @@ export function TextContextBar() {
             type={attributes.italic ? 'primary' : 'text'}
             size="small"
             icon={<ItalicOutlined />}
-            title="Italic"
+            title={italicAvailable || attributes.italic ? 'Italic' : 'Italic (not available in this font)'}
+            disabled={!italicAvailable && !attributes.italic}
             onMouseDown={(e) => e.preventDefault()}
             onClick={(e) => {
               e.preventDefault()

@@ -1,5 +1,6 @@
 import mongoose, { Types } from 'mongoose'
 import type {
+  FontDTO,
   Presentation,
   PresentationDTO,
   PresentationSummary,
@@ -8,6 +9,7 @@ import type {
   VariableData,
   VariableDTO,
 } from '@imprime/common'
+import type { FontDocument, IFont, IFontFile } from './Font.js'
 import type { IPresentation, PresentationDocument } from './Presentation.js'
 import type { ISlide, SlideDocument } from './Slide.js'
 import type { IVariableData, VariableDataDocument } from './VariableData.js'
@@ -109,6 +111,41 @@ export function variableUpdateToModel(
   if (dto.required !== undefined) update.required = dto.required
   if (dto.itemFields !== undefined) update.itemFields = dto.itemFields
   return update
+}
+
+// Reads only the faces' metadata, so it accepts a document loaded without the
+// file data.
+export function fontToDTO(doc: FontDocument): FontDTO.Response {
+  const faces: FontDTO.Response['faces'] = { regular: fontFileToDTO(doc.faces.regular) }
+  if (doc.faces.bold) faces.bold = fontFileToDTO(doc.faces.bold)
+  if (doc.faces.italic) faces.italic = fontFileToDTO(doc.faces.italic)
+  if (doc.faces.boldItalic) faces.boldItalic = fontFileToDTO(doc.faces.boldItalic)
+
+  return {
+    _id: doc._id.toString(),
+    family: doc.family,
+    version: doc.version,
+    faces,
+    createdAt: doc.createdAt,
+    updatedAt: doc.updatedAt,
+  }
+}
+
+function fontFileToDTO(file: IFontFile): FontDTO.FaceInfo {
+  return { size: file.size, originalName: file.originalName }
+}
+
+// `family` is the validated, trimmed name.
+export function fontCreateToModel(
+  family: string,
+  regular: IFontFile
+): Pick<IFont, 'family' | 'familyKey' | 'version' | 'faces'> {
+  return {
+    family,
+    familyKey: family.toLowerCase(),
+    version: 1,
+    faces: { regular },
+  }
 }
 
 export function toObjectId(id: string): Types.ObjectId {

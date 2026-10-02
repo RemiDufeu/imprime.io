@@ -1,5 +1,6 @@
 import type { ListLayout, ListMarker, TextFormatting } from '@imprime/sdk'
-import { getBulletBox, normalizeFontFamily } from '@imprime/sdk'
+import { getBulletBox, resolveFontFace } from '@imprime/sdk'
+import { useEditorStore } from '../../store/editor/EditorStore'
 
 interface ListItemMarkerProps {
   marker: ListMarker
@@ -11,6 +12,7 @@ interface ListItemMarkerProps {
 // as `getListLayout` describes — the PDF export draws it the same way. It is
 // decoration, not content: Slate must neither select nor edit it.
 export function ListItemMarker({ marker, layout, formatting }: ListItemMarkerProps) {
+  const fontCatalog = useEditorStore(state => state.fontCatalog)
   const color = formatting.color ?? '#000000'
 
   if (marker.kind === 'bullet') {
@@ -40,9 +42,9 @@ export function ListItemMarker({ marker, layout, formatting }: ListItemMarkerPro
         left: layout.markerLeft,
         fontSize: layout.fontSize,
         lineHeight: layout.lineHeight,
-        // Normalised like the PDF does, so an unset or unknown family falls
+        // Resolved like the PDF does, so an unset or unknown family falls
         // back to the same font on both sides.
-        fontFamily: normalizeFontFamily(formatting.fontFamily),
+        ...resolveFontFace(formatting, fontCatalog),
         color,
       }}
     >

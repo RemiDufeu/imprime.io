@@ -1,0 +1,16 @@
+.admin-page {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-l);
+}
+
+.admin-page-nav.ant-menu {
+  flex: 0 0 200px;
+  border-inline-end: none;
+  background: transparent;
+}
+
+.admin-page-content {
+  flex: 1;
+  min-width: 0;
+}

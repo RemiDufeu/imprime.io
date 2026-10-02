@@ -1,5 +1,5 @@
 import { ImprimeClient } from '@imprime/sdk'
-import type { Presentation, PresentationSummary, Shape, ImageDTO, VariableDTO, VariableValueType } from '@imprime/sdk'
+import type { Presentation, PresentationSummary, Shape, ImageDTO, FontDTO, FontVariant, VariableDTO, VariableValueType } from '@imprime/sdk'
 import { API_BASE } from '../config'
 
 // Create a single SDK client instance
@@ -65,6 +65,35 @@ export const imagesAPI = {
 
   async getById(imageId: string): Promise<ImageDTO.ResponseWithData> {
     return client.getImage(imageId)
+  },
+}
+
+/**
+ * Fonts API using Imprime SDK
+ */
+export const fontsAPI = {
+  async list(): Promise<FontDTO.Response[]> {
+    return client.listFonts()
+  },
+
+  async create(family: string, regular: FontDTO.FaceUpload): Promise<FontDTO.Response> {
+    return client.createFont(family, regular)
+  },
+
+  async setFace(fontId: string, variant: FontVariant, face: FontDTO.FaceUpload): Promise<FontDTO.Response> {
+    return client.setFontFace(fontId, variant, face)
+  },
+
+  async getFace(fontId: string, variant: FontVariant): Promise<FontDTO.FaceData> {
+    return client.getFontFace(fontId, variant)
+  },
+
+  async deleteFace(fontId: string, variant: Exclude<FontVariant, 'regular'>): Promise<FontDTO.Response> {
+    return client.deleteFontFace(fontId, variant)
+  },
+
+  async delete(fontId: string): Promise<void> {
+    return client.deleteFont(fontId)
   },
 }
 

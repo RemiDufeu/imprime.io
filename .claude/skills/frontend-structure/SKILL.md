@@ -13,7 +13,7 @@ src/
   App.tsx             routes only
   config.ts           API base URL resolution
   index.css           design tokens + global type styles
-  fonts.css           @font-face, pointing at packages/common/src/assets/fonts
+  fonts.ts            registers font faces (built-in and imported) with document.fonts
 
   api/                the SDK client, wrapped as *API objects
   auth/               better-auth client
@@ -42,6 +42,7 @@ plausibly generic. Current contents:
 | `common/` | genuinely generic widgets (`DebouncedColorPicker`) |
 | `Feedback/` | `SpinnerFullScreen` |
 | `RequireAuth.tsx` | the route guard |
+| `RequireAdmin.tsx` | the admin-role guard around `/admin/*` (UI only — the API checks the role itself) |
 
 A component used by exactly one page stays inside that page's folder. Promote it
 when the second consumer appears — not in anticipation of one.

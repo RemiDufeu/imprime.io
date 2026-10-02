@@ -7,7 +7,7 @@ metadata:
 
 # Persistence and Mapping
 
-Four collections, four thin schemas, and one mapper module that is the only
+Five collections, five thin schemas, and one mapper module that is the only
 place a Mongoose document turns into something a client may see.
 
 ```
@@ -15,6 +15,7 @@ Presentation  { title, ownerId, timestamps }
 Slide         { presentationId, order, shapes: Mixed[], timestamps }
 VariableData  { presentationId, type, name, default: Mixed, required }
 Image         { data (base64), mimeType, originalName, size, timestamps }
+Font          { family, familyKey (unique), version, faces: { regular, bold?, italic?, boldItalic? }, timestamps }
 ```
 
 ## Model file anatomy
@@ -71,7 +72,9 @@ Schema conventions in use:
 
 ## Ownership scoping
 
-Only `Presentation` carries `ownerId`. Everything else is scoped **through** it:
+Only `Presentation` carries `ownerId`. `Font` belongs to the instance: no
+owner, readable by everyone, written only behind `requireAdmin`. Everything
+else is scoped **through** the presentation:
 
 - `Slide` and `VariableData` hold `presentationId`, and services query with both
   ids together (`findOne({ _id, presentationId })`) so a child cannot be reached

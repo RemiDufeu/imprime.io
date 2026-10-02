@@ -14,14 +14,16 @@ export default function EditorPage() {
   const isLoading = useEditorStore(state => state.isLoading)
   const error = useEditorStore(state => state.error)
   const loadPresentation = useEditorStore(state => state.loadPresentation)
+  const loadFonts = useEditorStore(state => state.loadFonts)
   const hasAttemptedLoad = useRef(false)
 
   useEffect(() => {
     if (id && !hasAttemptedLoad.current) {
       hasAttemptedLoad.current = true
       loadPresentation(id)
+      loadFonts()
     }
-  }, [id, loadPresentation])
+  }, [id, loadPresentation, loadFonts])
 
   if (isLoading) {
     return (<SpinnerFullScreen />)

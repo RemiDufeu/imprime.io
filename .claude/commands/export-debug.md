@@ -46,7 +46,7 @@ speculating down the pipeline.
 | Repeat renders once or zero times | `itemsVariable` is not a non-empty array |
 | Content off-slide | `expandForGroup` bbox origin, or the stage-3 filter |
 | Colour flat, shape invisible | `parseColor` — alpha must be split out |
-| Wrong font, no bold | `AVAILABLE_FONTS` / `FONT_FILES` / missing font file |
+| Wrong font, no bold | family not in the catalog (`BUILTIN_FONTS`, the instance's imported fonts) / no file for that face |
 | Text wraps differently | expected: browser vs react-pdf metrics |
 | Stroke clipped at an edge | `renderInSvgLayer` clamps to the page; the editor does not |
 | 408 | render exceeded 30s |

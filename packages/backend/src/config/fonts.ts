@@ -1,101 +1,80 @@
 import { Font } from '@react-pdf/renderer'
-import { AVAILABLE_FONTS, DEFAULT_FONT, FONT_FILES, type FontFamily } from '@imprime/common'
+import {
+  BUILTIN_FONTS,
+  BUILTIN_FONT_FAMILIES,
+  FONT_VARIANTS,
+  FONT_VARIANT_STYLE,
+  importedFontFamilyName,
+  type FontVariant,
+} from '@imprime/common'
+import type { FontWithFiles } from '../services/FontService.js'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 /**
- * Font Configuration for @react-pdf/renderer
+ * Font registration for @react-pdf/renderer.
  *
- * SIMPLE RULES:
- * - Only locally downloaded fonts are used
- * - NO font substitution (Arial stays Arial, not replaced by Roboto)
- * - Fallback is ALWAYS from @imprime/common
+ * The editor registers the same files under the same family names, with the
+ * same weight and style per face (frontend `fonts/fontLoader.ts`), and both
+ * sides resolve a run through `resolveFontFace` in common.
  */
 
-// Flag to track if fonts have been registered
-let fontsRegistered = false
-
-// Re-export from common for convenience
-export { AVAILABLE_FONTS, DEFAULT_FONT }
-
-/**
- * Register fonts from common/assets/fonts
- * Fonts are registered with their ACTUAL names (not substitutes)
- */
-function registerCustomFonts(): void {
-  if (fontsRegistered) return
-
-  // Resolve fonts directory. Works both in dev (tsx from src/config/) and
-  // when bundled by esbuild into dist/server.js (depth differs by one).
+// Works both in dev (tsx from src/config/) and when bundled by esbuild into
+// dist/server.js (depth differs by one).
+function builtinFontsDirectory(): string {
   const here = path.dirname(fileURLToPath(import.meta.url))
   const candidates = [
     path.resolve(here, '../../../common/src/assets/fonts'), // dev: src/config/
     path.resolve(here, '../../common/src/assets/fonts'),    // bundled: dist/
   ]
-  const resolved = candidates.find(p => existsSync(p)) ?? candidates[0]
-  const normalizedPath = resolved.endsWith(path.sep) ? resolved : resolved + path.sep
+  return candidates.find(p => existsSync(p)) ?? candidates[0]
+}
 
-  // Register each font family dynamically based on FONT_FILES
-  for (const fontFamily of AVAILABLE_FONTS) {
-    const fontConfig = FONT_FILES[fontFamily]
-    const fonts: Array<{ src: string; fontWeight?: 'normal' | 'bold'; fontStyle?: 'normal' | 'italic' }> = []
+let builtinFontsRegistered = false
 
-    if (fontConfig.regular) {
-      const ext = fontFamily === 'Crimson Text' ? 'otf' : 'ttf'
-      fonts.push({ src: `${normalizedPath}${fontConfig.regular}.${ext}` })
-    }
+export function registerBuiltinFonts(): void {
+  if (builtinFontsRegistered) return
 
-    if (fontConfig.bold) {
-      const ext = fontFamily === 'Crimson Text' ? 'otf' : 'ttf'
-      fonts.push({
-        src: `${normalizedPath}${fontConfig.bold}.${ext}`,
-        fontWeight: 'bold'
-      })
-    }
-
-    if ('italic' in fontConfig && fontConfig.italic) {
-      const ext = fontFamily === 'Crimson Text' ? 'otf' : 'ttf'
-      fonts.push({
-        src: `${normalizedPath}${fontConfig.italic}.${ext}`,
-        fontStyle: 'italic'
-      })
-    }
-
-    if ('boldItalic' in fontConfig && fontConfig.boldItalic) {
-      const ext = fontFamily === 'Crimson Text' ? 'otf' : 'ttf'
-      fonts.push({
-        src: `${normalizedPath}${fontConfig.boldItalic}.${ext}`,
-        fontWeight: 'bold',
-        fontStyle: 'italic'
-      })
-    }
-
+  const directory = builtinFontsDirectory()
+  for (const family of BUILTIN_FONT_FAMILIES) {
+    const files: Partial<Record<FontVariant, string>> = BUILTIN_FONTS[family]
     Font.register({
-      family: fontFamily,
-      fonts
+      family,
+      fonts: FONT_VARIANTS.flatMap(variant => {
+        const file = files[variant]
+        return file ? [{ src: path.join(directory, file), ...FONT_VARIANT_STYLE[variant] }] : []
+      }),
     })
   }
 
-  fontsRegistered = true
+  // By default react-pdf breaks long words with English hyphenation rules,
+  // whatever the language; the browser never does. Breaking between words only
+  // keeps the PDF's lines where the editor puts them.
+  Font.registerHyphenationCallback(word => [word])
+
+  builtinFontsRegistered = true
 }
 
-// Re-export normalizeFontFamily from common
-export { normalizeFontFamily } from '@imprime/common'
+// Names already registered. react-pdf's registry is process-wide and has no
+// way to remove one family, so each imported font version is registered once
+// and stays for the life of the process.
+const registeredImportedFonts = new Set<string>()
 
-/**
- * Returns font style properties for text formatting
- */
-export function getFontStyleProps(bold: boolean = false, italic: boolean = false) {
-  return {
-    fontWeight: bold ? ('bold') : ('normal'),
-    fontStyle: italic ? ('italic') : ('normal')
+export function registerImportedFonts(fonts: readonly FontWithFiles[]): void {
+  for (const { font, files } of fonts) {
+    const family = importedFontFamilyName(font)
+    if (registeredImportedFonts.has(family)) continue
+
+    Font.register({
+      family,
+      fonts: FONT_VARIANTS.flatMap(variant => {
+        const data = files[variant]
+        return data
+          ? [{ src: `data:font/ttf;base64,${data.toString('base64')}`, ...FONT_VARIANT_STYLE[variant] }]
+          : []
+      }),
+    })
+    registeredImportedFonts.add(family)
   }
-}
-
-/**
- * Initialize font registration
- */
-export function initializeFonts(): void {
-  registerCustomFonts()
 }

@@ -21,7 +21,7 @@ packages/common/src/types.ts   (DTO namespaces)
 ```
 
 `frontend/src/api/api.ts` instantiates one `ImprimeClient` and re-exports it as
-`presentationsAPI` / `imagesAPI` / `variablesAPI`. The frontend therefore
+`presentationsAPI` / `imagesAPI` / `fontsAPI` / `variablesAPI`. The frontend therefore
 consumes the *same* client third parties do — if a method is missing from the
 SDK, the editor cannot use it either. That is a feature: it keeps the public
 API honest.
@@ -35,6 +35,7 @@ Mounted in `packages/backend/src/server.ts`, all behind `requireAuth`:
 | `/api/presentations` | `presentations.ts`, `slides.ts`, `variables.ts` (three routers, same mount) |
 | `/api/export` | `export.ts` |
 | `/api/images` | `images.ts` |
+| `/api/fonts` | `fonts.ts` — instance-wide; reads open, writes behind `requireAdmin` |
 | `/api/mcp` | MCP router — **owns its own sessions, outside the `requireAuth` pipeline** |
 
 Public: `/api/health`, `/api/auth-providers`, `/api/auth/*` (better-auth, rate
@@ -68,6 +69,16 @@ learn that someone else's presentation exists. Keep that when you add a check.
 A route that takes a `:id` presentation param and does not go through
 `requireOwnsPresentation` is a vulnerability, not a style issue.
 
+Some resources belong to the **instance**, not to a user: imported fonts today,
+instance settings later. Every authenticated user reads them; only admins
+change them, through `requireAdmin` (`middleware/requireAdmin.ts`), which
+answers **403 `ADMIN_REQUIRED`** — not 404, since the resource is visible to
+everyone anyway. The role is better-auth's (`admin` plugin, `user.role`) and is
+read from the database on each check, so it holds for API keys as for
+sessions. Accounts listed in `ADMIN_EMAILS` are promoted at startup and at
+sign-in (`AuthService.promoteConfiguredAdmins` and the `session.create` hook);
+in production only if their address is verified.
+
 ## Error contract
 
 Throw, never hand-build a response:
@@ -75,6 +86,7 @@ Throw, never hand-build a response:
 | Class | Status | Use |
 |---|---|---|
 | `NotFoundError` | 404 | missing **or** not owned |
+| `ForbiddenError` | 403 | authenticated but lacking a role (`ADMIN_REQUIRED`); never for owned resources |
 | `ValidationError` | 400 | bad input; carries optional `details: string[]` |
 | `ConflictError` | 409 | uniqueness violations (e.g. `VARIABLE_NAME_EXISTS`) |
 | `AppError` | any | anything else (`exportToPDF` timeout uses 408) |

@@ -1,98 +1,140 @@
 /**
- * Font Configuration
- * Shared between frontend and backend
+ * Font Catalog
+ *
+ * The fonts a run can be drawn with: the built-in families shipped in
+ * `src/assets/fonts/`, plus the families an account imported. Both renderers
+ * register the same files under the same names and resolve a run through
+ * `resolveFontFace`, so the editor and the PDF pick the same face.
  */
 
-/**
- * List of available fonts
- * These fonts must have corresponding font files in src/assets/fonts/
- */
-export const AVAILABLE_FONTS = [
-  'Roboto',
-  'Comic Neue',
-  'Courier Prime',
-  'Anton',
-  'Open Sans',
-  'Crimson Text',
-  'Merriweather',
-] as const
+import type { FontDTO, FontVariant } from './types.js'
+
+export const FONT_VARIANTS: readonly FontVariant[] = ['regular', 'bold', 'italic', 'boldItalic']
+
+// Largest file an imported face may have, in bytes. Faces are uploaded one per
+// request: 4 MB base64-encodes to about 5.4 MB, inside the API's 10 MB body
+// limit, and four faces fit MongoDB's 16 MB document limit.
+export const MAX_FONT_FILE_SIZE = 4 * 1024 * 1024
+
+// Weight and style each variant is registered with — `FontFace` descriptors in
+// the editor, `Font.register` options in the export.
+export const FONT_VARIANT_STYLE: Record<FontVariant, { fontWeight: 'normal' | 'bold'; fontStyle: 'normal' | 'italic' }> = {
+  regular: { fontWeight: 'normal', fontStyle: 'normal' },
+  bold: { fontWeight: 'bold', fontStyle: 'normal' },
+  italic: { fontWeight: 'normal', fontStyle: 'italic' },
+  boldItalic: { fontWeight: 'bold', fontStyle: 'italic' },
+}
+
+type FontFiles = { regular: string } & Partial<Record<Exclude<FontVariant, 'regular'>, string>>
 
 /**
- * Default font
+ * Built-in families and the file of each face they provide, in
+ * `src/assets/fonts/`. A face left out is not drawn by synthesis on either
+ * side: the run falls back to the closest face the family has.
  */
-export const DEFAULT_FONT = 'Roboto'
-
-/**
- * Font file mappings
- * Maps font family names to their file names (without extension)
- */
-export const FONT_FILES = {
+export const BUILTIN_FONTS = {
   'Roboto': {
-    regular: 'Roboto-Regular',
-    bold: 'Roboto-Bold',
-    italic: 'Roboto-Italic',
-    boldItalic: 'Roboto-BoldItalic',
+    regular: 'Roboto-Regular.ttf',
+    bold: 'Roboto-Bold.ttf',
+    italic: 'Roboto-Italic.ttf',
+    boldItalic: 'Roboto-BoldItalic.ttf',
   },
   'Comic Neue': {
-    regular: 'ComicNeue-Regular',
-    bold: 'ComicNeue-Bold',
-    italic: 'ComicNeue-Italic',
-    boldItalic: 'ComicNeue-BoldItalic',
+    regular: 'ComicNeue-Regular.ttf',
+    bold: 'ComicNeue-Bold.ttf',
+    italic: 'ComicNeue-Italic.ttf',
+    boldItalic: 'ComicNeue-BoldItalic.ttf',
   },
   'Courier Prime': {
-    regular: 'CourierPrime-Regular',
-    bold: 'CourierPrime-Bold',
-    italic: 'CourierPrime-Italic',
-    boldItalic: 'CourierPrime-BoldItalic',
+    regular: 'CourierPrime-Regular.ttf',
+    bold: 'CourierPrime-Bold.ttf',
+    italic: 'CourierPrime-Italic.ttf',
+    boldItalic: 'CourierPrime-BoldItalic.ttf',
   },
   'Anton': {
-    regular: 'Anton-Regular',
-    bold: 'Anton-Regular', // Anton only has regular weight
+    regular: 'Anton-Regular.ttf',
   },
   'Open Sans': {
-    regular: 'OpenSans-Regular',
-    bold: 'OpenSans-Bold',
-    italic: 'OpenSans-Italic',
-    boldItalic: 'OpenSans-BoldItalic',
+    regular: 'OpenSans-Regular.ttf',
+    bold: 'OpenSans-Bold.ttf',
+    italic: 'OpenSans-Italic.ttf',
+    boldItalic: 'OpenSans-BoldItalic.ttf',
   },
   'Crimson Text': {
-    regular: 'CrimsonText-Regular',
-    bold: 'CrimsonText-Bold',
-    italic: 'CrimsonText-Italic',
-    boldItalic: 'CrimsonText-BoldItalic',
+    regular: 'CrimsonText-Regular.otf',
+    bold: 'CrimsonText-Bold.otf',
+    italic: 'CrimsonText-Italic.otf',
+    boldItalic: 'CrimsonText-BoldItalic.otf',
   },
   'Merriweather': {
-    regular: 'Merriweather-Regular',
-    bold: 'Merriweather-Bold',
-    italic: 'Merriweather-Italic',
-    boldItalic: 'Merriweather-BoldItalic',
+    regular: 'Merriweather-Regular.ttf',
+    bold: 'Merriweather-Bold.ttf',
+    italic: 'Merriweather-Italic.ttf',
+    boldItalic: 'Merriweather-BoldItalic.ttf',
   },
-} as const
+} as const satisfies Record<string, FontFiles>
 
-export type FontFamily = typeof AVAILABLE_FONTS[number]
+export type BuiltinFontFamily = keyof typeof BUILTIN_FONTS
 
-/**
- * Normalize font family - returns font name or default fallback
- */
-export function normalizeFontFamily(fontFamily: string | undefined): FontFamily {
-  if (!fontFamily) {
-    return DEFAULT_FONT
-  }
+export const BUILTIN_FONT_FAMILIES = Object.keys(BUILTIN_FONTS) as BuiltinFontFamily[]
 
-  if (AVAILABLE_FONTS.includes(fontFamily as FontFamily)) {
-    return fontFamily as FontFamily
-  }
+// Family of a run with no `fontFamily`, or one the catalog does not know.
+export const DEFAULT_FONT: BuiltinFontFamily = 'Roboto'
 
-  return DEFAULT_FONT
+// Built-in families are matched case-insensitively here, so an import cannot
+// shadow one under a different case.
+export function isBuiltinFontFamily(family: string): boolean {
+  const key = family.trim().toLowerCase()
+  return BUILTIN_FONT_FAMILIES.some(builtin => builtin.toLowerCase() === key)
 }
 
 /**
- * Get font file extension for a given font
+ * Name an imported family is registered under in both renderers. Unique across
+ * accounts, which the family name is not, and changed by every face update so
+ * neither renderer keeps drawing a replaced file from its cache.
  */
-export function getFontExtension(fontFamily: FontFamily, variant: 'regular' | 'bold' | 'italic' | 'boldItalic' = 'regular'): string {
-  // Crimson Text uses .otf, others use .ttf
-  if (fontFamily === 'Crimson Text') {
-    return 'otf'
+export function importedFontFamilyName(font: Pick<FontDTO.Response, '_id' | 'version'>): string {
+  return `imprime-font-${font._id}-${font.version}`
+}
+
+export interface FontCatalogEntry {
+  // Name runs store in `fontFamily`.
+  family: string
+  // Name the renderers registered the faces under.
+  registeredFamily: string
+  variants: readonly FontVariant[]
+  imported: boolean
+}
+
+// Keyed by `family`.
+export type FontCatalog = ReadonlyMap<string, FontCatalogEntry>
+
+/**
+ * The built-in families followed by an account's imported ones. An imported
+ * family never shadows a built-in one: the backend refuses the name.
+ */
+export function createFontCatalog(imported: readonly FontDTO.Response[] = []): FontCatalog {
+  const catalog = new Map<string, FontCatalogEntry>()
+
+  for (const family of BUILTIN_FONT_FAMILIES) {
+    const files: FontFiles = BUILTIN_FONTS[family]
+    catalog.set(family, {
+      family,
+      registeredFamily: family,
+      variants: FONT_VARIANTS.filter(variant => files[variant] !== undefined),
+      imported: false,
+    })
   }
-  return 'ttf'
+
+  for (const font of imported) {
+    if (catalog.has(font.family)) continue
+    catalog.set(font.family, {
+      family: font.family,
+      registeredFamily: importedFontFamilyName(font),
+      variants: FONT_VARIANTS.filter(variant => font.faces[variant] !== undefined),
+      imported: true,
+    })
+  }
+
+  return catalog
 }

@@ -301,6 +301,44 @@ export namespace ImageDTO {
   }
 }
 
+// The four faces a font family may provide. A run asks for one through its
+// `bold` and `italic` marks; a family missing it is drawn with the closest face
+// it has (see `resolveFontFace`).
+export type FontVariant = 'regular' | 'bold' | 'italic' | 'boldItalic'
+
+export namespace FontDTO {
+  // A TrueType or OpenType file, base64-encoded.
+  export interface FaceUpload {
+    data: string
+    originalName?: string
+  }
+
+  export interface Create {
+    family: string
+    regular: FaceUpload
+  }
+
+  export interface FaceInfo {
+    size: number
+    originalName?: string
+  }
+
+  // An imported font family, owned by one account. Runs refer to it by
+  // `family`; `version` changes whenever one of its faces does.
+  export interface Response {
+    _id: string
+    family: string
+    version: number
+    faces: { regular: FaceInfo } & Partial<Record<Exclude<FontVariant, 'regular'>, FaceInfo>>
+    createdAt?: Date
+    updatedAt?: Date
+  }
+
+  export interface FaceData {
+    data: string
+  }
+}
+
 export namespace ExportDTO {
   export interface PdfRequest {
     variableValues?: Record<string, VariableValueType>

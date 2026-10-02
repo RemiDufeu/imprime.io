@@ -15,6 +15,14 @@ export class NotFoundError extends AppError {
   }
 }
 
+// Authenticated, but not allowed. Not for resources a third party must not
+// learn about: those answer NotFoundError.
+export class ForbiddenError extends AppError {
+  constructor(message: string, code?: string) {
+    super(message, 403, code)
+  }
+}
+
 export class ValidationError extends AppError {
   constructor(
     message: string,

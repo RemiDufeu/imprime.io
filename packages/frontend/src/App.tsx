@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Layout from './pages/Layout'
 import HomePage from './pages/HomePage/HomePage'
 import EditorPage from './pages/EditorPage/EditorPage'
@@ -8,7 +8,10 @@ import VerifyEmailPage from './pages/LoginPage/VerifyEmailPage'
 import ForgotPasswordPage from './pages/LoginPage/ForgotPasswordPage'
 import ResetPasswordPage from './pages/LoginPage/ResetPasswordPage'
 import ApiKeysPage from './pages/SettingsPage/ApiKeysPage'
+import AdminPage from './pages/AdminPage/AdminPage'
+import FontsPage from './pages/AdminPage/FontsPage/FontsPage'
 import RequireAuth from './components/RequireAuth'
+import RequireAdmin from './components/RequireAdmin'
 
 function App() {
   return (
@@ -27,6 +30,14 @@ function App() {
                 <Route index element={<HomePage />} />
                 <Route path="editor/:id" element={<EditorPage />} />
                 <Route path="settings/api-keys" element={<ApiKeysPage />} />
+
+                {/* Administration de l'instance : rôle admin requis */}
+                <Route element={<RequireAdmin />}>
+                  <Route path="admin" element={<AdminPage />}>
+                    <Route index element={<Navigate to="fonts" replace />} />
+                    <Route path="fonts" element={<FontsPage />} />
+                  </Route>
+                </Route>
               </Route>
             </Route>
           </Routes>

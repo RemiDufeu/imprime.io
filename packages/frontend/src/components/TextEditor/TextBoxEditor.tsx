@@ -1,5 +1,5 @@
 import type { CustomText, Paragraph, VariableElement } from '@imprime/sdk';
-import { getTextDecoration, getTextTransform, PARAGRAPH_SPACING } from '@imprime/sdk';
+import { getRunTextStyle, PARAGRAPH_SPACING } from '@imprime/sdk';
 import { useCallback } from 'react';
 import { Editor, type BaseEditor, type Descendant } from 'slate';
 import { Slate, Editable, ReactEditor, type RenderLeafProps, type RenderElementProps } from 'slate-react';
@@ -7,6 +7,7 @@ import { VariableBlock } from './VariableBlock';
 import { ParagraphElement } from './ParagraphElement';
 import { ListMarkersProvider } from './ListMarkersProvider';
 import { selectionHasListItem, shiftListIndent } from '../../utils/paragraphs';
+import { useEditorStore } from '../../store/editor/EditorStore';
 import './TextBoxEditor.css';
 
 export type CustomElement = VariableElement | Paragraph;
@@ -41,6 +42,7 @@ export type VariableEditorProps = {
 };
 
 export const TextBoxEditor = ({ initialContent, editor, readonly, fillHeight = true, onValueChange, onChange, onFocus }: VariableEditorProps) => {
+  const fontCatalog = useEditorStore(state => state.fontCatalog);
 
   const initialValue: Descendant[] = initialContent?.length ? initialContent : [
     {
@@ -58,43 +60,16 @@ export const TextBoxEditor = ({ initialContent, editor, readonly, fillHeight = t
     }
   }, []);
 
+  // The face comes from the catalog, as in the PDF; no <strong>/<em> around
+  // the text, which would ask the browser for a weight the catalog ruled out.
   const renderLeaf = useCallback((props: RenderLeafProps) => {
-    let { children } = props;
-
-    if (props.leaf.bold) {
-      children = <strong>{children}</strong>;
-    }
-
-    if (props.leaf.italic) {
-      children = <em>{children}</em>;
-    }
-
-    const style: React.CSSProperties = {
-      textDecoration: getTextDecoration(props.leaf),
-      textTransform: getTextTransform(props.leaf),
-    };
+    const style: React.CSSProperties = getRunTextStyle(props.leaf, fontCatalog);
     if (props.leaf.color) {
       style.color = props.leaf.color;
     }
 
-    if (props.leaf.fontSize) {
-      style.fontSize = props.leaf.fontSize;
-    }
-
-    if (props.leaf.fontFamily) {
-      style.fontFamily = props.leaf.fontFamily;
-    }
-
-    if (props.leaf.bold) {
-      style.fontWeight = 'bold';
-    }
-
-    if (props.leaf.italic) {
-      style.fontStyle = 'italic';
-    }
-
-    return <span {...props.attributes} style={style}>{children}</span>;
-  }, []);
+    return <span {...props.attributes} style={style}>{props.children}</span>;
+  }, [fontCatalog]);
 
   return (
     <Slate

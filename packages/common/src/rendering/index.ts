@@ -19,11 +19,14 @@ export {
   getTextTransform,
   getVerticalJustify,
   parseFontSize,
+  resolveFontVariant,
+  resolveFontFace,
+  getRunTextStyle,
   DEFAULT_FONT_SIZE,
   DEFAULT_LINE_HEIGHT,
   PARAGRAPH_SPACING,
 } from './slideContentStyles.js'
-export type { ParagraphStyle } from './slideContentStyles.js'
+export type { ParagraphStyle, RunFontFace, RunTextStyle } from './slideContentStyles.js'
 export {
   getListStyle,
   getListMarkers,

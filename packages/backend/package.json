@@ -21,6 +21,7 @@
     "dotenv": "^16.4.7",
     "express": "^5.2.1",
     "express-rate-limit": "^8.6.1",
+    "fontkit": "^2.0.4",
     "helmet": "^8.3.0",
     "mongodb": "^6.20.0",
     "mongoose": "^8.9.5",
@@ -30,6 +31,7 @@
   "devDependencies": {
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
+    "@types/fontkit": "^2.0.9",
     "@types/node": "^22.10.5",
     "@types/nodemailer": "^6.4.24",
     "esbuild": "^0.28.1",

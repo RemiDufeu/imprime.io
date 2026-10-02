@@ -19,16 +19,17 @@ src/
   middleware/
     requireAuth.ts       session cookie or x-api-key → req.user
     requireOwnsPresentation.ts  ownership guard + assertOwnsPresentation()
+    requireAdmin.ts      admin-role guard for instance-wide resources
     errorHandler.ts      AppError subclasses → HTTP responses
   models/
-    Presentation.ts  Slide.ts  VariableData.ts  Image.ts
+    Presentation.ts  Slide.ts  VariableData.ts  Image.ts  Font.ts
     mappers.ts           document ↔ DTO
   routes/
-    presentations.ts  slides.ts  variables.ts  export.ts  images.ts
+    presentations.ts  slides.ts  variables.ts  export.ts  images.ts  fonts.ts
   services/
     index.ts             the singletons, wired here
     PresentationService.ts  SlideService.ts  VariableService.ts
-    ImageService.ts  ExportService.ts  AuthService.ts  MailerService.ts
+    ImageService.ts  FontService.ts  ExportService.ts  AuthService.ts  MailerService.ts
     errors.ts            AppError, NotFoundError, ValidationError, ConflictError
     pdfDownloadStore.ts  in-process single-use PDF store
   mcp/

@@ -15,7 +15,8 @@ import type {
   ListMarker,
   TextFormatting,
   VariableValueType,
-  ResolveContext
+  ResolveContext,
+  FontCatalog
 } from '@imprime/common'
 import {
   SLIDE_WIDTH,
@@ -28,31 +29,38 @@ import {
   getEllipseGeometry,
   getRectangleCornerRadius,
   getParagraphStyle,
-  getTextDecoration,
-  getTextTransform,
+  getRunTextStyle,
+  resolveFontFace,
+  createFontCatalog,
   getVerticalJustify,
   getListStyle,
   getListMarkers,
   getListMarkerFormatting,
   getListLayout,
   getBulletBox,
-  parseFontSize,
   PARAGRAPH_SPACING
 } from '@imprime/common'
 import type { ImageService } from './ImageService.js'
+import type { FontService } from './FontService.js'
 import { AppError, ValidationError } from './errors.js'
-import { normalizeFontFamily, getFontStyleProps, initializeFonts } from '../config/fonts.js'
+import { registerBuiltinFonts, registerImportedFonts } from '../config/fonts.js'
 import type { Style } from '@react-pdf/types'
 
-// Initialize fonts on module load
-initializeFonts()
+registerBuiltinFonts()
 
 export interface RenderOptions {
   variableValues?: Record<string, VariableValueType>
 }
 
+// What one export fetched before drawing: image data URLs by image id, and the
+// fonts its runs can resolve to.
+interface RenderAssets {
+  images: Map<string, string>
+  fonts: FontCatalog
+}
+
 export class ExportService {
-  constructor(private imageService: ImageService) { }
+  constructor(private imageService: ImageService, private fontService: FontService) { }
 
   private validateVariables(presentation: Presentation, variableValues: Record<string, VariableValueType>): void {
     const requiredVariables = presentation.variableData?.filter(v => v.required) || []
@@ -107,6 +115,29 @@ export class ExportService {
     }
 
     return imageDataMap
+  }
+
+  /**
+   * Registers the imported fonts that the runs ask for, and returns the
+   * catalog they resolve against. A family that is not imported (or no longer
+   * is) is left out and drawn in the default font, as the editor draws it.
+   */
+  private async loadFonts(resolvedSlides: Slide[]): Promise<FontCatalog> {
+    const families = new Set<string>()
+    for (const slide of resolvedSlides) {
+      for (const shape of slide.shapes) {
+        if (shape.type !== 'text') continue
+        for (const paragraph of shape.paragraphes) {
+          for (const run of paragraph.children) {
+            if (run.fontFamily) families.add(run.fontFamily)
+          }
+        }
+      }
+    }
+
+    const imported = await this.fontService.getForExport([...families])
+    registerImportedFonts(imported)
+    return createFontCatalog(imported.map(({ font }) => font))
   }
 
   /**
@@ -187,19 +218,15 @@ export class ExportService {
    * that declares it and passes the product down, so a run left to inherit the
    * paragraph's would get a height computed from the default font size.
    */
-  private inlineTextStyle(node: TextFormatting, lineHeight: number): Style {
+  private inlineTextStyle(node: TextFormatting, lineHeight: number, fonts: FontCatalog): Style {
     const color = this.parseColor(node.color, '#000000')
 
     return {
-      fontFamily: normalizeFontFamily(node.fontFamily),
-      fontSize: parseFontSize(node.fontSize),
+      ...getRunTextStyle(node, fonts),
       color: color.color,
       opacity: color.opacity,
       lineHeight,
-      textDecoration: getTextDecoration(node),
-      textTransform: getTextTransform(node),
-      ...getFontStyleProps(node.bold, node.italic)
-    } as Style
+    }
   }
 
   /**
@@ -213,7 +240,8 @@ export class ExportService {
     style: ListStyle,
     marker: ListMarker,
     marginBottom: number,
-    text: React.ReactElement
+    text: React.ReactElement,
+    fonts: FontCatalog
   ): React.ReactElement {
     const layout = getListLayout(paragraph, style)
     const formatting = getListMarkerFormatting(paragraph)
@@ -246,7 +274,7 @@ export class ExportService {
           position: 'absolute',
           left: layout.markerLeft,
           top: 0,
-          fontFamily: normalizeFontFamily(formatting.fontFamily),
+          ...resolveFontFace(formatting, fonts),
           fontSize: layout.fontSize,
           lineHeight: layout.lineHeight,
           color: color.color,
@@ -262,7 +290,7 @@ export class ExportService {
     }, [text, markerElement])
   }
 
-  private renderTextBox(shape: TextBoxShape, ctx: ResolveContext): React.ReactElement {
+  private renderTextBox(shape: TextBoxShape, ctx: ResolveContext, fonts: FontCatalog): React.ReactElement {
     const markers = getListMarkers(shape.paragraphes)
 
     const paragraphElements = shape.paragraphes.map((paragraph, pIndex) => {
@@ -276,7 +304,7 @@ export class ExportService {
         return React.createElement(PDFText, {
           key: `${pIndex}-${cIndex}`,
           fixed: true,
-          style: this.inlineTextStyle(child, paragraphStyle.lineHeight)
+          style: this.inlineTextStyle(child, paragraphStyle.lineHeight, fonts)
         }, content)
       })
 
@@ -298,7 +326,7 @@ export class ExportService {
         style: { ...paragraphStyle }
       }, textSegments)
 
-      return this.renderListItem(pIndex, paragraph, listStyle, marker, marginBottom, text)
+      return this.renderListItem(pIndex, paragraph, listStyle, marker, marginBottom, text, fonts)
     })
 
     // The outer View is the box and places the text vertically; the inner one
@@ -373,7 +401,7 @@ export class ExportService {
   // tree into leaves before rendering starts.
   private renderShape(
     shape: Shape,
-    imageDataMap: Map<string, string>,
+    assets: RenderAssets,
     ctx: ResolveContext
   ): React.ReactElement {
     switch (shape.type) {
@@ -382,9 +410,9 @@ export class ExportService {
       case 'ellipse':
         return this.renderEllipse(shape)
       case 'text':
-        return this.renderTextBox(shape, ctx)
+        return this.renderTextBox(shape, ctx, assets.fonts)
       case 'image':
-        return this.renderImage(shape, imageDataMap)
+        return this.renderImage(shape, assets.images)
       default:
         return React.createElement(View, {})
     }
@@ -392,10 +420,10 @@ export class ExportService {
 
   private renderSlide(
     slide: Slide,
-    imageDataMap: Map<string, string>,
+    assets: RenderAssets,
     ctx: ResolveContext
   ): React.ReactElement {
-    const shapes = slide.shapes.map(shape => this.renderShape(shape, imageDataMap, ctx))
+    const shapes = slide.shapes.map(shape => this.renderShape(shape, assets, ctx))
 
     return React.createElement(Page, {
       key: slide._id,
@@ -422,8 +450,12 @@ export class ExportService {
         .filter(s => s.y < SLIDE_HEIGHT && s.x < SLIDE_WIDTH),
     }))
 
-    const imageDataMap = await this.fetchImageData(resolvedSlides)
-    const pages = resolvedSlides.map(slide => this.renderSlide(slide, imageDataMap, ctx))
+    const [images, fonts] = await Promise.all([
+      this.fetchImageData(resolvedSlides),
+      this.loadFonts(resolvedSlides),
+    ])
+    const assets: RenderAssets = { images, fonts }
+    const pages = resolvedSlides.map(slide => this.renderSlide(slide, assets, ctx))
 
     const doc = React.createElement(Document, {}, pages)
 

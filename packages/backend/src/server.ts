@@ -17,6 +17,7 @@ import slideRouter from './routes/slides.js'
 import variablesRouter from './routes/variables.js'
 import exportRouter from './routes/export.js'
 import imagesRouter from './routes/images.js'
+import fontsRouter from './routes/fonts.js'
 import { createMcpRouter } from './mcp/router.js'
 import { errorHandler } from './middleware/errorHandler.js'
 
@@ -101,6 +102,7 @@ app.use('/api/presentations', requireAuth, slideRouter)
 app.use('/api/presentations', requireAuth, variablesRouter)
 app.use('/api/export', requireAuth, exportRouter)
 app.use('/api/images', requireAuth, imagesRouter)
+app.use('/api/fonts', requireAuth, fontsRouter)
 
 // MCP (owns its own sessions, outside the requireAuth pipeline for now)
 const mcp = createMcpRouter()
@@ -142,6 +144,7 @@ async function startServer() {
   try {
     await connectDatabase()
     await connectAuthDb()
+    await authService.promoteConfiguredAdmins()
     const httpServer = app.listen(PORT, () => {
       console.log(`Server running on http://localhost:${PORT}`)
     })

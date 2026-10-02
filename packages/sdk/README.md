@@ -161,7 +161,7 @@ Second paragraph',
   width: 200,              // optional, default: 200
   height: 50,              // optional, default: 50
   fontSize: 24,            // optional, default: 24
-  fontFamily: 'Roboto',    // optional, default: 'Roboto'; unknown fonts fall back to it
+  fontFamily: 'Roboto',    // optional, default: 'Roboto'; a built-in or imported font (see listFonts), unknown fonts fall back to Roboto
   color: '#000000',        // optional, default: '#000000'
   align: 'center',         // optional: 'left' | 'center' | 'right' | 'justify', default: 'left'
   lineHeight: 1.15,        // optional, multiplier of the font size, default: 1.5
@@ -187,6 +187,54 @@ Delete a shape from a slide.
 ```typescript
 await client.deleteShape('674abc123def456', 'slide-123', 'rect-1')
 ```
+
+### Font Methods
+
+Built-in fonts: Roboto, Comic Neue, Courier Prime, Anton, Open Sans, Crimson
+Text, Merriweather. Imported fonts belong to the instance: every user can use
+them, by setting a text run's `fontFamily` to their `family`, and only admins
+can import, change or delete them (other users get `403 ADMIN_REQUIRED`).
+Files must be TrueType (`.ttf`) or OpenType (`.otf`), 4 MB at most, sent
+base64-encoded.
+
+A run marked bold or italic is drawn with the matching face; when the family
+does not have it, the closest face it has is used instead (bold italic → bold →
+italic → regular). Nothing is synthesised, so the editor and the PDF agree.
+
+#### `listFonts()`
+List the font families imported into the instance.
+
+#### `createFont(family, regular)` — admin
+Import a family with its regular face. `family` must be unique in the instance
+and differ from the built-in fonts.
+
+```typescript
+import { readFileSync } from 'node:fs'
+
+const font = await client.createFont('Brand Sans', {
+  data: readFileSync('BrandSans-Regular.ttf').toString('base64'),
+  originalName: 'BrandSans-Regular.ttf',
+})
+```
+
+#### `setFontFace(fontId, variant, face)` — admin
+Add or replace one face: `'regular' | 'bold' | 'italic' | 'boldItalic'`.
+
+```typescript
+await client.setFontFace(font._id, 'bold', {
+  data: readFileSync('BrandSans-Bold.ttf').toString('base64'),
+  originalName: 'BrandSans-Bold.ttf',
+})
+```
+
+#### `getFontFace(fontId, variant)`
+Get one face's file, base64-encoded.
+
+#### `deleteFontFace(fontId, variant)` — admin
+Remove an optional face (not `'regular'`).
+
+#### `deleteFont(fontId)` — admin
+Delete a family. Text that uses it, in every presentation, is drawn in Roboto.
 
 ## Error Handling
 
