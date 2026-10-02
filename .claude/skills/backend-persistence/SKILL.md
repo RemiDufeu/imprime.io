@@ -7,7 +7,7 @@ metadata:
 
 # Persistence and Mapping
 
-Five collections, five thin schemas, and one mapper module that is the only
+Six collections, six thin schemas, and one mapper module that is the only
 place a Mongoose document turns into something a client may see.
 
 ```
@@ -15,7 +15,8 @@ Presentation  { title, ownerId, timestamps }
 Slide         { presentationId, order, shapes: Mixed[], timestamps }
 VariableData  { presentationId, type, name, default: Mixed, required }
 Image         { data (base64), mimeType, originalName, size, timestamps }
-Font          { family, familyKey (unique), version, faces: { regular, bold?, italic?, boldItalic? }, timestamps }
+Font          { family, familyKey (unique), version, faces: { regular, bold?, italic?, boldItalic? } (size, name), timestamps }
+FontFile      { fontId, variant, data (binary) }   — one per face, unique (fontId, variant)
 ```
 
 ## Model file anatomy

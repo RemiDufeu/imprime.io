@@ -1,15 +1,13 @@
 import mongoose from 'mongoose'
 import { create as parseFont } from 'fontkit'
-import { FONT_VARIANTS, MAX_FONT_FILE_SIZE, isBuiltinFontFamily } from '@imprime/common'
+import { FONT_VARIANTS, MAX_FONT_FILE_SIZE, MAX_FONT_FILE_SIZE_MB, isBuiltinFontFamily } from '@imprime/common'
 import type { FontDTO, FontVariant } from '@imprime/common'
-import { FontModel, type IFontFile } from '../models/Font.js'
-import { fontCreateToModel, fontToDTO } from '../models/mappers.js'
+import { FontModel, type IFontFace } from '../models/Font.js'
+import { FontFileModel } from '../models/FontFile.js'
+import { fontCreateToModel, fontFileCreateToModel, fontToDTO, toObjectId } from '../models/mappers.js'
 import { ConflictError, NotFoundError, ValidationError } from './errors.js'
 
 const MAX_FAMILY_LENGTH = 64
-
-// Projection leaving out every face's file, for reads that only need metadata.
-const WITHOUT_FILE_DATA = FONT_VARIANTS.map(variant => `-faces.${variant}.data`).join(' ')
 
 const fontNotFound = () => new NotFoundError('Font not found', 'FONT_NOT_FOUND')
 
@@ -22,9 +20,9 @@ function isDuplicateKey(err: unknown): boolean {
 
 // An id that is not an ObjectId cannot name a font; answering 404 rather than
 // letting the cast fail keeps the response the same as for any unknown font.
-function fontFilter(fontId: string): { _id: string } {
+function parseFontId(fontId: string): mongoose.Types.ObjectId {
   if (!mongoose.isValidObjectId(fontId)) throw fontNotFound()
-  return { _id: fontId }
+  return toObjectId(fontId)
 }
 
 function parseFamily(value: unknown): string {
@@ -49,20 +47,25 @@ export function parseFontVariant(value: string): FontVariant {
   return variant
 }
 
+interface UploadedFace {
+  data: Buffer
+  face: IFontFace
+}
+
 /**
  * Decodes an uploaded face and checks it with fontkit, the parser react-pdf
  * draws with, so a file accepted here is one the export can embed. Only
  * TrueType and OpenType are accepted: the formats the editor and the export
  * both load from the same bytes.
  */
-function parseFontFile(upload: FontDTO.FaceUpload | undefined): IFontFile {
+function parseFontFile(upload: FontDTO.FaceUpload | undefined): UploadedFace {
   if (!upload || typeof upload.data !== 'string' || !upload.data) {
     throw new ValidationError('Missing font file data', 'FONT_FILE_REQUIRED')
   }
 
   const data = Buffer.from(upload.data, 'base64')
   if (data.length > MAX_FONT_FILE_SIZE) {
-    throw new ValidationError('Font file exceeds 4 MB', 'FONT_FILE_TOO_LARGE')
+    throw new ValidationError(`Font file exceeds ${MAX_FONT_FILE_SIZE_MB} MB`, 'FONT_FILE_TOO_LARGE')
   }
 
   const unsupported = () =>
@@ -81,8 +84,10 @@ function parseFontFile(upload: FontDTO.FaceUpload | undefined): IFontFile {
 
   return {
     data,
-    size: data.length,
-    originalName: typeof upload.originalName === 'string' ? upload.originalName : undefined,
+    face: {
+      size: data.length,
+      originalName: typeof upload.originalName === 'string' ? upload.originalName : undefined,
+    },
   }
 }
 
@@ -96,10 +101,14 @@ export interface FontWithFiles {
  * The font families imported into the instance, shared by every user. Reads
  * are open to any authenticated caller; the routes that write are behind
  * `requireAdmin`, and the service trusts them.
+ *
+ * A font's metadata lives in `Font`, each face's file in its own `FontFile`.
+ * Without transactions, writes are ordered so a font never lists a face whose
+ * file is missing; a failure can at worst leave an unreachable file behind.
  */
 export class FontService {
   public async list(): Promise<FontDTO.Response[]> {
-    const fonts = await FontModel.find().select(WITHOUT_FILE_DATA).sort({ familyKey: 1 })
+    const fonts = await FontModel.find().sort({ familyKey: 1 })
     return fonts.map(fontToDTO)
   }
 
@@ -112,25 +121,45 @@ export class FontService {
       throw familyConflict()
     }
 
+    let font
     try {
-      const font = await FontModel.create(fontCreateToModel(family, regular))
-      return fontToDTO(font)
+      font = await FontModel.create(fontCreateToModel(family, regular.face))
     } catch (err) {
       if (isDuplicateKey(err)) throw familyConflict()
       throw err
     }
+
+    // The font needs its id before its file can point at it; if the file
+    // cannot be stored, the font is taken back out.
+    try {
+      await FontFileModel.create(fontFileCreateToModel(font._id, 'regular', regular.data))
+    } catch (err) {
+      await FontModel.deleteOne({ _id: font._id })
+      throw err
+    }
+    return fontToDTO(font)
   }
 
   public async setFace(fontId: string, variant: string, upload: FontDTO.FaceUpload): Promise<FontDTO.Response> {
-    const filter = fontFilter(fontId)
+    const id = parseFontId(fontId)
     const face = parseFontVariant(variant)
-    const file = parseFontFile(upload)
+    const uploaded = parseFontFile(upload)
 
+    if (!(await FontModel.exists({ _id: id }))) {
+      throw fontNotFound()
+    }
+
+    // The file before the metadata that lists it.
+    await FontFileModel.updateOne(
+      { fontId: id, variant: face },
+      { $set: fontFileCreateToModel(id, face, uploaded.data) },
+      { upsert: true }
+    )
     const font = await FontModel.findOneAndUpdate(
-      filter,
-      { $set: { [`faces.${face}`]: file }, $inc: { version: 1 } },
+      { _id: id },
+      { $set: { [`faces.${face}`]: uploaded.face }, $inc: { version: 1 } },
       { new: true }
-    ).select(WITHOUT_FILE_DATA)
+    )
     if (!font) {
       throw fontNotFound()
     }
@@ -138,29 +167,30 @@ export class FontService {
   }
 
   public async deleteFace(fontId: string, variant: string): Promise<FontDTO.Response> {
-    const filter = fontFilter(fontId)
+    const id = parseFontId(fontId)
     const face = parseFontVariant(variant)
     if (face === 'regular') {
       throw new ValidationError('The regular face cannot be removed; delete the font instead', 'FONT_REGULAR_REQUIRED')
     }
 
+    // The metadata before the file: a face no longer listed is never read.
     const font = await FontModel.findOneAndUpdate(
-      filter,
+      { _id: id },
       { $unset: { [`faces.${face}`]: 1 }, $inc: { version: 1 } },
       { new: true }
-    ).select(WITHOUT_FILE_DATA)
+    )
     if (!font) {
       throw fontNotFound()
     }
+    await FontFileModel.deleteOne({ fontId: id, variant: face })
     return fontToDTO(font)
   }
 
   public async getFaceData(fontId: string, variant: string): Promise<FontDTO.FaceData> {
-    const filter = fontFilter(fontId)
+    const id = parseFontId(fontId)
     const face = parseFontVariant(variant)
 
-    const font = await FontModel.findOne(filter).select(`faces.${face}`)
-    const file = font?.faces[face]
+    const file = await FontFileModel.findOne({ fontId: id, variant: face })
     if (!file) {
       throw new NotFoundError('Font face not found', 'FONT_FACE_NOT_FOUND')
     }
@@ -171,27 +201,53 @@ export class FontService {
   // draw an unknown family in the default font, and re-importing the name
   // brings it back.
   public async delete(fontId: string): Promise<void> {
-    const result = await FontModel.deleteOne(fontFilter(fontId))
+    const id = parseFontId(fontId)
+    const result = await FontModel.deleteOne({ _id: id })
     if (result.deletedCount === 0) {
       throw fontNotFound()
+    }
+
+    // Best effort: an orphaned file is unreachable once its font is gone.
+    try {
+      await FontFileModel.deleteMany({ fontId: id })
+    } catch (error) {
+      console.error(`Failed to delete the files of font ${fontId}:`, error)
     }
   }
 
   /**
    * The imported families among `families`, with their files. Names that are
-   * built-in or unknown are not imported fonts and are skipped.
+   * built-in or unknown are not imported fonts and are skipped. A face whose
+   * file is missing is left out, as is a font without its regular file, so the
+   * export never asks react-pdf for a face it was not given.
    */
   public async getForExport(families: readonly string[]): Promise<FontWithFiles[]> {
     if (families.length === 0) return []
 
     const fonts = await FontModel.find({ family: { $in: families } })
-    return fonts.map(doc => {
+    if (fonts.length === 0) return []
+
+    const files = await FontFileModel.find({ fontId: { $in: fonts.map(font => font._id) } })
+    const filesByFont = new Map<string, Partial<Record<FontVariant, Buffer>>>()
+    for (const file of files) {
+      const key = file.fontId.toString()
+      filesByFont.set(key, { ...filesByFont.get(key), [file.variant]: file.data })
+    }
+
+    return fonts.flatMap(doc => {
+      const dto = fontToDTO(doc)
+      const available = filesByFont.get(dto._id) ?? {}
       const files: FontWithFiles['files'] = {}
+      const faces: Partial<FontDTO.Response['faces']> = {}
       for (const variant of FONT_VARIANTS) {
-        const file = doc.faces[variant]
-        if (file) files[variant] = file.data
+        const data = available[variant]
+        const face = dto.faces[variant]
+        if (data && face) {
+          files[variant] = data
+          faces[variant] = face
+        }
       }
-      return { font: fontToDTO(doc), files }
+      return faces.regular ? [{ font: { ...dto, faces: { ...faces, regular: faces.regular } }, files }] : []
     })
   }
 }

@@ -38,7 +38,7 @@ export function registerBuiltinFonts(): void {
 
   const directory = builtinFontsDirectory()
   for (const family of BUILTIN_FONT_FAMILIES) {
-    const files: Partial<Record<FontVariant, string>> = BUILTIN_FONTS[family]
+    const files: Partial<Record<FontVariant, string>> = BUILTIN_FONTS[family].files
     Font.register({
       family,
       fonts: FONT_VARIANTS.flatMap(variant => {

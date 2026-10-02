@@ -19,7 +19,7 @@ import {
   MenuFoldOutlined,
   MenuUnfoldOutlined,
 } from '@ant-design/icons'
-import type { FontCatalog, FontCatalogEntry, ListType, TextAlign, TextVerticalAlign } from '@imprime/sdk'
+import type { FontCatalog, FontCatalogEntry, FontCategory, ListType, TextAlign, TextVerticalAlign } from '@imprime/sdk'
 import { DEFAULT_FONT, resolveFontVariant } from '@imprime/sdk'
 import { useEditorStore } from '../../../../../../store/editor/EditorStore'
 import { DebouncedColorPicker } from '../../../../../../components/common'
@@ -34,13 +34,26 @@ function fontOption(entry: FontCatalogEntry) {
   }
 }
 
+const FONT_CATEGORY_LABELS: Record<FontCategory, string> = {
+  'sans-serif': 'Sans serif',
+  serif: 'Serif',
+  monospace: 'Monospace',
+  display: 'Display',
+  handwriting: 'Handwriting',
+}
+
+// Built-in families by category, then the imported ones; alphabetical within
+// each group.
 function fontOptions(catalog: FontCatalog): SelectProps['options'] {
-  const entries = [...catalog.values()]
-  const builtin = entries.filter(entry => !entry.imported).map(fontOption)
-  const imported = entries.filter(entry => entry.imported).map(fontOption)
-  return imported.length === 0
-    ? builtin
-    : [{ label: 'Built-in', options: builtin }, { label: 'Imported', options: imported }]
+  const entries = [...catalog.values()].sort((a, b) => a.family.localeCompare(b.family))
+  const groups = [
+    ...Object.entries(FONT_CATEGORY_LABELS).map(([category, label]) => ({
+      label,
+      options: entries.filter(entry => entry.category === category).map(fontOption),
+    })),
+    { label: 'Imported', options: entries.filter(entry => entry.imported).map(fontOption) },
+  ]
+  return groups.filter(group => group.options.length > 0)
 }
 
 const FONT_SIZES = [8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 64, 72, 96]
@@ -153,6 +166,8 @@ export function TextContextBar() {
               onChange={handleFontFamilyChange}
               size="small"
               style={{ width: '140px' }}
+              popupMatchSelectWidth={false}
+              listHeight={320}
               options={fontOptions(fontCatalog)}
               // Picks up fonts an admin imported since the editor opened.
               onOpenChange={(open) => { if (open) void loadFonts() }}

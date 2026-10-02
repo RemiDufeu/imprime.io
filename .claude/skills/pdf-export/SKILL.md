@@ -68,14 +68,18 @@ Fonts): the browser never hyphenates.
 
 Two kinds of family, one resolution.
 
-- **Built-in** — `BUILTIN_FONTS` in `packages/common/src/fonts.ts` maps each
-  family to the file of each face it has: `regular` always, `bold`, `italic`,
-  `boldItalic` when shipped. Full file names (`.ttf` or `.otf`), in
-  `packages/common/src/assets/fonts/`. Adding a family is the files plus one
-  entry; nothing else lists families.
-- **Imported** — instance-wide, managed by admins, in the `Font` collection
-  (`FontService`), each face stored as binary and checked with fontkit at
-  upload. Registered under `importedFontFamilyName(font)` =
+- **Built-in** — `BUILTIN_FONTS` in `packages/common/src/fonts.ts` gives each
+  family a `category` (the font menu groups by it) and the file of each face
+  it has: `regular` always, `bold`, `italic`, `boldItalic` when shipped. Full
+  file names (`.ttf` or `.otf`), in `packages/common/src/assets/fonts/`, with
+  each family's license in `licenses/` (the Docker image copies the folder).
+  Files must be **static** instances — react-pdf cannot use a variable font.
+  Adding a family is the files, the license and one entry; nothing else lists
+  families. `assets/fonts/README.md` has the download recipe.
+- **Imported** — instance-wide, managed by admins: metadata in the `Font`
+  collection, each face's file in its own `FontFile` document (so a family is
+  not bound by MongoDB's 16 MB document limit), checked with fontkit at upload,
+  `MAX_FONT_FILE_SIZE_MB` (5) per file. Registered under `importedFontFamilyName(font)` =
   `imprime-font-<id>-<version>`: the version changes with every face update,
   because react-pdf's registry is process-wide and cannot unregister a family.
 

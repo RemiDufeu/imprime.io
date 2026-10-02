@@ -190,11 +190,21 @@ await client.deleteShape('674abc123def456', 'slide-123', 'rect-1')
 
 ### Font Methods
 
-Built-in fonts: Roboto, Comic Neue, Courier Prime, Anton, Open Sans, Crimson
-Text, Merriweather. Imported fonts belong to the instance: every user can use
+Built-in fonts (all open source):
+
+- **Sans serif** — Roboto (default), Open Sans, Inter, Lato, Montserrat, Noto
+  Sans, Nunito, Poppins, Raleway, Roboto Condensed, Source Sans 3, Work Sans,
+  Oswald
+- **Serif** — Merriweather, Crimson Text, EB Garamond, Lora, Noto Serif,
+  Playfair Display, Roboto Slab
+- **Monospace** — Courier Prime, Roboto Mono, Source Code Pro
+- **Display** — Anton, Bebas Neue
+- **Handwriting** — Comic Neue, Dancing Script, Pacifico
+
+The list is exported as `BUILTIN_FONT_FAMILIES`. Imported fonts belong to the instance: every user can use
 them, by setting a text run's `fontFamily` to their `family`, and only admins
 can import, change or delete them (other users get `403 ADMIN_REQUIRED`).
-Files must be TrueType (`.ttf`) or OpenType (`.otf`), 4 MB at most, sent
+Files must be TrueType (`.ttf`) or OpenType (`.otf`), 5 MB at most, sent
 base64-encoded.
 
 A run marked bold or italic is drawn with the matching face; when the family

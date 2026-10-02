@@ -1,6 +1,7 @@
 import mongoose, { Types } from 'mongoose'
 import type {
   FontDTO,
+  FontVariant,
   Presentation,
   PresentationDTO,
   PresentationSummary,
@@ -9,7 +10,8 @@ import type {
   VariableData,
   VariableDTO,
 } from '@imprime/common'
-import type { FontDocument, IFont, IFontFile } from './Font.js'
+import type { FontDocument, IFont, IFontFace } from './Font.js'
+import type { IFontFile } from './FontFile.js'
 import type { IPresentation, PresentationDocument } from './Presentation.js'
 import type { ISlide, SlideDocument } from './Slide.js'
 import type { IVariableData, VariableDataDocument } from './VariableData.js'
@@ -113,13 +115,11 @@ export function variableUpdateToModel(
   return update
 }
 
-// Reads only the faces' metadata, so it accepts a document loaded without the
-// file data.
 export function fontToDTO(doc: FontDocument): FontDTO.Response {
-  const faces: FontDTO.Response['faces'] = { regular: fontFileToDTO(doc.faces.regular) }
-  if (doc.faces.bold) faces.bold = fontFileToDTO(doc.faces.bold)
-  if (doc.faces.italic) faces.italic = fontFileToDTO(doc.faces.italic)
-  if (doc.faces.boldItalic) faces.boldItalic = fontFileToDTO(doc.faces.boldItalic)
+  const faces: FontDTO.Response['faces'] = { regular: fontFaceToDTO(doc.faces.regular) }
+  if (doc.faces.bold) faces.bold = fontFaceToDTO(doc.faces.bold)
+  if (doc.faces.italic) faces.italic = fontFaceToDTO(doc.faces.italic)
+  if (doc.faces.boldItalic) faces.boldItalic = fontFaceToDTO(doc.faces.boldItalic)
 
   return {
     _id: doc._id.toString(),
@@ -131,14 +131,14 @@ export function fontToDTO(doc: FontDocument): FontDTO.Response {
   }
 }
 
-function fontFileToDTO(file: IFontFile): FontDTO.FaceInfo {
-  return { size: file.size, originalName: file.originalName }
+function fontFaceToDTO(face: IFontFace): FontDTO.FaceInfo {
+  return { size: face.size, originalName: face.originalName }
 }
 
 // `family` is the validated, trimmed name.
 export function fontCreateToModel(
   family: string,
-  regular: IFontFile
+  regular: IFontFace
 ): Pick<IFont, 'family' | 'familyKey' | 'version' | 'faces'> {
   return {
     family,
@@ -146,6 +146,12 @@ export function fontCreateToModel(
     version: 1,
     faces: { regular },
   }
+}
+
+// The font comes from the document just created or the verified route param,
+// never from the request body.
+export function fontFileCreateToModel(fontId: Types.ObjectId, variant: FontVariant, data: Buffer): IFontFile {
+  return { fontId, variant, data }
 }
 
 export function toObjectId(id: string): Types.ObjectId {

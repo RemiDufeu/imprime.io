@@ -17,10 +17,11 @@ import {
 import type { FontDTO, FontVariant } from '@imprime/sdk'
 import { fontsAPI } from './api/api'
 
-// URL Vite serves each built-in font file at, keyed by file name.
+// URL Vite serves each built-in font file at, keyed by file name. Only the
+// font files: the folder also holds their licenses.
 const builtinFontUrls = new Map(
   Object.entries(
-    import.meta.glob<string>('../../common/src/assets/fonts/*', { query: '?url', import: 'default', eager: true })
+    import.meta.glob<string>('../../common/src/assets/fonts/*.{ttf,otf}', { query: '?url', import: 'default', eager: true })
   ).map(([path, url]) => [path.slice(path.lastIndexOf('/') + 1), url])
 )
 
@@ -35,7 +36,7 @@ function faceDescriptors(variant: FontVariant): FontFaceDescriptors {
  */
 export function registerBuiltinFonts(): void {
   for (const family of BUILTIN_FONT_FAMILIES) {
-    const files: Partial<Record<FontVariant, string>> = BUILTIN_FONTS[family]
+    const files: Partial<Record<FontVariant, string>> = BUILTIN_FONTS[family].files
     for (const variant of FONT_VARIANTS) {
       const file = files[variant]
       if (!file) continue

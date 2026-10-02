@@ -22,7 +22,7 @@ src/
     requireAdmin.ts      admin-role guard for instance-wide resources
     errorHandler.ts      AppError subclasses → HTTP responses
   models/
-    Presentation.ts  Slide.ts  VariableData.ts  Image.ts  Font.ts
+    Presentation.ts  Slide.ts  VariableData.ts  Image.ts  Font.ts  FontFile.ts
     mappers.ts           document ↔ DTO
   routes/
     presentations.ts  slides.ts  variables.ts  export.ts  images.ts  fonts.ts

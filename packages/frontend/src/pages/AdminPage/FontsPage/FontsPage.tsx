@@ -9,6 +9,7 @@ import { parseApiError } from '../../../utils/apiError'
 import ImportFontModal from './ImportFontModal'
 import {
   FONT_FILE_ACCEPT,
+  FONT_FILE_SIZE_LIMIT,
   FONT_VARIANT_LABELS,
   formatFileSize,
   isFontFileTooLarge,
@@ -53,7 +54,7 @@ export default function FontsPage() {
 
   async function handleSetFace(font: FontDTO.Response, variant: FontVariant, file: File) {
     if (isFontFileTooLarge(file)) {
-      message.error(`${file.name} is larger than 4 MB`)
+      message.error(`${file.name} is larger than ${FONT_FILE_SIZE_LIMIT}`)
       return
     }
     try {

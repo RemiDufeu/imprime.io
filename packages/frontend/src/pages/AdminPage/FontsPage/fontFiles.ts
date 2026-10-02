@@ -1,4 +1,4 @@
-import { MAX_FONT_FILE_SIZE } from '@imprime/sdk'
+import { MAX_FONT_FILE_SIZE, MAX_FONT_FILE_SIZE_MB } from '@imprime/sdk'
 import type { FontDTO, FontVariant } from '@imprime/sdk'
 
 export const FONT_FILE_ACCEPT = '.ttf,.otf'
@@ -9,6 +9,8 @@ export const FONT_VARIANT_LABELS: Record<FontVariant, string> = {
   italic: 'Italic',
   boldItalic: 'Bold italic',
 }
+
+export const FONT_FILE_SIZE_LIMIT = `${MAX_FONT_FILE_SIZE_MB} MB`
 
 // Checked before reading the file, so an oversized one fails without an upload.
 export function isFontFileTooLarge(file: File): boolean {

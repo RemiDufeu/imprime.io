@@ -1,7 +1,7 @@
 import { Schema, model, HydratedDocument } from 'mongoose'
 
-export interface IFontFile {
-  data: Buffer
+// What the font knows of one of its faces. The file itself is a `FontFile`.
+export interface IFontFace {
   size: number
   originalName?: string
 }
@@ -17,17 +17,16 @@ export interface IFont {
   // family under, so neither keeps a replaced file from its cache.
   version: number
   faces: {
-    regular: IFontFile
-    bold?: IFontFile
-    italic?: IFontFile
-    boldItalic?: IFontFile
+    regular: IFontFace
+    bold?: IFontFace
+    italic?: IFontFace
+    boldItalic?: IFontFace
   }
   createdAt?: Date
   updatedAt?: Date
 }
 
-const FontFileSchema = new Schema<IFontFile>({
-  data: { type: Buffer, required: true },
+const FontFaceSchema = new Schema<IFontFace>({
   size: { type: Number, required: true },
   originalName: { type: String },
 }, { _id: false })
@@ -37,10 +36,10 @@ const FontSchema = new Schema<IFont>({
   familyKey: { type: String, required: true, unique: true },
   version: { type: Number, required: true, default: 1 },
   faces: {
-    regular: { type: FontFileSchema, required: true },
-    bold: { type: FontFileSchema },
-    italic: { type: FontFileSchema },
-    boldItalic: { type: FontFileSchema },
+    regular: { type: FontFaceSchema, required: true },
+    bold: { type: FontFaceSchema },
+    italic: { type: FontFaceSchema },
+    boldItalic: { type: FontFaceSchema },
   },
 }, { timestamps: true })
 

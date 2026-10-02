@@ -7,6 +7,7 @@ import { fontsAPI } from '../../../api/api'
 import { parseApiError } from '../../../utils/apiError'
 import {
   FONT_FILE_ACCEPT,
+  FONT_FILE_SIZE_LIMIT,
   FONT_VARIANT_LABELS,
   guessFontFamily,
   isFontFileTooLarge,
@@ -34,7 +35,7 @@ export default function ImportFontModal({ open, onClose, onChanged }: ImportFont
 
   function pickFile(variant: FontVariant, file: File) {
     if (isFontFileTooLarge(file)) {
-      message.error(`${file.name} is larger than 4 MB`)
+      message.error(`${file.name} is larger than ${FONT_FILE_SIZE_LIMIT}`)
       return
     }
     setFiles(current => ({ ...current, [variant]: file }))
@@ -126,8 +127,9 @@ export default function ImportFontModal({ open, onClose, onChanged }: ImportFont
       </Form>
 
       <Typography.Text type="secondary">
-        TrueType (.ttf) or OpenType (.otf), 4 MB at most per file. Text set in
-        a face you do not provide is drawn with the closest one you do.
+        TrueType (.ttf) or OpenType (.otf), {FONT_FILE_SIZE_LIMIT} at most per
+        file. Text set in a face you do not provide is drawn with the closest
+        one you do.
       </Typography.Text>
     </Modal>
   )
