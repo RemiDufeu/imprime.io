@@ -1,5 +1,5 @@
 import { PresentationModel } from '../models/Presentation.js'
-import { SlideModel } from '../models/Slide.js'
+import { SlideModel, collectImageIds } from '../models/Slide.js'
 import { VariableDataModel } from '../models/VariableData.js'
 import {
   presentationCreateToModel,
@@ -14,7 +14,7 @@ import {
 } from '../models/mappers.js'
 import type { Types } from 'mongoose'
 import type { Presentation, PresentationDTO, PresentationSummary } from '@imprime/common'
-import { collectImageIds, type ImageService } from './ImageService.js'
+import type { ImageService } from './ImageService.js'
 import { NotFoundError } from './errors.js'
 
 export function touchPresentation(presentationId: Types.ObjectId): Promise<unknown> {
@@ -87,15 +87,17 @@ export class PresentationService {
 
     const slides = await SlideModel.find({ presentationId: presentation._id })
     const imageIds = slides.flatMap(slide => collectImageIds(slide.shapes))
+
+    // Slides first: an image another presentation still shows is kept, and
+    // these slides must no longer count as showing theirs.
+    await SlideModel.deleteMany({ presentationId: presentation._id })
     if (imageIds.length) {
       try {
-        await this.imageService.deleteMany(imageIds)
+        await this.imageService.deleteUnused(imageIds)
       } catch (error) {
         console.error('Failed to delete associated images:', error)
       }
     }
-
-    await SlideModel.deleteMany({ presentationId: presentation._id })
     await VariableDataModel.deleteMany({ presentationId: presentation._id })
     await PresentationModel.findByIdAndDelete(id)
   }

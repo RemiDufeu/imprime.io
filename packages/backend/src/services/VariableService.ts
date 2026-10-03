@@ -9,6 +9,7 @@ import {
   variableUpdateToModel,
 } from '../models/mappers.js'
 import type { VariableDTO, VariableData } from '@imprime/common'
+import { collectVariableIds } from '@imprime/common'
 import { touchPresentation } from './PresentationService.js'
 import { NotFoundError, ConflictError, ValidationError } from './errors.js'
 
@@ -119,7 +120,7 @@ export class VariableService {
       throw new ValidationError(
         `Cannot delete variable that is currently in use`,
         'VARIABLE_IN_USE',
-        [`Variable "${variable.name}" is being used in one or more text boxes`]
+        [`Variable "${variable.name}" is used by text, a condition or a repeated group`]
       )
     }
 
@@ -135,20 +136,13 @@ export class VariableService {
     return variables.map(variableToDTO)
   }
 
+  // Anywhere in the trees: text runs inside containers, if-group conditions
+  // and for-group lists all point at the variable by id.
   private async isVariableInUse(presentationId: string, variableId: string): Promise<boolean> {
     const slides = await SlideModel.find({
       presentationId: toObjectId(presentationId),
     }).select('shapes')
 
-    return slides.some(slide =>
-      (slide.shapes).some(shape => {
-        if (shape.type !== 'text') return false
-        return shape.paragraphes?.some(paragraph =>
-          paragraph.children?.some(child =>
-            'type' in child && child.type === 'variable' && child.variableId === variableId
-          )
-        )
-      })
-    )
+    return slides.some(slide => collectVariableIds(slide.shapes).has(variableId))
   }
 }

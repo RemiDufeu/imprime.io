@@ -1,20 +1,7 @@
 import { ImageModel } from '../models/Image.js'
-import type { ImageDTO, Shape } from '@imprime/common'
-import { isContainerShape } from '@imprime/common'
+import { SlideModel } from '../models/Slide.js'
+import type { ImageDTO } from '@imprime/common'
 import { NotFoundError, ValidationError } from './errors.js'
-
-// Every image a shape tree shows, containers included.
-export function collectImageIds(shapes: Shape[]): string[] {
-  const ids: string[] = []
-  for (const shape of shapes) {
-    if (shape.type === 'image') {
-      if (shape.imageId) ids.push(shape.imageId)
-    } else if (isContainerShape(shape)) {
-      ids.push(...collectImageIds(shape.children))
-    }
-  }
-  return ids
-}
 
 export class ImageService {
   public async upload(data: ImageDTO.Create): Promise<ImageDTO.Response> {
@@ -65,17 +52,29 @@ export class ImageService {
     }
   }
 
-  // No slide shows these any more: start their grace period. An image already
-  // orphaned keeps its original date.
-  public async markOrphaned(ids: string[]): Promise<void> {
-    if (ids.length === 0) return
+  // Of `ids`, those no slide shows any more — on any presentation, since a
+  // duplicated or pasted image shape keeps its image. Read after the write
+  // that removed them, so that slide already counts as not showing them.
+  private async unused(ids: string[]): Promise<string[]> {
+    if (ids.length === 0) return []
+    const used = new Set(await SlideModel.distinct('imageIds', { imageIds: { $in: ids } }))
+    return [...new Set(ids)].filter(id => !used.has(id))
+  }
+
+  // These left a slide. Those no slide shows any more start their grace
+  // period (ORPHAN_GRACE_SECONDS) rather than being deleted: the editor can
+  // undo the removal. An image already orphaned keeps its original date.
+  public async release(ids: string[]): Promise<void> {
+    const unused = await this.unused(ids)
+    if (unused.length === 0) return
     await ImageModel.updateMany(
-      { _id: { $in: ids }, orphanedAt: { $exists: false } },
+      { _id: { $in: unused }, orphanedAt: { $exists: false } },
       { $set: { orphanedAt: new Date() } }
     )
   }
 
-  // A slide shows these again (an undo, a restored slide): keep them.
+  // A slide shows these: keep them. Run for every image of every saved tree,
+  // not only the new ones, so a release that raced a later save is undone.
   public async markReferenced(ids: string[]): Promise<void> {
     if (ids.length === 0) return
     await ImageModel.updateMany(
@@ -84,9 +83,12 @@ export class ImageService {
     )
   }
 
-  public async deleteMany(ids: string[]): Promise<number> {
-    if (ids.length === 0) return 0
-    const result = await ImageModel.deleteMany({ _id: { $in: ids } })
+  // Deleted now, without a grace period: their presentation is gone. Those
+  // another presentation shows are kept.
+  public async deleteUnused(ids: string[]): Promise<number> {
+    const unused = await this.unused(ids)
+    if (unused.length === 0) return 0
+    const result = await ImageModel.deleteMany({ _id: { $in: unused } })
     return result.deletedCount
   }
 }

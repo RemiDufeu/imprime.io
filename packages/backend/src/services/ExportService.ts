@@ -43,7 +43,7 @@ import {
 import type { ImageService } from './ImageService.js'
 import type { FontService } from './FontService.js'
 import { AppError, ValidationError } from './errors.js'
-import { registerBuiltinFonts, registerImportedFonts } from '../config/fonts.js'
+import { isImportedFontRegistered, registerBuiltinFonts, registerImportedFonts } from '../config/fonts.js'
 import type { Style } from '@react-pdf/types'
 
 registerBuiltinFonts()
@@ -135,9 +135,8 @@ export class ExportService {
       }
     }
 
-    const imported = await this.fontService.getForExport([...families])
-    registerImportedFonts(imported)
-    return createFontCatalog(imported.map(({ font }) => font))
+    const imported = await this.fontService.getForExport([...families], isImportedFontRegistered)
+    return createFontCatalog(registerImportedFonts(imported))
   }
 
   /**

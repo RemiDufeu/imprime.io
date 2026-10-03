@@ -332,8 +332,8 @@ export namespace FontDTO {
     originalName?: string
   }
 
-  // An imported font family, owned by one account. Runs refer to it by
-  // `family`; `version` changes whenever one of its faces does.
+  // A font family imported into the instance, shared by every user. Runs
+  // refer to it by `family`; `version` changes whenever one of its faces does.
   export interface Response {
     _id: string
     family: string

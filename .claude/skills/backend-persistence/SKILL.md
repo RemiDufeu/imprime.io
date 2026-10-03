@@ -203,13 +203,24 @@ cleanup work; do not match it for anything the caller needs to know about.
 
 ### Images are released, not deleted
 
+An image is **shared**: duplicating or pasting an image shape keeps its
+`imageId`, on any slide of any presentation. So "is it still used?" is asked of
+every slide, through `Slide.imageIds` — derived from `shapes` by a pre-save hook
+on the model, indexed, and backfilled at startup for slides saved before it
+existed (`SlideService.indexImageReferences`). `updateOne` and `bulkWrite` skip
+that hook: never use them to write `shapes`.
+
 An image that leaves its slide — a shape write without it, or the slide's
-deletion — gets `orphanedAt` instead of being deleted, because the editor can
-undo either and shows the image again by the same id. A TTL index
-(`ORPHAN_GRACE_SECONDS`, 7 days) lets MongoDB delete it after that; a slide that
-shows it again unsets the field (`ImageService.markReferenced`). Only
-`PresentationService.delete` deletes images outright. Anything that removes an
-image from a slide goes through `markOrphaned`, never `delete`.
+deletion — is **released** (`ImageService.release`): if no slide shows it any
+more it gets `orphanedAt` instead of being deleted, because the editor can undo
+either and shows the image again by the same id. A TTL index
+(`ORPHAN_GRACE_SECONDS`, 7 days) lets MongoDB delete it after that. Every save
+unsets the field on all the images its tree shows (`markReferenced`), which also
+repairs a release that raced another save. Release **after** the write that
+removed the image, so that slide no longer counts as showing it.
+`PresentationService.delete` deletes its slides first, then the images no other
+presentation shows (`deleteUnused`). Nothing calls `delete` on an image a slide
+dropped.
 
 ### Restoring under a former id
 

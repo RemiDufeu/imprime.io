@@ -15,13 +15,15 @@ export default function EditorPage() {
   const error = useEditorStore(state => state.error)
   const loadPresentation = useEditorStore(state => state.loadPresentation)
   const loadFonts = useEditorStore(state => state.loadFonts)
-  const hasAttemptedLoad = useRef(false)
+  // The id loaded last: the route can change presentation without remounting
+  // the page (history navigation between two editors).
+  const loadedId = useRef<string | null>(null)
 
   useEffect(() => {
-    if (id && !hasAttemptedLoad.current) {
-      hasAttemptedLoad.current = true
-      loadPresentation(id)
-      loadFonts()
+    if (id && loadedId.current !== id) {
+      loadedId.current = id
+      // Fonts after the presentation: only the ones its text uses are loaded.
+      void loadPresentation(id).then(loadFonts)
     }
   }, [id, loadPresentation, loadFonts])
 

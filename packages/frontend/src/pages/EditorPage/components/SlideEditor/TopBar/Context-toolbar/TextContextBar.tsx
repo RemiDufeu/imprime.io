@@ -104,7 +104,7 @@ export function TextContextBar() {
   const selectedShape = useEditorStore(state => state.selectedShape)
   const updateShape = useEditorStore(state => state.updateShape)
   const fontCatalog = useEditorStore(state => state.fontCatalog)
-  const loadFonts = useEditorStore(state => state.loadFonts)
+  const loadAllFonts = useEditorStore(state => state.loadAllFonts)
 
   // Bold or italic only changes the face if the family has one for it; both
   // renderers draw the closest face otherwise. A mark already set can still
@@ -169,8 +169,9 @@ export function TextContextBar() {
               popupMatchSelectWidth={false}
               listHeight={320}
               options={fontOptions(fontCatalog)}
-              // Picks up fonts an admin imported since the editor opened.
-              onOpenChange={(open) => { if (open) void loadFonts() }}
+              // The editor loads only the fonts its text uses; the picker
+              // previews every one, including those imported since.
+              onOpenChange={(open) => { if (open) void loadAllFonts() }}
             />
           </div>
           <div title="Font size" onMouseDown={(e) => e.preventDefault()}>

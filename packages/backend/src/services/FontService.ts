@@ -92,9 +92,10 @@ function parseFontFile(upload: FontDTO.FaceUpload | undefined): UploadedFace {
 }
 
 // An imported family with the files of its faces, as the export registers it.
+// `files` is null for a font the caller already registered: not fetched.
 export interface FontWithFiles {
   font: FontDTO.Response
-  files: Partial<Record<FontVariant, Buffer>>
+  files: Partial<Record<FontVariant, Buffer>> | null
 }
 
 /**
@@ -220,24 +221,33 @@ export class FontService {
    * built-in or unknown are not imported fonts and are skipped. A face whose
    * file is missing is left out, as is a font without its regular file, so the
    * export never asks react-pdf for a face it was not given.
+   *
+   * Files are fetched only for the fonts `isRegistered` does not know: a
+   * version, once registered, never changes, and files run to megabytes.
    */
-  public async getForExport(families: readonly string[]): Promise<FontWithFiles[]> {
+  public async getForExport(
+    families: readonly string[],
+    isRegistered: (font: FontDTO.Response) => boolean = () => false
+  ): Promise<FontWithFiles[]> {
     if (families.length === 0) return []
 
-    const fonts = await FontModel.find({ family: { $in: families } })
+    const fonts = (await FontModel.find({ family: { $in: families } })).map(fontToDTO)
     if (fonts.length === 0) return []
+    const toFetch = fonts.filter(font => !isRegistered(font))
 
-    const files = await FontFileModel.find({ fontId: { $in: fonts.map(font => font._id) } })
+    const files = toFetch.length
+      ? await FontFileModel.find({ fontId: { $in: toFetch.map(font => toObjectId(font._id)) } })
+      : []
     const filesByFont = new Map<string, Partial<Record<FontVariant, Buffer>>>()
     for (const file of files) {
       const key = file.fontId.toString()
       filesByFont.set(key, { ...filesByFont.get(key), [file.variant]: file.data })
     }
 
-    return fonts.flatMap(doc => {
-      const dto = fontToDTO(doc)
+    return fonts.flatMap((dto): FontWithFiles[] => {
+      if (!toFetch.includes(dto)) return [{ font: dto, files: null }]
       const available = filesByFont.get(dto._id) ?? {}
-      const files: FontWithFiles['files'] = {}
+      const files: Partial<Record<FontVariant, Buffer>> = {}
       const faces: Partial<FontDTO.Response['faces']> = {}
       for (const variant of FONT_VARIANTS) {
         const data = available[variant]

@@ -102,6 +102,23 @@ export function SVGText({ shape, readonly }: SVGTextProps) {
     }
   }, [readonly, currentEditor, localEditor, shape.id, shape.paragraphes, updateShape, setIsFocused])
 
+  // Unmounted mid-session — its slide was left, or the editor closed — the
+  // effect above never runs. Commit the typing here (`updateShape` finds the
+  // slide the box is on), and release the editor and the focus flag, which
+  // would otherwise keep shortcuts aimed at a detached editor.
+  useEffect(() => () => {
+    if (!wasActiveRef.current) return
+    wasActiveRef.current = false
+    if (hasTextChanged(localEditor.children, sessionStartRef.current)) {
+      updateShape(shape.id, { paragraphes: localEditor.children as Paragraph[] })
+    }
+    const store = useEditorStore.getState()
+    if (store.editor === localEditor) {
+      store.setEditor(null)
+      store.setIsFocused(false)
+    }
+  }, [localEditor, shape.id, updateShape])
+
   // Subscribe to attributes changes and sync them to the editor
   useEffect(() => {
     const unsubscribe = useEditorStore.subscribe(

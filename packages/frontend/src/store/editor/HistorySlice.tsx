@@ -121,8 +121,10 @@ export const createHistorySlice: StateCreator<
     }
 
     // Pop the newest step that still applies off one stack, apply it, and push
-    // its inverse onto the other. A failed step goes back where it was, so it
-    // can be tried again.
+    // its inverse onto the other. A step the server refuses (4xx: a slide id
+    // taken, a variable gone) would be refused again and block every step
+    // under it, so it is dropped; any other failure (network, 5xx) puts it
+    // back where it was, to be tried again.
     const replay = async (from: Stack) => {
         const to: Stack = from === 'undoStack' ? 'redoStack' : 'undoStack'
         for (;;) {
@@ -135,9 +137,14 @@ export const createHistorySlice: StateCreator<
                 inverse = await apply(step.entry)
             } catch (err) {
                 console.error('History step failed:', err)
+                const { status, message: detail } = parseApiError(err)
+                const action = from === 'undoStack' ? 'Undo' : 'Redo'
+                if (status !== undefined && status >= 400 && status < 500) {
+                    message.error(`${action} skipped a step that can no longer apply${detail ? `: ${detail}` : ''}`)
+                    continue
+                }
                 setStack(from, [...get()[from], step])
-                const detail = parseApiError(err).message
-                message.error(`${from === 'undoStack' ? 'Undo' : 'Redo'} failed${detail ? `: ${detail}` : ''}`)
+                message.error(`${action} failed${detail ? `: ${detail}` : ''}`)
                 return
             }
             if (inverse) {

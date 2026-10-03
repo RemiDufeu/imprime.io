@@ -297,9 +297,9 @@ export function isBuiltinFontFamily(family: string): boolean {
 }
 
 /**
- * Name an imported family is registered under in both renderers. Unique across
- * accounts, which the family name is not, and changed by every face update so
- * neither renderer keeps drawing a replaced file from its cache.
+ * Name an imported family is registered under in both renderers. Tied to the
+ * font's id and version rather than its name, so every face update changes it
+ * and neither renderer keeps drawing a replaced file from its cache.
  */
 export function importedFontFamilyName(font: Pick<FontDTO.Response, '_id' | 'version'>): string {
   return `imprime-font-${font._id}-${font.version}`
@@ -320,7 +320,7 @@ export interface FontCatalogEntry {
 export type FontCatalog = ReadonlyMap<string, FontCatalogEntry>
 
 /**
- * The built-in families followed by an account's imported ones. An imported
+ * The built-in families followed by the instance's imported ones. An imported
  * family never shadows a built-in one: the backend refuses the name.
  */
 export function createFontCatalog(imported: readonly FontDTO.Response[] = []): FontCatalog {

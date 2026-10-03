@@ -10,7 +10,7 @@ import { oAuthDiscoveryMetadata, oAuthProtectedResourceMetadata } from 'better-a
 import type { Server as HttpServer } from 'http'
 import { connectDatabase } from './config/database.js'
 import { connectAuthDb, closeAuthDb } from './config/authDb.js'
-import { authService } from './services/index.js'
+import { authService, slideService } from './services/index.js'
 import { requireAuth } from './middleware/requireAuth.js'
 import presentationsRouter from './routes/presentations.js'
 import slideRouter from './routes/slides.js'
@@ -145,6 +145,8 @@ async function startServer() {
     await connectDatabase()
     await connectAuthDb()
     await authService.promoteConfiguredAdmins()
+    const indexed = await slideService.indexImageReferences()
+    if (indexed > 0) console.log(`Indexed the image references of ${indexed} slides`)
     const httpServer = app.listen(PORT, () => {
       console.log(`Server running on http://localhost:${PORT}`)
     })

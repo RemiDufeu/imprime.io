@@ -5,6 +5,7 @@ import {
   FONT_VARIANTS,
   FONT_VARIANT_STYLE,
   importedFontFamilyName,
+  type FontDTO,
   type FontVariant,
 } from '@imprime/common'
 import type { FontWithFiles } from '../services/FontService.js'
@@ -56,15 +57,28 @@ export function registerBuiltinFonts(): void {
   builtinFontsRegistered = true
 }
 
-// Names already registered. react-pdf's registry is process-wide and has no
-// way to remove one family, so each imported font version is registered once
-// and stays for the life of the process.
-const registeredImportedFonts = new Set<string>()
+// Imported fonts registered so far, by registered family name, each as it was
+// registered (without the faces whose file was missing). react-pdf's registry
+// is process-wide and cannot drop one family — only clear them all, which an
+// export running meanwhile would not survive — so each version, once
+// registered, stays for the life of the process.
+const registeredImportedFonts = new Map<string, FontDTO.Response>()
 
-export function registerImportedFonts(fonts: readonly FontWithFiles[]): void {
-  for (const { font, files } of fonts) {
+export function isImportedFontRegistered(font: FontDTO.Response): boolean {
+  return registeredImportedFonts.has(importedFontFamilyName(font))
+}
+
+/**
+ * Registers the fonts not registered yet, and returns every one of `fonts` as
+ * react-pdf knows it — the catalog an export resolves against. A font already
+ * registered may arrive without files: they were not fetched again.
+ */
+export function registerImportedFonts(fonts: readonly FontWithFiles[]): FontDTO.Response[] {
+  return fonts.flatMap(({ font, files }) => {
     const family = importedFontFamilyName(font)
-    if (registeredImportedFonts.has(family)) continue
+    const registered = registeredImportedFonts.get(family)
+    if (registered) return [registered]
+    if (!files) return []
 
     Font.register({
       family,
@@ -75,6 +89,7 @@ export function registerImportedFonts(fonts: readonly FontWithFiles[]): void {
           : []
       }),
     })
-    registeredImportedFonts.add(family)
-  }
+    registeredImportedFonts.set(family, font)
+    return [font]
+  })
 }

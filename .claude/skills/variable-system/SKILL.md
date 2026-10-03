@@ -97,25 +97,31 @@ Enforced in `packages/backend/src/services/VariableService.ts`:
 - **A variable has no stored value.** `default` is the only value on the
   definition; runtime values arrive per export and never persist.
 - **A variable in use cannot be deleted** — `ValidationError('VARIABLE_IN_USE')`.
+  "In use" is any reference, anywhere in any slide's tree (see References).
   The frontend special-cases this code in `VariableSlice.deleteVariable` to show
   "Variable used in the template".
 - Every mutation calls `touchPresentation()` so `updatedAt` reflects variable edits,
   and returns the **full refreshed list**, which the store swaps into
   `presentation.variableData` wholesale.
 
-### Two known gaps
+### References
 
-Both are live traps, not style opinions — check whether they still hold before
-relying on them:
+A tree points at a variable in three places: a text run, an `if-group`'s
+`conditionVariable`, a `for-group`'s `itemsVariable`. `collectVariableIds` and
+`rebindVariables` (common `variableReferences.ts`) are the only walks over them —
+the in-use guard reads the first, the editor's paste the second. A fourth kind
+of reference is added there, once.
 
-1. **`isVariableInUse` only scans top-level text shapes.** It filters
-   `shape.type !== 'text'` on `slide.shapes` without recursing into containers,
-   and never inspects `conditionVariable` or `itemsVariable`. So a variable used
-   only as an `if-group` condition, as a `for-group` source, or inside a text box
-   nested in any group, can be deleted with the guard passing.
-2. **A dangling reference degrades silently.** `resolveVariable` returns
-   `undefined` for an unknown `_id`, so the `if-group` disappears, the
-   `for-group` disappears and the text run renders empty — no error anywhere.
+### Known gap
+
+Check it still holds before relying on it:
+
+**A dangling reference degrades silently.** `resolveVariable` returns
+`undefined` for an unknown `_id`, so the `if-group` disappears, the `for-group`
+disappears and the text run renders empty — no error anywhere. The server
+validates text-run ids on every slide save, but not `conditionVariable` or
+`itemsVariable`: a client can still store an unknown one. Validating them would
+make slides that already hold one unsavable, so it needs a cleanup first.
 
 ## Related
 

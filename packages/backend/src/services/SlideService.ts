@@ -1,11 +1,11 @@
 import { PresentationModel } from '../models/Presentation.js'
-import { SlideModel } from '../models/Slide.js'
+import { SlideModel, collectImageIds } from '../models/Slide.js'
 import { VariableDataModel } from '../models/VariableData.js'
 import { isObjectIdString, slideCreateToModel, slideToDTO, slideUpdateToModel, toObjectId } from '../models/mappers.js'
 import type { Shape, Slide, SlideDTO } from '@imprime/common'
 import { isContainerShape } from '@imprime/common'
 import type { Types } from 'mongoose'
-import { collectImageIds, type ImageService } from './ImageService.js'
+import type { ImageService } from './ImageService.js'
 import { touchPresentation } from './PresentationService.js'
 import { ConflictError, NotFoundError, ValidationError } from './errors.js'
 
@@ -91,22 +91,21 @@ export class SlideService {
 
     await this.assertVariableReferences(slide.presentationId, data.shapes)
 
-    const oldImageIds = new Set(collectImageIds(slide.shapes))
-    const newImageIds = new Set(collectImageIds(data.shapes))
-    const removedImageIds = [...oldImageIds].filter(id => !newImageIds.has(id))
-    const addedImageIds = [...newImageIds].filter(id => !oldImageIds.has(id))
-
-    // Not deleted: the editor can undo the removal. See ORPHAN_GRACE_SECONDS.
-    try {
-      await this.imageService.markOrphaned(removedImageIds)
-      await this.imageService.markReferenced(addedImageIds)
-    } catch (error) {
-      console.error('Failed to update image references:', error)
-    }
-
+    const previousImageIds = collectImageIds(slide.shapes)
     Object.assign(slide, slideUpdateToModel(data))
     await slide.save()
     await touchPresentation(slide.presentationId)
+
+    // After the save, so this slide no longer counts as showing what it
+    // dropped. Released, not deleted: the editor can undo the removal.
+    const imageIds = collectImageIds(data.shapes)
+    const kept = new Set(imageIds)
+    try {
+      await this.imageService.release(previousImageIds.filter(id => !kept.has(id)))
+      await this.imageService.markReferenced(imageIds)
+    } catch (error) {
+      console.error('Failed to update image references:', error)
+    }
   }
 
   async delete(presentationId: string, slideId: string): Promise<void> {
@@ -118,15 +117,32 @@ export class SlideService {
       throw new NotFoundError('Slide not found', 'SLIDE_NOT_FOUND')
     }
 
-    // Orphaned rather than deleted, so restoring the slide shows them again.
+    await slide.deleteOne()
+    await touchPresentation(slide.presentationId)
+
+    // Released rather than deleted, so restoring the slide shows them again.
     try {
-      await this.imageService.markOrphaned(collectImageIds(slide.shapes))
+      await this.imageService.release(collectImageIds(slide.shapes))
     } catch (error) {
       console.error('Failed to release the images of a deleted slide:', error)
     }
+  }
 
-    await slide.deleteOne()
-    await touchPresentation(slide.presentationId)
+  /**
+   * Fills `imageIds` on slides saved before the field existed, which image
+   * reference checks would otherwise miss. Run at startup; a no-op once every
+   * slide has it.
+   */
+  async indexImageReferences(): Promise<number> {
+    const slides = await SlideModel.find({ imageIds: { $exists: false } }).select('shapes')
+    if (slides.length === 0) return 0
+    await SlideModel.bulkWrite(slides.map(slide => ({
+      updateOne: {
+        filter: { _id: slide._id },
+        update: { $set: { imageIds: [...new Set(collectImageIds(slide.shapes))] } },
+      },
+    })))
+    return slides.length
   }
 
   private async assertVariableReferences(presentationId: Types.ObjectId, shapes: Shape[]): Promise<void> {

@@ -121,7 +121,7 @@ that belongs to the slice but not to the store.
   rethrows on create so a form can react, and surfaces an antd `message` for the
   `VARIABLE_IN_USE` code.
 - **Private members are prefixed `_`** and still live on the store, because
-  retries need `get()` — `_saveSlide`.
+  other slices call them through `get()` — `_writeSlideShapes`, `_insertSlide`.
 - **Slices are `.tsx`** even without JSX. Consistent, if odd; match it.
 
 ## Components read the store directly
@@ -158,8 +158,12 @@ which does four things in order:
    or a held arrow key undoes at once); `hint.selection` is the shape undo
    selects again;
 3. **set** — optimistic local update of the presentation;
-4. **save** — fire-and-forget `_saveSlide`, which retries twice with exponential
-   backoff (1s, 2s) and then sets `error`.
+4. **save** — fire-and-forget `_saveSlide`. Saves of one slide go out **one at
+   a time**: the server reads, replaces and writes a slide with no concurrency
+   check, so two in flight can land in either order and keep the older tree.
+   While one is out, later writes only replace the tree waiting to go next. A
+   failed save retries twice (1s, 2s) unless a newer tree is waiting, then sets
+   `error`.
 
 Steps 3–4 are `_writeSlideShapes`, the path undo and redo replay through so a
 replay records nothing.
@@ -174,6 +178,16 @@ returns the entry for the state it replaced. A deleted slide or variable comes
 back **under its id** (the API accepts `_id` on create), so steps above it and
 text runs still point to it. Steps that reach the API run one at a time, and a
 failed one goes back on its stack.
+
+A replayed step the server refuses (4xx) is dropped, since it would be refused
+again and block every step under it; a network or 5xx failure keeps it.
+
+`updateShape` writes to the slide that holds the shape, not only the one on
+screen: a text box commits its typing as it unmounts, after its slide was left.
+A shape found nowhere is a no-op. `loadPresentation` resets everything that
+pointed into the previous presentation (slide index, selection, text editor,
+variable form); the clipboard stays, and a paste rebinds its variable
+references by id, then name and type (`rebindVariables` in common).
 
 None of these write the server's copy of the presentation back into the store:
 it would overwrite shape edits whose save is still in flight. Write the one

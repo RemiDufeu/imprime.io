@@ -1,4 +1,5 @@
-import type { Shape } from '@imprime/sdk'
+import type { Shape, VariableData } from '@imprime/sdk'
+import { rebindVariables } from '@imprime/sdk'
 import type { SlideSlice } from './SlideSlice'
 import type { PresentationSlice } from './PresentationSlice'
 import type { ToolSlice } from './ToolSlice'
@@ -31,6 +32,32 @@ export interface Clipboard {
     // Names this copy on the system clipboard, so a paste can tell it is still
     // the last thing copied — not text or an image copied elsewhere since.
     token: string
+    // The variables of the presentation it was copied from, to bind its
+    // references in the one it is pasted into.
+    variables: VariableData[]
+}
+
+// A copied shape's variable references, as the presentation it is pasted into
+// knows them: kept by id, else matched by name and type (a copy from another
+// presentation, or a variable deleted and recreated since), else dropped — a
+// text run then becomes its name as plain text. The server refuses every save
+// of a slide holding an unknown reference, so none may get through.
+function bindVariables(shape: Shape, from: VariableData[], to: VariableData[]): Shape {
+    const present = new Set(to.map(variable => variable._id))
+    const original = new Map(from.map(variable => [variable._id, variable]))
+    return rebindVariables(
+        shape,
+        variableId => {
+            if (present.has(variableId)) return variableId
+            const source = original.get(variableId)
+            if (!source) return null
+            return to.find(variable => variable.name === source.name && variable.type === source.type)?._id ?? null
+        },
+        run => {
+            const name = original.get(run.variableId)?.name ?? 'variable'
+            return `{${run.itemPath ? `${name}.${run.itemPath}` : name}}`
+        },
+    )
 }
 
 export interface ShapeSlice {
@@ -140,10 +167,16 @@ export const createShapeSlice : StateCreator<
         updateShape: (id: string, updates: Partial<Shape>) => {
             const { presentation, updateSlideShapes } = get()
             if (!presentation) return
+            // Usually the slide on screen; but a text box commits its typing
+            // as it unmounts, after its slide was left. A shape found nowhere
+            // was removed meanwhile: nothing to write.
             const currentSlide = selectCurrentSlide(get())
-            if (!currentSlide) return
-            const updatedShapes = updateShapeById(currentSlide.shapes, id, updates)
-            updateSlideShapes(currentSlide._id, updatedShapes, {
+            const slide = currentSlide && findShapeById(currentSlide.shapes, id)
+                ? currentSlide
+                : presentation.slides.find(s => findShapeById(s.shapes, id) !== null)
+            if (!slide) return
+            const updatedShapes = updateShapeById(slide.shapes, id, updates)
+            updateSlideShapes(slide._id, updatedShapes, {
                 // Successive edits of the same fields of one shape undo as one step.
                 mergeKey: `${id}:${Object.keys(updates).sort().join(',')}`,
                 selection: id,
@@ -232,6 +265,7 @@ export const createShapeSlice : StateCreator<
                 x: loc.absX + PASTE_OFFSET,
                 y: loc.absY + PASTE_OFFSET,
                 token: crypto.randomUUID(),
+                variables: get().presentation?.variableData ?? [],
             } })
         },
         cutShape: (id: string) => {
@@ -239,13 +273,20 @@ export const createShapeSlice : StateCreator<
             if (!currentSlide) return
             const loc = findShapeById(currentSlide.shapes, id)
             if (!loc) return
-            set({ clipboard: { shape: loc.shape, x: loc.absX, y: loc.absY, token: crypto.randomUUID() } })
+            set({ clipboard: {
+                shape: loc.shape,
+                x: loc.absX,
+                y: loc.absY,
+                token: crypto.randomUUID(),
+                variables: get().presentation?.variableData ?? [],
+            } })
             get().deleteShape(id)
         },
         pasteShape: () => {
-            const { clipboard, selectedShape } = get()
-            if (!clipboard) return
-            insertNear(cloneShapeWithNewIds(clipboard.shape), clipboard.x, clipboard.y, selectedShape?.id ?? null)
+            const { clipboard, selectedShape, presentation } = get()
+            if (!clipboard || !presentation) return
+            const shape = bindVariables(clipboard.shape, clipboard.variables, presentation.variableData ?? [])
+            insertNear(cloneShapeWithNewIds(shape), clipboard.x, clipboard.y, selectedShape?.id ?? null)
             // The next paste lands one step further, not on top of this one.
             set({ clipboard: { ...clipboard, x: clipboard.x + PASTE_OFFSET, y: clipboard.y + PASTE_OFFSET } })
         },

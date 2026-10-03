@@ -3,6 +3,10 @@ import type { Presentation, Slide } from '@imprime/sdk'
 import type { StateCreator } from 'zustand'
 import type { HistorySlice } from './HistorySlice'
 import type { SlideSlice } from './SlideSlice'
+import type { ShapeSlice } from './ShapeSlice'
+import type { RichTextEditorSlice } from './RichTextEditorSlice'
+import type { ToolAttributesSlice } from './ToolAttributeSlice'
+import type { VariableSlice } from './VariableSlice'
 
 // `slides` in the order of `slideIds`; slides the list leaves out keep their
 // relative order, after it. `order` is rewritten to match.
@@ -33,7 +37,7 @@ export interface PresentationSlice {
 }
 
 export const createPresentationSlice: StateCreator<
-  PresentationSlice & HistorySlice & SlideSlice,
+  PresentationSlice & HistorySlice & SlideSlice & ShapeSlice & RichTextEditorSlice & ToolAttributesSlice & VariableSlice,
   [],
   [],
   PresentationSlice
@@ -47,7 +51,20 @@ export const createPresentationSlice: StateCreator<
 
     try {
       const data = await presentationsAPI.getById(id)
-      set({ presentation: data })
+      // Everything that pointed into the previous presentation goes: a slide
+      // index past this one's last slide shows nothing at all, and a selection,
+      // an open text editor or a variable form would name what is not here.
+      // The clipboard stays — a paste binds its variables to this presentation.
+      set({
+        presentation: data,
+        currentSlideIndex: 0,
+        selectedShape: null,
+        contextBarType: 'none',
+        editor: null,
+        isFocused: false,
+        variableForm: null,
+        variablesPanelOpen: false,
+      })
       // Steps recorded on another presentation cannot be replayed on this one.
       get().clearHistory()
     } catch {
