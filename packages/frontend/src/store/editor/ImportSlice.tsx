@@ -2,9 +2,10 @@ import { message } from 'antd'
 import type { Paragraph, Shape } from '@imprime/sdk'
 import { DEFAULT_FONT_SIZE, DEFAULT_LINE_HEIGHT, PARAGRAPH_SPACING, SLIDE_HEIGHT, SLIDE_WIDTH } from '@imprime/sdk'
 import type { StateCreator } from 'zustand'
-import type { SlideSlice } from './SlideSlice'
-import type { ShapeSlice } from './ShapeSlice'
 import type { PresentationSlice } from './PresentationSlice'
+import type { SlideSlice } from './SlideSlice'
+import type { DocumentWriteSlice } from './DocumentWriteSlice'
+import type { SelectionSlice } from './SelectionSlice'
 import { imagesAPI } from '../../api/api'
 import { nextShapeName } from '../../utils/shapeTree'
 import { selectCurrentSlide } from './selectors'
@@ -44,7 +45,7 @@ function uploadErrorMessage(error: unknown): string {
 }
 
 // Shapes made from content that comes from outside the editor: an image file,
-// picked or pasted, and pasted text. Drawn shapes are ShapeCreationSlice's.
+// picked or pasted, and pasted text. Drawn shapes are ToolSlice's.
 export interface ImportSlice {
     // Ask for an image file, then insert it.
     handleImageUpload: () => void
@@ -55,7 +56,7 @@ export interface ImportSlice {
 }
 
 export const createImportSlice: StateCreator<
-    ImportSlice & PresentationSlice & SlideSlice & ShapeSlice,
+    ImportSlice & PresentationSlice & SlideSlice & DocumentWriteSlice & SelectionSlice,
     [],
     [],
     ImportSlice
@@ -115,7 +116,7 @@ export const createImportSlice: StateCreator<
                     imageId,
                     alt: file.name,
                 }
-                get().updateSlideShapes(slide._id, [...slide.shapes, newShape])
+                get()._editSlide(shapes => [...shapes, newShape], { slideId: slide._id })
                 get().selectShape(shapeId)
                 message.success('Image uploaded successfully')
             } finally {
@@ -148,7 +149,7 @@ export const createImportSlice: StateCreator<
                 height,
                 paragraphes: lines.map((line): Paragraph => ({ type: 'paragraph', children: [{ text: line }] })),
             }
-            get().updateSlideShapes(slide._id, [...slide.shapes, newShape])
+            get()._editSlide(shapes => [...shapes, newShape], { slideId: slide._id })
             get().selectShape(shapeId)
         },
     }

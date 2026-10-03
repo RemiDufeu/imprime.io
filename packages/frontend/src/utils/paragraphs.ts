@@ -19,6 +19,20 @@ export function toEditorValue(content: Descendant[] | undefined): Descendant[] {
 }
 
 /**
+ * Replaces the whole content of an editor that is not being typed in — an undo
+ * or redo changed its text from outside, and Slate reads its value on mount
+ * only. The selection and the history go too: they point into the old content.
+ */
+export function replaceEditorContent(editor: Editor, content: Descendant[] | undefined): void {
+  const next = toEditorValue(content)
+  if (next === editor.children || JSON.stringify(next) === JSON.stringify(editor.children)) return
+  editor.children = next
+  editor.selection = null
+  editor.history = { undos: [], redos: [] }
+  editor.onChange()
+}
+
+/**
  * Paragraph formatting is shown for, and diffed against, the first paragraph
  * of the selection. Diffing against the same paragraph that was read means an
  * unrelated change (a mark) on a selection spanning differently-formatted

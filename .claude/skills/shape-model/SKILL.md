@@ -107,9 +107,8 @@ compile errors after you extend the union — which is the point of the union.
    `renderShape` case. Containers need no case (they never arrive).
 4. `packages/frontend/src/components/slide/svg/` — the component, plus the
    `SVGShape` switch.
-5. `packages/frontend/src/store/editor/` — `ToolSlice` (the tool),
-   `ShapeCreationSlice` (drawing → shape), `ShapeSlice.selectShape`
-   (`contextBarType`), `ToolAttributeSlice` (`shapeToAttributesHelper`).
+5. `packages/frontend/src/store/editor/` — `ToolSlice` (the tool, and
+   `drawnShape`: drawing → shape), `selectors.ts` (`contextBarFor`).
 6. `packages/frontend/src/components/slide/SlideCanvas.tsx` — the drawing-tool
    list in `handleMouseDown`, if it is drawn by dragging.
 7. Context toolbar under `.../TopBar/Context-toolbar/` + its `index.tsx` switch.

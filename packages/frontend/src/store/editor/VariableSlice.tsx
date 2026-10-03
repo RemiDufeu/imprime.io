@@ -11,7 +11,6 @@ export type VariableFormTarget = { mode: 'create' } | { mode: 'edit'; variableId
 
 export interface VariableSlice {
   isLoadingVariables: boolean
-  variableError: string | null
 
   // The browse panel and the form are two surfaces, and the form outlives the
   // panel: it is a modal owned by the header, because rc-dropdown closes its
@@ -24,6 +23,8 @@ export interface VariableSlice {
   openVariableForm: (target: VariableFormTarget) => void
   closeVariableForm: () => void
 
+  // Both reject on failure, so the form can attach a name conflict to its own
+  // field instead of showing it as a detached toast.
   createVariable: (variable: VariableDTO.Create) => Promise<VariableData[]>
   updateVariable: (variableId: string, updates: VariableDTO.Update) => Promise<VariableData[]>
   deleteVariable: (variableId: string) => Promise<void>
@@ -42,7 +43,6 @@ export const createVariableSlice: StateCreator<
   VariableSlice
 > = (set, get) => ({
   isLoadingVariables: false,
-  variableError: null,
 
   variablesPanelOpen: false,
   variableForm: null,
@@ -59,7 +59,7 @@ export const createVariableSlice: StateCreator<
     const { presentation } = get()
     if (!presentation) return []
 
-    set({ isLoadingVariables: true, variableError: null })
+    set({ isLoadingVariables: true })
 
     try {
       const result = await variablesAPI.create(presentation._id, variable)
@@ -67,9 +67,6 @@ export const createVariableSlice: StateCreator<
       get()._setVariables(result.variables)
       const created = result.variables.find(v => v.name === variable.name)
       if (created) get()._recordHistory({ kind: 'variable', variableId: created._id, snapshot: null })
-    } catch (err) {
-      set({ variableError: 'Failed to create variable' })
-      throw err
     } finally {
       set({ isLoadingVariables: false })
     }
@@ -82,7 +79,7 @@ export const createVariableSlice: StateCreator<
     const { presentation } = get()
     if (!presentation) return []
 
-    set({ isLoadingVariables: true, variableError: null })
+    set({ isLoadingVariables: true })
     const previous = presentation.variableData?.find(v => v._id === variableId) ?? null
 
     try {
@@ -91,11 +88,6 @@ export const createVariableSlice: StateCreator<
       get()._setVariables(result.variables)
       get()._recordHistory({ kind: 'variable', variableId, snapshot: previous })
       return result.variables
-    } catch (err) {
-      // Rethrown so the form can attach a name conflict to its own field
-      // instead of showing it as a detached toast.
-      set({ variableError: parseApiError(err).message ?? 'Failed to update variable' })
-      throw err
     } finally {
       set({ isLoadingVariables: false })
     }
@@ -105,7 +97,7 @@ export const createVariableSlice: StateCreator<
     const { presentation } = get()
     if (!presentation) return
 
-    set({ isLoadingVariables: true, variableError: null })
+    set({ isLoadingVariables: true })
     const previous = presentation.variableData?.find(v => v._id === variableId) ?? null
 
     try {
@@ -114,9 +106,7 @@ export const createVariableSlice: StateCreator<
       get()._setVariables(result.variables)
       get()._recordHistory({ kind: 'variable', variableId, snapshot: previous })
     } catch (err) {
-      const { code, message: detail } = parseApiError(err)
-
-      set({ variableError: detail ?? 'Failed to delete variable' })
+      const { code } = parseApiError(err)
 
       if (code === 'VARIABLE_IN_USE') {
         message.error('Variable used in the template')

@@ -1,69 +1,34 @@
-import type { Shape, VariableData } from '@imprime/sdk'
-import { rebindVariables } from '@imprime/sdk'
-import type { SlideSlice } from './SlideSlice'
-import type { PresentationSlice } from './PresentationSlice'
-import type { ToolSlice } from './ToolSlice'
-import type { ToolAttributesSlice } from './ToolAttributeSlice'
-import { shapeToAttributesHelper } from './ToolAttributeSlice'
+import type { Shape } from '@imprime/sdk'
 import type { StateCreator } from 'zustand'
-import type { RichTextEditorSlice } from './RichTextEditorSlice'
+import type { PresentationSlice } from './PresentationSlice'
+import type { SlideSlice } from './SlideSlice'
+import type { DocumentWriteSlice } from './DocumentWriteSlice'
+import type { SelectionSlice } from './SelectionSlice'
 import {
     findShapeById,
     updateShapeById,
     deleteShapeById,
     extractShapeById,
     insertShapeAt,
+    insertNear,
     cloneShapeWithNewIds,
     isDescendantOf,
     getSiblingList,
+    replaceSiblingList,
     isContainerShape,
 } from '../../utils/shapeTree'
 import { selectCurrentSlide } from './selectors'
 
 // Offset between a copy and what it was copied from, so it reads as new.
-const PASTE_OFFSET = 20
+export const COPY_OFFSET = 20
 
-// What the next paste inserts, and where. The position is absolute, so the
-// copy lands in the same place whichever container receives it.
-export interface Clipboard {
-    shape: Shape
-    x: number
-    y: number
-    // Names this copy on the system clipboard, so a paste can tell it is still
-    // the last thing copied — not text or an image copied elsewhere since.
-    token: string
-    // The variables of the presentation it was copied from, to bind its
-    // references in the one it is pasted into.
-    variables: VariableData[]
-}
+export const copyName = (shape: Shape) => shape.name ? `${shape.name} copy` : undefined
 
-// A copied shape's variable references, as the presentation it is pasted into
-// knows them: kept by id, else matched by name and type (a copy from another
-// presentation, or a variable deleted and recreated since), else dropped — a
-// text run then becomes its name as plain text. The server refuses every save
-// of a slide holding an unknown reference, so none may get through.
-function bindVariables(shape: Shape, from: VariableData[], to: VariableData[]): Shape {
-    const present = new Set(to.map(variable => variable._id))
-    const original = new Map(from.map(variable => [variable._id, variable]))
-    return rebindVariables(
-        shape,
-        variableId => {
-            if (present.has(variableId)) return variableId
-            const source = original.get(variableId)
-            if (!source) return null
-            return to.find(variable => variable.name === source.name && variable.type === source.type)?._id ?? null
-        },
-        run => {
-            const name = original.get(run.variableId)?.name ?? 'variable'
-            return `{${run.itemPath ? `${name}.${run.itemPath}` : name}}`
-        },
-    )
-}
-
+/** Edits of the shapes on a slide: their properties, place in the tree and z-order. */
 export interface ShapeSlice {
-    selectedShape: Shape | null
-    clipboard: Clipboard | null
-    selectShape: (id: string | null) => void
+    // Writes to the slide holding the shape, not only the one on screen: a
+    // text box commits its typing as it unmounts, after its slide was left.
+    // A shape found nowhere is a no-op.
     updateShape: (id: string, updates: Partial<Shape>) => void
     // Move a shape by (dx, dy) in its parent's space: the arrow keys.
     nudgeShape: (id: string, dx: number, dy: number) => void
@@ -78,243 +43,131 @@ export interface ShapeSlice {
     // Move a shape into a group, appended at the end of its children — i.e. the
     // top of the group's visual stack (highest z-order among its children).
     moveShapeIntoGroup: (id: string, targetGroupId: string) => void
-    copyShape: (id: string) => void
-    // Copy, then delete. A cut shape pastes back in place rather than offset.
-    cutShape: (id: string) => void
-    // Insert the clipboard right after the selected shape, in its container,
-    // or on top of the slide when nothing is selected. Pasting again cascades.
-    pasteShape: () => void
     // Pull a shape out of its parent group into the group's own parent (or
     // the slide root), keeping its absolute position. No-op if the shape
     // isn't inside a group.
     ungroupShape: (id: string) => void
+    // Z-order within the shape's own container.
+    bringToFront: (id: string) => void
+    sendToBack: (id: string) => void
+    bringForward: (id: string) => void
+    sendBackward: (id: string) => void
 }
 
-export const createShapeSlice : StateCreator<
-  ShapeSlice & SlideSlice & PresentationSlice & ToolSlice & ToolAttributesSlice & RichTextEditorSlice,
-  [],
+export const createShapeSlice: StateCreator<
+    ShapeSlice & PresentationSlice & SlideSlice & DocumentWriteSlice & SelectionSlice,
+    [],
     [],
     ShapeSlice
-> = (set, get) => {
-    const copyName = (shape: Shape) => shape.name ? `${shape.name} copy` : undefined
-
-    // Insert `shape` at absolute (x, y), right after `anchorId` in the
-    // anchor's container (the slide root when there is no anchor), and
-    // select it.
-    const insertNear = (shape: Shape, x: number, y: number, anchorId: string | null) => {
-        const { updateSlideShapes, selectShape } = get()
-        const currentSlide = selectCurrentSlide(get())
-        if (!currentSlide) return
-
-        const anchor = anchorId !== null ? findShapeById(currentSlide.shapes, anchorId) : null
-        const parentId = anchor?.parentGroupId ?? null
-        const parent = parentId !== null ? findShapeById(currentSlide.shapes, parentId) : null
-        const siblings = getSiblingList(currentSlide.shapes, parentId)
-        const anchorIndex = siblings.findIndex(s => s.id === anchorId)
-        const index = anchorIndex === -1 ? siblings.length : anchorIndex + 1
-
-        const placed = { ...shape, x: x - (parent?.absX ?? 0), y: y - (parent?.absY ?? 0) }
-        updateSlideShapes(currentSlide._id, insertShapeAt(currentSlide.shapes, parentId, index, placed))
-        selectShape(placed.id)
+> = (_, get) => {
+    // Move a shape within its own container's list, to the index `target`
+    // computes from its current one (clamped).
+    const reorder = (id: string, target: (index: number, length: number) => number) => {
+        get()._editSlide(shapes => {
+            const loc = findShapeById(shapes, id)
+            if (!loc) return null
+            const siblings = getSiblingList(shapes, loc.parentGroupId)
+            const from = siblings.findIndex(s => s.id === id)
+            const to = Math.max(0, Math.min(siblings.length - 1, target(from, siblings.length)))
+            if (from === -1 || from === to) return null
+            const next = siblings.filter(s => s.id !== id)
+            next.splice(to, 0, siblings[from])
+            return replaceSiblingList(shapes, loc.parentGroupId, next)
+        })
     }
 
     return {
-        selectedShape: null,
-        clipboard: null,
-        selectShape: (id) => {
-            // Retrieve with Id (walk the tree — shapes can be nested in groups)
-            let selectedShape: Shape | null = null
-             try {
-                const currentSlide = selectCurrentSlide(get())
-                if (!currentSlide) return
-                if (id !== null) {
-                    selectedShape = findShapeById(currentSlide.shapes, id)?.shape ?? null
-                }
-            } catch {
-                return
-            }
-
-            const selectedTool = get().selectedTool
-            let contextBarType = get().contextBarType
-
-            // Update context bar type based on selected shape and tool
-            if (selectedTool === 'move') {
-                if(selectedShape) {
-                    if (selectedShape.type === 'rectangle' || selectedShape.type === 'ellipse') {
-                        contextBarType = 'shape'
-                    } else if (selectedShape.type === 'text') {
-                        contextBarType = 'text'
-                    } else if (selectedShape.type === 'group') {
-                        contextBarType = 'group'
-                    } else if (selectedShape.type === 'if-group') {
-                        contextBarType = 'if-group'
-                    } else if (selectedShape.type === 'for-group') {
-                        contextBarType = 'for-group'
-                    }
-                } else {
-                    contextBarType = 'none'
-                }
-            }
-
-            // Sync attributes with selected shape properties
-            const shapeAttributes = selectedShape ? shapeToAttributesHelper(selectedShape) : {}
-            const updatedAttributes = { ...get().attributes, ...shapeAttributes }
-
-            // Update store
-             // Unselect editor when we change selection
-            set({ selectedShape, contextBarType, attributes: updatedAttributes, editor : null })
-        },
-        updateShape: (id: string, updates: Partial<Shape>) => {
-            const { presentation, updateSlideShapes } = get()
+        updateShape: (id, updates) => {
+            const { presentation, _editSlide } = get()
             if (!presentation) return
-            // Usually the slide on screen; but a text box commits its typing
-            // as it unmounts, after its slide was left. A shape found nowhere
-            // was removed meanwhile: nothing to write.
-            const currentSlide = selectCurrentSlide(get())
-            const slide = currentSlide && findShapeById(currentSlide.shapes, id)
-                ? currentSlide
+            const current = selectCurrentSlide(get())
+            const slide = current && findShapeById(current.shapes, id)
+                ? current
                 : presentation.slides.find(s => findShapeById(s.shapes, id) !== null)
             if (!slide) return
-            const updatedShapes = updateShapeById(slide.shapes, id, updates)
-            updateSlideShapes(slide._id, updatedShapes, {
+            _editSlide(shapes => updateShapeById(shapes, id, updates), {
+                slideId: slide._id,
                 // Successive edits of the same fields of one shape undo as one step.
                 mergeKey: `${id}:${Object.keys(updates).sort().join(',')}`,
                 selection: id,
             })
         },
-        nudgeShape: (id: string, dx: number, dy: number) => {
-            const { updateShape, selectShape } = get()
-            const currentSlide = selectCurrentSlide(get())
-            if (!currentSlide) return
-            const shape = findShapeById(currentSlide.shapes, id)?.shape
-            if (!shape) return
-            updateShape(id, { x: shape.x + dx, y: shape.y + dy })
-            // A drag starts from the selection snapshot, so refresh it.
-            selectShape(id)
+
+        nudgeShape: (id, dx, dy) => {
+            const slide = selectCurrentSlide(get())
+            const shape = slide ? findShapeById(slide.shapes, id)?.shape : undefined
+            if (shape) get().updateShape(id, { x: shape.x + dx, y: shape.y + dy })
         },
-        deleteShape: (id: string) => {
-            const { presentation, updateSlideShapes, selectedShape, selectShape } = get()
-            if (!presentation) return
-            const currentSlide = selectCurrentSlide(get())
-            if (!currentSlide) return
-            const updatedShapes = deleteShapeById(currentSlide.shapes, id)
-            updateSlideShapes(currentSlide._id, updatedShapes)
-            if (selectedShape && !findShapeById(updatedShapes, selectedShape.id)) selectShape(null)
+
+        deleteShape: (id) => {
+            get()._editSlide(shapes => deleteShapeById(shapes, id))
+            const { selectedShapeId, selectShape } = get()
+            const slide = selectCurrentSlide(get())
+            if (selectedShapeId && slide && !findShapeById(slide.shapes, selectedShapeId)) selectShape(null)
         },
-        duplicateShape: (id: string) => {
-            const currentSlide = selectCurrentSlide(get())
-            if (!currentSlide) return
-            const loc = findShapeById(currentSlide.shapes, id)
+
+        duplicateShape: (id) => {
+            const slide = selectCurrentSlide(get())
+            const loc = slide ? findShapeById(slide.shapes, id) : null
             if (!loc) return
             const copy = cloneShapeWithNewIds({ ...loc.shape, name: copyName(loc.shape) })
-            insertNear(copy, loc.absX + PASTE_OFFSET, loc.absY + PASTE_OFFSET, id)
+            get()._editSlide(shapes => insertNear(shapes, copy, loc.absX + COPY_OFFSET, loc.absY + COPY_OFFSET, id))
+            get().selectShape(copy.id)
         },
-        moveShape: (id: string, targetGroupId: string | null, index: number) => {
-            const { presentation, updateSlideShapes, selectShape } = get()
-            if (!presentation) return
-            const currentSlide = selectCurrentSlide(get())
-            if (!currentSlide) return
-            // Reject moves into own subtree (would make a group its own descendant).
-            if (targetGroupId !== null && isDescendantOf(currentSlide.shapes, targetGroupId, id)) return
 
-            const sourceLoc = findShapeById(currentSlide.shapes, id)
-            if (!sourceLoc) return
-            const targetParentAbs = targetGroupId === null
-                ? { absX: 0, absY: 0 }
-                : findShapeById(currentSlide.shapes, targetGroupId)
-            if (targetParentAbs === null) return
-            const newX = sourceLoc.absX - targetParentAbs.absX
-            const newY = sourceLoc.absY - targetParentAbs.absY
+        moveShape: (id, targetGroupId, index) => {
+            get()._editSlide(shapes => {
+                // Reject moves into own subtree (would make a group its own descendant).
+                if (targetGroupId !== null && isDescendantOf(shapes, targetGroupId, id)) return null
 
-            const { removed, remaining } = extractShapeById(currentSlide.shapes, id)
-            if (!removed) return
-            const repositioned = { ...removed, x: newX, y: newY } as Shape
+                const source = findShapeById(shapes, id)
+                const target = targetGroupId === null ? { absX: 0, absY: 0 } : findShapeById(shapes, targetGroupId)
+                if (!source || !target) return null
 
-            // If moving within the same parent, the target index may shift once the
-            // source is removed. Caller passes the index in the *pre-removal* tree,
-            // and we adjust here.
-            const preSiblings = targetGroupId === null
-                ? currentSlide.shapes
-                : (findShapeById(currentSlide.shapes, targetGroupId)?.shape as { children?: Shape[] } | undefined)?.children ?? []
-            const sourceIndexInTarget = preSiblings.findIndex(s => s.id === id)
-            const adjustedIndex = sourceIndexInTarget !== -1 && sourceIndexInTarget < index
-                ? index - 1
-                : index
+                const { removed, remaining } = extractShapeById(shapes, id)
+                if (!removed) return null
+                const repositioned = { ...removed, x: source.absX - target.absX, y: source.absY - target.absY }
 
-            const nextShapes = insertShapeAt(remaining, targetGroupId, adjustedIndex, repositioned)
-            updateSlideShapes(currentSlide._id, nextShapes)
-            selectShape(id)
+                // The caller's index is in the pre-removal tree: moving down
+                // within the same container shifts it by one.
+                const sourceIndex = getSiblingList(shapes, targetGroupId).findIndex(s => s.id === id)
+                const adjusted = sourceIndex !== -1 && sourceIndex < index ? index - 1 : index
+                return insertShapeAt(remaining, targetGroupId, adjusted, repositioned)
+            })
+            get().selectShape(id)
         },
-        moveShapeIntoGroup: (id: string, targetGroupId: string) => {
-            const { presentation, moveShape } = get()
-            if (!presentation) return
-            const currentSlide = selectCurrentSlide(get())
-            if (!currentSlide) return
 
-            const target = findShapeById(currentSlide.shapes, targetGroupId)?.shape
+        moveShapeIntoGroup: (id, targetGroupId) => {
+            const slide = selectCurrentSlide(get())
+            const target = slide ? findShapeById(slide.shapes, targetGroupId)?.shape : undefined
             if (!target || !isContainerShape(target)) return
-            moveShape(id, targetGroupId, target.children.length)
+            get().moveShape(id, targetGroupId, target.children.length)
         },
-        copyShape: (id: string) => {
-            const currentSlide = selectCurrentSlide(get())
-            if (!currentSlide) return
-            const loc = findShapeById(currentSlide.shapes, id)
-            if (!loc) return
-            set({ clipboard: {
-                shape: { ...loc.shape, name: copyName(loc.shape) },
-                x: loc.absX + PASTE_OFFSET,
-                y: loc.absY + PASTE_OFFSET,
-                token: crypto.randomUUID(),
-                variables: get().presentation?.variableData ?? [],
-            } })
+
+        ungroupShape: (id) => {
+            get()._editSlide(shapes => {
+                const loc = findShapeById(shapes, id)
+                if (!loc || loc.parentGroupId === null) return null
+                const parentLoc = findShapeById(shapes, loc.parentGroupId)
+                if (!parentLoc || !isContainerShape(parentLoc.shape)) return null
+                const group = parentLoc.shape
+
+                const relocated = { ...loc.shape, x: loc.shape.x + group.x, y: loc.shape.y + group.y }
+                const { remaining } = extractShapeById(shapes, id)
+
+                // Right after the (former) group in its own container, so the
+                // shape stays visually close to where it came from.
+                const grandSiblings = getSiblingList(remaining, parentLoc.parentGroupId)
+                const groupIndex = grandSiblings.findIndex(s => s.id === loc.parentGroupId)
+                const insertIndex = groupIndex === -1 ? grandSiblings.length : groupIndex + 1
+                return insertShapeAt(remaining, parentLoc.parentGroupId, insertIndex, relocated)
+            })
+            get().selectShape(id)
         },
-        cutShape: (id: string) => {
-            const currentSlide = selectCurrentSlide(get())
-            if (!currentSlide) return
-            const loc = findShapeById(currentSlide.shapes, id)
-            if (!loc) return
-            set({ clipboard: {
-                shape: loc.shape,
-                x: loc.absX,
-                y: loc.absY,
-                token: crypto.randomUUID(),
-                variables: get().presentation?.variableData ?? [],
-            } })
-            get().deleteShape(id)
-        },
-        pasteShape: () => {
-            const { clipboard, selectedShape, presentation } = get()
-            if (!clipboard || !presentation) return
-            const shape = bindVariables(clipboard.shape, clipboard.variables, presentation.variableData ?? [])
-            insertNear(cloneShapeWithNewIds(shape), clipboard.x, clipboard.y, selectedShape?.id ?? null)
-            // The next paste lands one step further, not on top of this one.
-            set({ clipboard: { ...clipboard, x: clipboard.x + PASTE_OFFSET, y: clipboard.y + PASTE_OFFSET } })
-        },
-        ungroupShape: (id: string) => {
-            const { presentation, updateSlideShapes, selectShape } = get()
-            if (!presentation) return
-            const currentSlide = selectCurrentSlide(get())
-            if (!currentSlide) return
-            const loc = findShapeById(currentSlide.shapes, id)
-            if (!loc || loc.parentGroupId === null) return
 
-            const parentLoc = findShapeById(currentSlide.shapes, loc.parentGroupId)
-            if (!parentLoc || !isContainerShape(parentLoc.shape)) return
-            const group = parentLoc.shape
-
-            const relocated = { ...loc.shape, x: loc.shape.x + group.x, y: loc.shape.y + group.y } as Shape
-
-            const { remaining } = extractShapeById(currentSlide.shapes, id)
-
-            // Insert right after the (former) group in its own container, so the
-            // shape stays visually close to where it came from.
-            const grandSiblings = getSiblingList(remaining, parentLoc.parentGroupId)
-            const groupIndex = grandSiblings.findIndex(s => s.id === loc.parentGroupId)
-            const insertIndex = groupIndex === -1 ? grandSiblings.length : groupIndex + 1
-
-            const nextShapes = insertShapeAt(remaining, parentLoc.parentGroupId, insertIndex, relocated)
-            updateSlideShapes(currentSlide._id, nextShapes)
-            selectShape(id)
-        },
+        bringToFront: (id) => reorder(id, (_index, length) => length - 1),
+        sendToBack: (id) => reorder(id, () => 0),
+        bringForward: (id) => reorder(id, index => index + 1),
+        sendBackward: (id) => reorder(id, index => index - 1),
     }
 }

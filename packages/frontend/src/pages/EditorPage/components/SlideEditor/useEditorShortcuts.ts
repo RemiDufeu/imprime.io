@@ -69,7 +69,7 @@ export function useEditorShortcuts(editorRootRef: RefObject<HTMLElement | null>)
             if (!isEditorTarget(e.target, editorRootRef.current)) return
 
             const store = useEditorStore.getState()
-            const selectedId = store.selectedShape?.id ?? null
+            const selectedId = store.selectedShapeId
             const isMod = isModChord(e)
             const key = e.key.toLowerCase()
             const inFormField = isFormFieldTarget(e.target)

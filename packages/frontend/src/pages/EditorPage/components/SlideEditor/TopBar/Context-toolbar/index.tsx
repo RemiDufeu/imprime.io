@@ -1,4 +1,5 @@
 import { useEditorStore } from '../../../../../../store/editor/EditorStore'
+import { selectContextBar } from '../../../../../../store/editor/selectors'
 import { ShapeContextBar } from './ShapeContextBar'
 import { TextContextBar } from './TextContextBar'
 import { GroupContextBar } from './GroupContextBar'
@@ -6,7 +7,7 @@ import { IfGroupContextBar } from './IfGroupContextBar'
 import { ForGroupContextBar } from './ForGroupContextBar'
 
 export function ContextToolbar() {
-  const contextBarType = useEditorStore(state => state.contextBarType)
+  const contextBarType = useEditorStore(selectContextBar)
 
   if (contextBarType === 'none') {
     return null

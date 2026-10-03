@@ -3,8 +3,9 @@ import type { StateCreator } from 'zustand'
 import { message } from 'antd'
 import type { PresentationSlice } from './PresentationSlice'
 import type { SlideSlice } from './SlideSlice'
-import type { ShapeSlice } from './ShapeSlice'
-import type { RichTextEditorSlice } from './RichTextEditorSlice'
+import type { SelectionSlice } from './SelectionSlice'
+import type { DocumentWriteSlice } from './DocumentWriteSlice'
+import type { TextEditorSlice } from './TextEditorSlice'
 import type { VariableSlice } from './VariableSlice'
 import { parseApiError } from '../../utils/apiError'
 
@@ -56,7 +57,7 @@ export interface HistorySlice {
 type Stack = 'undoStack' | 'redoStack'
 
 export const createHistorySlice: StateCreator<
-    HistorySlice & PresentationSlice & SlideSlice & ShapeSlice & RichTextEditorSlice & VariableSlice,
+    HistorySlice & PresentationSlice & SlideSlice & SelectionSlice & DocumentWriteSlice & TextEditorSlice & VariableSlice,
     [],
     [],
     HistorySlice
@@ -81,8 +82,6 @@ export const createHistorySlice: StateCreator<
                 const { currentSlideIndex, selectSlide, _writeSlideShapes, selectShape } = get()
                 if (index !== currentSlideIndex) selectSlide(index)
                 _writeSlideShapes(entry.slideId, entry.shapes)
-                // Also ends any text editing session, and refreshes the
-                // selection snapshot, which would describe the shape as it was.
                 selectShape(entry.selection)
                 return inverse
             }

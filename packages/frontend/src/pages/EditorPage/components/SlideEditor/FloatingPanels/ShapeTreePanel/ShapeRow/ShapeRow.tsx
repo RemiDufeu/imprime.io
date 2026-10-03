@@ -42,7 +42,7 @@ export function ShapeRow({
     const duplicateShape = useEditorStore(s => s.duplicateShape)
     const moveShape = useEditorStore(s => s.moveShape)
     const moveShapeIntoGroup = useEditorStore(s => s.moveShapeIntoGroup)
-    const isSelected = useEditorStore(s => s.selectedShape?.id === shape.id)
+    const isSelected = useEditorStore(s => s.selectedShapeId === shape.id)
 
     const { draggedId, setDraggedId, dropTarget, setDropTarget } = useShapeTreeUI()
 

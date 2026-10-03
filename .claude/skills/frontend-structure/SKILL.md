@@ -97,7 +97,7 @@ Used sparingly, and only two shapes of them:
 - `index.tsx` **as** the component, when the folder name already says what it is:
   `pages/Layout/index.tsx`, `FloatingPanels/SlideList/index.tsx`,
   `TopBar/Context-toolbar/index.tsx` (which is the dispatcher over
-  `contextBarType`).
+  `selectContextBar`).
 
 Do not add a barrel per folder. Most components are imported by their real path.
 

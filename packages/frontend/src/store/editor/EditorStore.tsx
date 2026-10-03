@@ -1,35 +1,35 @@
 import { create } from "zustand"
-import { createPresentationSlice, type PresentationSlice } from "./PresentationSlice"
-import { createPreferencesSlice, type PreferencesSlice } from "./PreferencesSlice"
 import { persist, subscribeWithSelector } from "zustand/middleware"
-import { createToolSlice, type ToolSlice } from "./ToolSlice"
+import { createPresentationSlice, type PresentationSlice } from "./PresentationSlice"
 import { createSlideSlice, type SlideSlice } from "./SlideSlice"
+import { createDocumentWriteSlice, type DocumentWriteSlice } from "./DocumentWriteSlice"
+import { createSelectionSlice, type SelectionSlice } from "./SelectionSlice"
 import { createShapeSlice, type ShapeSlice } from "./ShapeSlice"
+import { createClipboardSlice, type ClipboardSlice } from "./ClipboardSlice"
+import { createToolSlice, type ToolSlice } from "./ToolSlice"
 import { createTransformationSlice, type TransformationSlice } from "./TransformationSlice"
-import { createToolAttributesSlice, type ToolAttributesSlice } from "./ToolAttributeSlice"
-import { createLayeringSlice, type LayeringSlice } from "./LayeringSlice"
-import { createShapeCreationSlice, type ShapeCreationSlice } from "./ShapeCreationSlice"
-import { createRichTextEditorSlice, type RichTextEditorSlice } from "./RichTextEditorSlice"
-import { createVariableSlice, type VariableSlice } from "./VariableSlice"
-import { createFontSlice, type FontSlice } from "./FontSlice"
+import { createTextEditorSlice, type TextEditorSlice } from "./TextEditorSlice"
 import { createHistorySlice, type HistorySlice } from "./HistorySlice"
 import { createImportSlice, type ImportSlice } from "./ImportSlice"
+import { createVariableSlice, type VariableSlice } from "./VariableSlice"
+import { createFontSlice, type FontSlice } from "./FontSlice"
+import { createPreferencesSlice, type PreferencesSlice } from "./PreferencesSlice"
 import { selectCurrentSlide } from "./selectors"
 
 type BaseEditorStore = PresentationSlice &
-    PreferencesSlice &
-    ToolSlice &
     SlideSlice &
+    DocumentWriteSlice &
+    SelectionSlice &
     ShapeSlice &
+    ClipboardSlice &
+    ToolSlice &
     TransformationSlice &
-    ToolAttributesSlice &
-    LayeringSlice &
-    ShapeCreationSlice &
-    RichTextEditorSlice &
+    TextEditorSlice &
+    HistorySlice &
+    ImportSlice &
     VariableSlice &
     FontSlice &
-    HistorySlice &
-    ImportSlice
+    PreferencesSlice
 
 export const useEditorStore = create<BaseEditorStore>()(
     subscribeWithSelector(
@@ -37,18 +37,18 @@ export const useEditorStore = create<BaseEditorStore>()(
             (...args) => ({
                 ...createPresentationSlice(...args),
                 ...createSlideSlice(...args),
+                ...createDocumentWriteSlice(...args),
+                ...createSelectionSlice(...args),
                 ...createShapeSlice(...args),
-                ...createPreferencesSlice(...args),
+                ...createClipboardSlice(...args),
                 ...createToolSlice(...args),
                 ...createTransformationSlice(...args),
-                ...createToolAttributesSlice(...args),
-                ...createLayeringSlice(...args),
-                ...createShapeCreationSlice(...args),
-                ...createRichTextEditorSlice(...args),
+                ...createTextEditorSlice(...args),
+                ...createHistorySlice(...args),
+                ...createImportSlice(...args),
                 ...createVariableSlice(...args),
                 ...createFontSlice(...args),
-                ...createHistorySlice(...args),
-                ...createImportSlice(...args)
+                ...createPreferencesSlice(...args),
             }),
             {
                 name: 'editor-store',

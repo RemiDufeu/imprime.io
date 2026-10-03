@@ -22,6 +22,7 @@ import {
 import type { FontCatalog, FontCatalogEntry, FontCategory, ListType, TextAlign, TextVerticalAlign } from '@imprime/sdk'
 import { DEFAULT_FONT, resolveFontVariant } from '@imprime/sdk'
 import { useEditorStore } from '../../../../../../store/editor/EditorStore'
+import { selectSelectedShape } from '../../../../../../store/editor/selectors'
 import { DebouncedColorPicker } from '../../../../../../components/common'
 import { InsertVariableButton } from './InsertVariableButton/InsertVariableButton'
 import { IconMenuButton, type IconMenuOption } from './IconMenuButton/IconMenuButton'
@@ -86,22 +87,10 @@ const VERTICAL_ALIGNS: IconMenuOption<TextVerticalAlign>[] = [
 ]
 
 export function TextContextBar() {
-
-  const attributes = useEditorStore(state => state.attributes)
-  const setFontFamily = useEditorStore(state => state.setFontFamily)
-  const setFontSize = useEditorStore(state => state.setFontSize)
-  const setTextColor = useEditorStore(state => state.setTextColor)
-  const setBold = useEditorStore(state => state.setBold)
-  const setItalic = useEditorStore(state => state.setItalic)
-  const setUnderline = useEditorStore(state => state.setUnderline)
-  const setStrikethrough = useEditorStore(state => state.setStrikethrough)
-  const setUppercase = useEditorStore(state => state.setUppercase)
-  const setTextAlign = useEditorStore(state => state.setTextAlign)
-  const setLineHeight = useEditorStore(state => state.setLineHeight)
-  const setVerticalAlign = useEditorStore(state => state.setVerticalAlign)
-  const setListType = useEditorStore(state => state.setListType)
+  const format = useEditorStore(state => state.textFormat)
+  const applyTextFormat = useEditorStore(state => state.applyTextFormat)
   const changeListIndent = useEditorStore(state => state.changeListIndent)
-  const selectedShape = useEditorStore(state => state.selectedShape)
+  const selected = useEditorStore(selectSelectedShape)
   const updateShape = useEditorStore(state => state.updateShape)
   const fontCatalog = useEditorStore(state => state.fontCatalog)
   const loadAllFonts = useEditorStore(state => state.loadAllFonts)
@@ -109,51 +98,17 @@ export function TextContextBar() {
   // Bold or italic only changes the face if the family has one for it; both
   // renderers draw the closest face otherwise. A mark already set can still
   // be cleared.
-  const fontVariants = (fontCatalog.get(attributes.fontFamily) ?? fontCatalog.get(DEFAULT_FONT))?.variants ?? []
-  const boldAvailable = resolveFontVariant(fontVariants, true, attributes.italic)
-    !== resolveFontVariant(fontVariants, false, attributes.italic)
-  const italicAvailable = resolveFontVariant(fontVariants, attributes.bold, true)
-    !== resolveFontVariant(fontVariants, attributes.bold, false)
+  const fontVariants = (fontCatalog.get(format.fontFamily) ?? fontCatalog.get(DEFAULT_FONT))?.variants ?? []
+  const boldAvailable = resolveFontVariant(fontVariants, true, format.italic)
+    !== resolveFontVariant(fontVariants, false, format.italic)
+  const italicAvailable = resolveFontVariant(fontVariants, format.bold, true)
+    !== resolveFontVariant(fontVariants, format.bold, false)
 
-  const handleFontFamilyChange = (value: string) => {
-    setFontFamily(value)
-  }
-
-  const handleFontSizeChange = (value: number) => {
-    setFontSize(value)
-  }
-
-  const handleTextColorChange = (hex: string) => {
-    setTextColor(hex)
-  }
-
-  const handleBoldToggle = () => {
-    setBold(!attributes.bold)
-  }
-
-  const handleItalicToggle = () => {
-    setItalic(!attributes.italic)
-  }
-
-  const handleUnderlineToggle = () => {
-    setUnderline(!attributes.underline)
-  }
-
-  const handleStrikethroughToggle = () => {
-    setStrikethrough(!attributes.strikethrough)
-  }
-
-  const handleUppercaseToggle = () => {
-    setUppercase(!attributes.uppercase)
-  }
-
-  // Box-level, so written to the shape directly rather than through the
-  // editor sync that carries run and paragraph formatting.
+  // Box-level: a property of the shape, not of the text being edited.
+  const textBox = selected?.type === 'text' ? selected : null
+  const verticalAlign = textBox?.verticalAlign ?? 'top'
   const handleVerticalAlignChange = (value: TextVerticalAlign) => {
-    setVerticalAlign(value)
-    if (selectedShape?.type === 'text') {
-      updateShape(selectedShape.id, { verticalAlign: value })
-    }
+    if (textBox) updateShape(textBox.id, { verticalAlign: value })
   }
 
   return (
@@ -162,8 +117,8 @@ export function TextContextBar() {
         <div className="toolbar-item">
           <div title="Font" onMouseDown={(e) => e.preventDefault()}>
             <Select
-              value={attributes.fontFamily}
-              onChange={handleFontFamilyChange}
+              value={format.fontFamily}
+              onChange={(fontFamily: string) => applyTextFormat({ fontFamily })}
               size="small"
               style={{ width: '140px' }}
               popupMatchSelectWidth={false}
@@ -176,8 +131,8 @@ export function TextContextBar() {
           </div>
           <div title="Font size" onMouseDown={(e) => e.preventDefault()}>
             <Select
-              value={attributes.fontSize}
-              onChange={handleFontSizeChange}
+              value={format.fontSize}
+              onChange={(fontSize: number) => applyTextFormat({ fontSize })}
               size="small"
               style={{ width: '64px' }}
               options={FONT_SIZES.map(size => ({ value: size, label: size.toString() }))}
@@ -185,8 +140,8 @@ export function TextContextBar() {
           </div>
           <div title="Text color" onMouseDown={(e) => e.preventDefault()}>
             <DebouncedColorPicker
-              value={attributes.textColor}
-              onChange={handleTextColorChange}
+              value={format.color}
+              onChange={(color: string) => applyTextFormat({ color })}
               size="small"
               showText={false}
             />
@@ -197,59 +152,59 @@ export function TextContextBar() {
 
         <div className="toolbar-item">
           <Button
-            type={attributes.bold ? 'primary' : 'text'}
+            type={format.bold ? 'primary' : 'text'}
             size="small"
             icon={<BoldOutlined />}
-            title={boldAvailable || attributes.bold ? 'Bold' : 'Bold (not available in this font)'}
-            disabled={!boldAvailable && !attributes.bold}
+            title={boldAvailable || format.bold ? 'Bold' : 'Bold (not available in this font)'}
+            disabled={!boldAvailable && !format.bold}
             onMouseDown={(e) => e.preventDefault()}
             onClick={(e) => {
               e.preventDefault()
-              handleBoldToggle()
+              applyTextFormat({ bold: !format.bold })
             }}
           />
           <Button
-            type={attributes.italic ? 'primary' : 'text'}
+            type={format.italic ? 'primary' : 'text'}
             size="small"
             icon={<ItalicOutlined />}
-            title={italicAvailable || attributes.italic ? 'Italic' : 'Italic (not available in this font)'}
-            disabled={!italicAvailable && !attributes.italic}
+            title={italicAvailable || format.italic ? 'Italic' : 'Italic (not available in this font)'}
+            disabled={!italicAvailable && !format.italic}
             onMouseDown={(e) => e.preventDefault()}
             onClick={(e) => {
               e.preventDefault()
-              handleItalicToggle()
+              applyTextFormat({ italic: !format.italic })
             }}
           />
           <Button
-            type={attributes.underline ? 'primary' : 'text'}
+            type={format.underline ? 'primary' : 'text'}
             size="small"
             icon={<UnderlineOutlined />}
             title="Underline"
             onMouseDown={(e) => e.preventDefault()}
             onClick={(e) => {
               e.preventDefault()
-              handleUnderlineToggle()
+              applyTextFormat({ underline: !format.underline })
             }}
           />
           <Button
-            type={attributes.strikethrough ? 'primary' : 'text'}
+            type={format.strikethrough ? 'primary' : 'text'}
             size="small"
             icon={<StrikethroughOutlined />}
             title="Strikethrough"
             onMouseDown={(e) => e.preventDefault()}
             onClick={(e) => {
               e.preventDefault()
-              handleStrikethroughToggle()
+              applyTextFormat({ strikethrough: !format.strikethrough })
             }}
           />
           <Button
-            type={attributes.uppercase ? 'primary' : 'text'}
+            type={format.uppercase ? 'primary' : 'text'}
             size="small"
             title="Uppercase"
             onMouseDown={(e) => e.preventDefault()}
             onClick={(e) => {
               e.preventDefault()
-              handleUppercaseToggle()
+              applyTextFormat({ uppercase: !format.uppercase })
             }}
           >
             AA
@@ -261,20 +216,20 @@ export function TextContextBar() {
         <div className="toolbar-item">
           <IconMenuButton
             options={TEXT_ALIGNS}
-            value={attributes.textAlign}
+            value={format.textAlign}
             title="Text alignment"
-            onChange={setTextAlign}
+            onChange={(textAlign: TextAlign) => applyTextFormat({ textAlign })}
           />
           <IconMenuButton
             options={VERTICAL_ALIGNS}
-            value={attributes.verticalAlign}
+            value={verticalAlign}
             title="Vertical alignment"
             onChange={handleVerticalAlignChange}
           />
           <div title="Line height" onMouseDown={(e) => e.preventDefault()}>
             <Select
-              value={attributes.lineHeight}
-              onChange={setLineHeight}
+              value={format.lineHeight}
+              onChange={(lineHeight: number) => applyTextFormat({ lineHeight })}
               size="small"
               style={{ width: '80px' }}
               prefix={<LineHeightOutlined />}
@@ -289,14 +244,14 @@ export function TextContextBar() {
           {LIST_TYPES.map(({ value, icon, title }) => (
             <Button
               key={value}
-              type={attributes.listType === value ? 'primary' : 'text'}
+              type={format.listType === value ? 'primary' : 'text'}
               size="small"
               icon={icon}
               title={title}
               onMouseDown={(e) => e.preventDefault()}
               onClick={(e) => {
                 e.preventDefault()
-                setListType(attributes.listType === value ? 'none' : value)
+                applyTextFormat({ listType: format.listType === value ? 'none' : value })
               }}
             />
           ))}
@@ -307,7 +262,7 @@ export function TextContextBar() {
               size="small"
               icon={icon}
               title={title}
-              disabled={attributes.listType === 'none'}
+              disabled={format.listType === 'none'}
               onMouseDown={(e) => e.preventDefault()}
               onClick={(e) => {
                 e.preventDefault()

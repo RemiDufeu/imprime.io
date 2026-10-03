@@ -17,7 +17,7 @@ const TOOLBAR_OFFSET = 12
 
 export default function LayeringToolbar() {
   const isDragging = useEditorStore(state => !!state.dragData)
-  const selectedShapeId = useEditorStore(state => state.selectedShape?.id)
+  const selectedShapeId = useEditorStore(state => state.selectedShapeId)
   const isTransforming = useEditorStore(state => !!state.transformationData)
 
   const zoom = useEditorStore(state => state.zoom)

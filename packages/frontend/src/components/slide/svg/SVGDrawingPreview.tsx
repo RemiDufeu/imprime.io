@@ -4,7 +4,7 @@ import { ContainerFrame } from './ContainerFrame'
 
 export function SVGDrawingPreview() {
     const drawingData = useEditorStore(state => state.drawingData)
-    const toolAttributes = useEditorStore(state => state.attributes)
+    const drawStyle = useEditorStore(state => state.drawStyle)
     const selectedTool = useEditorStore(state => state.selectedTool)
 
     if (!drawingData) return null
@@ -31,12 +31,12 @@ export function SVGDrawingPreview() {
                     y={y}
                     width={width}
                     height={height}
-                    fill={toolAttributes.fillColor}
-                    stroke={toolAttributes.strokeColor}
-                    strokeWidth={toolAttributes.strokeWidth}
-                    strokeDasharray={getDashArray(toolAttributes.strokeStyle)}
-                    rx={toolAttributes.cornerRadius}
-                    ry={toolAttributes.cornerRadius}
+                    fill={drawStyle.fill}
+                    stroke={drawStyle.stroke}
+                    strokeWidth={drawStyle.strokeWidth}
+                    strokeDasharray={getDashArray(drawStyle.strokeStyle)}
+                    rx={drawStyle.cornerRadius}
+                    ry={drawStyle.cornerRadius}
                     pointerEvents="none"
                 />
             )
@@ -53,10 +53,10 @@ export function SVGDrawingPreview() {
                     cy={cy}
                     rx={rx}
                     ry={ry}
-                    fill={toolAttributes.fillColor}
-                    stroke={toolAttributes.strokeColor}
-                    strokeWidth={toolAttributes.strokeWidth}
-                    strokeDasharray={getDashArray(toolAttributes.strokeStyle)}
+                    fill={drawStyle.fill}
+                    stroke={drawStyle.stroke}
+                    strokeWidth={drawStyle.strokeWidth}
+                    strokeDasharray={getDashArray(drawStyle.strokeStyle)}
                     pointerEvents="none"
                 />
             )
@@ -70,7 +70,7 @@ export function SVGDrawingPreview() {
                     width={width}
                     height={height}
                     fill="none"
-                    stroke={toolAttributes.strokeColor}
+                    stroke={drawStyle.stroke}
                     strokeWidth={2}
                     strokeDasharray="5,5"
                     pointerEvents="none"
