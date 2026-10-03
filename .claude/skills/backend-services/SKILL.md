@@ -142,8 +142,8 @@ because the schema stores shapes as `Mixed`.
 ### Clean up best-effort, log, continue
 
 ```ts
-try { await this.imageService.delete(imageId) }
-catch (error) { console.error(`Failed to delete image ${imageId}:`, error) }
+try { await this.imageService.markOrphaned(collectImageIds(slide.shapes)) }
+catch (error) { console.error('Failed to release the images of a deleted slide:', error) }
 ```
 
 Orphaned rows beat a failed user operation. Use this shape for cleanup only —

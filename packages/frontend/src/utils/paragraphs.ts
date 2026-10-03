@@ -1,4 +1,4 @@
-import { Editor, Element, Path, Range, Transforms, type Node, type NodeEntry } from 'slate'
+import { Editor, Element, Path, Range, Transforms, type Descendant, type Node, type NodeEntry } from 'slate'
 import type { ListType, Paragraph } from '@imprime/sdk'
 import { getListStyle, MAX_LIST_LEVEL } from '@imprime/sdk'
 
@@ -9,6 +9,14 @@ import { getListStyle, MAX_LIST_LEVEL } from '@imprime/sdk'
  */
 
 export const isParagraph = (n: Node): n is Paragraph => Element.isElement(n) && n.type === 'paragraph'
+
+/**
+ * The editor value for a text box's stored content. Slate needs a block to
+ * put the caret in, so an empty box starts with one empty paragraph.
+ */
+export function toEditorValue(content: Descendant[] | undefined): Descendant[] {
+  return content?.length ? content : [{ type: 'paragraph', children: [{ text: '' }] }]
+}
 
 /**
  * Paragraph formatting is shown for, and diffed against, the first paragraph

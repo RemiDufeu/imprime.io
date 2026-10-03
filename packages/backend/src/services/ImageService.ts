@@ -1,6 +1,20 @@
 import { ImageModel } from '../models/Image.js'
-import type { ImageDTO } from '@imprime/common'
+import type { ImageDTO, Shape } from '@imprime/common'
+import { isContainerShape } from '@imprime/common'
 import { NotFoundError, ValidationError } from './errors.js'
+
+// Every image a shape tree shows, containers included.
+export function collectImageIds(shapes: Shape[]): string[] {
+  const ids: string[] = []
+  for (const shape of shapes) {
+    if (shape.type === 'image') {
+      if (shape.imageId) ids.push(shape.imageId)
+    } else if (isContainerShape(shape)) {
+      ids.push(...collectImageIds(shape.children))
+    }
+  }
+  return ids
+}
 
 export class ImageService {
   public async upload(data: ImageDTO.Create): Promise<ImageDTO.Response> {
@@ -49,6 +63,25 @@ export class ImageService {
     if (!image) {
       throw new NotFoundError('Image not found')
     }
+  }
+
+  // No slide shows these any more: start their grace period. An image already
+  // orphaned keeps its original date.
+  public async markOrphaned(ids: string[]): Promise<void> {
+    if (ids.length === 0) return
+    await ImageModel.updateMany(
+      { _id: { $in: ids }, orphanedAt: { $exists: false } },
+      { $set: { orphanedAt: new Date() } }
+    )
+  }
+
+  // A slide shows these again (an undo, a restored slide): keep them.
+  public async markReferenced(ids: string[]): Promise<void> {
+    if (ids.length === 0) return
+    await ImageModel.updateMany(
+      { _id: { $in: ids }, orphanedAt: { $exists: true } },
+      { $unset: { orphanedAt: 1 } }
+    )
   }
 
   public async deleteMany(ids: string[]): Promise<number> {

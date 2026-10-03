@@ -15,6 +15,7 @@ import type {
   FontDTO,
   FontVariant,
   PresentationDTO,
+  SlideDTO,
   VariableDTO,
   VariableValueType,
   EnabledAuthProviders,
@@ -43,10 +44,10 @@ export interface ImprimeClientOptions {
  * const presentation = await client.createPresentation('My Presentation')
  *
  * // Add a slide
- * const updated = await client.addSlide(presentation._id)
+ * const slide = await client.addSlide(presentation._id)
  *
  * // Add shapes
- * await client.addRectangle(presentation._id, updated.slides[0]._id, {
+ * await client.addRectangle(presentation._id, slide._id, {
  *   x: 100, y: 100, width: 200, height: 100, fill: '#3b82f6'
  * })
  * ```
@@ -171,12 +172,14 @@ export class ImprimeClient {
   // ============================================
 
   /**
-   * Add a new blank slide to a presentation.
-   * The server returns no body — refetch the presentation if you need the new slide's id.
+   * Add a slide to a presentation and return it: blank and last by default,
+   * or at `slide.order` with `slide.shapes`. `slide._id` restores a deleted
+   * slide under its former id.
    */
-  async addSlide(presentationId: string): Promise<void> {
-    return this.request<void>(`/presentations/${presentationId}/slides`, {
+  async addSlide(presentationId: string, slide: SlideDTO.Create = {}): Promise<Slide> {
+    return this.request<Slide>(`/presentations/${presentationId}/slides`, {
       method: 'POST',
+      body: JSON.stringify(slide),
     })
   }
 

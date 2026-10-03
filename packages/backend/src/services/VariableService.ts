@@ -2,6 +2,7 @@ import { PresentationModel } from '../models/Presentation.js'
 import { SlideModel } from '../models/Slide.js'
 import { VariableDataModel } from '../models/VariableData.js'
 import {
+  isObjectIdString,
   toObjectId,
   variableCreateToModel,
   variableToDTO,
@@ -14,6 +15,8 @@ import { NotFoundError, ConflictError, ValidationError } from './errors.js'
 const nameConflict = () =>
   new ConflictError('Variable name already exists in this presentation', 'VARIABLE_NAME_EXISTS')
 
+const variableIdTaken = () => new ConflictError('Variable id already in use', 'VARIABLE_ID_TAKEN')
+
 function isDuplicateName(err: unknown): boolean {
   return typeof err === 'object' && err !== null && (err as { code?: number }).code === 11000
 }
@@ -25,6 +28,15 @@ export class VariableService {
       throw new NotFoundError('Presentation not found', 'PRESENTATION_NOT_FOUND')
     }
 
+    if (data._id !== undefined) {
+      if (!isObjectIdString(data._id)) {
+        throw new ValidationError('Invalid variable id', 'INVALID_VARIABLE_ID')
+      }
+      if (await VariableDataModel.exists({ _id: toObjectId(data._id) })) {
+        throw variableIdTaken()
+      }
+    }
+
     const exists = await VariableDataModel.exists({
       presentationId: presentation._id,
       name: data.name,
@@ -34,7 +46,10 @@ export class VariableService {
     }
 
     try {
-      await VariableDataModel.create(variableCreateToModel(presentation._id, data))
+      await VariableDataModel.create({
+        ...variableCreateToModel(presentation._id, data),
+        ...(data._id !== undefined ? { _id: toObjectId(data._id) } : {}),
+      })
     } catch (err) {
       if (isDuplicateName(err)) throw nameConflict()
       throw err

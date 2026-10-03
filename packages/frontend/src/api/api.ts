@@ -1,5 +1,5 @@
 import { ImprimeClient } from '@imprime/sdk'
-import type { Presentation, PresentationSummary, Shape, ImageDTO, FontDTO, FontVariant, VariableDTO, VariableValueType } from '@imprime/sdk'
+import type { Presentation, PresentationSummary, Shape, Slide, SlideDTO, ImageDTO, FontDTO, FontVariant, VariableDTO, VariableValueType } from '@imprime/sdk'
 import { API_BASE } from '../config'
 
 // Create a single SDK client instance
@@ -38,8 +38,8 @@ export const presentationsAPI = {
     return client.updateSlide(presentationId, slideId, shapes)
   },
 
-  async addSlide(presentationId: string): Promise<void> {
-    return client.addSlide(presentationId)
+  async addSlide(presentationId: string, slide?: SlideDTO.Create): Promise<Slide> {
+    return client.addSlide(presentationId, slide)
   },
 
   async deleteSlide(presentationId: string, slideId: string): Promise<void> {

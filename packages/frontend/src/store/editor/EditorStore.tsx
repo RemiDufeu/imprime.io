@@ -12,6 +12,8 @@ import { createShapeCreationSlice, type ShapeCreationSlice } from "./ShapeCreati
 import { createRichTextEditorSlice, type RichTextEditorSlice } from "./RichTextEditorSlice"
 import { createVariableSlice, type VariableSlice } from "./VariableSlice"
 import { createFontSlice, type FontSlice } from "./FontSlice"
+import { createHistorySlice, type HistorySlice } from "./HistorySlice"
+import { createImportSlice, type ImportSlice } from "./ImportSlice"
 import { selectCurrentSlide } from "./selectors"
 
 type BaseEditorStore = PresentationSlice &
@@ -25,7 +27,9 @@ type BaseEditorStore = PresentationSlice &
     ShapeCreationSlice &
     RichTextEditorSlice &
     VariableSlice &
-    FontSlice
+    FontSlice &
+    HistorySlice &
+    ImportSlice
 
 export const useEditorStore = create<BaseEditorStore>()(
     subscribeWithSelector(
@@ -42,7 +46,9 @@ export const useEditorStore = create<BaseEditorStore>()(
                 ...createShapeCreationSlice(...args),
                 ...createRichTextEditorSlice(...args),
                 ...createVariableSlice(...args),
-                ...createFontSlice(...args)
+                ...createFontSlice(...args),
+                ...createHistorySlice(...args),
+                ...createImportSlice(...args)
             }),
             {
                 name: 'editor-store',

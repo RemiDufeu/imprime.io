@@ -252,12 +252,21 @@ export namespace SlideDTO {
   }
 
   export interface Create {
+    // Position among the presentation's slides, 0-based; the end when absent.
+    // The slides from there on move down one.
     order?: number
+    shapes?: Shape[]
+    // Restores a deleted slide under its former id, so references to it stay
+    // valid (the editor's undo). Rejected with 409 when the id is in use.
+    _id?: string
   }
 }
 
 export namespace VariableDTO {
   export interface Create {
+    // Restores a deleted variable under its former id, which text runs and
+    // containers point to (the editor's undo). Rejected with 409 when in use.
+    _id?: string
     type: VariableType
     name: string
     default?: VariableValueType

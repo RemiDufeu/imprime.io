@@ -1,4 +1,3 @@
-import { message } from 'antd'
 import type { Shape } from '@imprime/sdk'
 import type { StateCreator } from 'zustand'
 import type { PresentationSlice } from './PresentationSlice'
@@ -6,7 +5,6 @@ import type { SlideSlice } from './SlideSlice'
 import type { ShapeSlice } from './ShapeSlice'
 import type { ToolSlice } from './ToolSlice'
 import type { ToolAttributesSlice } from './ToolAttributeSlice'
-import { imagesAPI } from '../../api/api'
 import { findInnermostGroupAt, insertShape, nextShapeName } from '../../utils/shapeTree'
 import { selectCurrentSlide } from './selectors'
 
@@ -25,8 +23,6 @@ export interface ShapeCreationSlice {
     updateDrawing: (x: number, y: number) => void
     finishDrawing: () => void
     cancelDrawing: () => void
-
-    handleImageUpload: () => void
 }
 
 export const createShapeCreationSlice: StateCreator<
@@ -184,100 +180,6 @@ export const createShapeCreationSlice: StateCreator<
             selectShape(shapeId)
             get().setTool('move')
             cancelDrawing()
-        },
-
-        handleImageUpload: () => {
-            const { updateSlideShapes, selectShape } = get()
-            const currentSlide = getCurrentSlide()
-            if (!currentSlide) return
-
-            const input = document.createElement('input')
-            input.type = 'file'
-            input.accept = 'image/*'
-
-            input.onchange = async (e) => {
-                const file = (e.target as HTMLInputElement).files?.[0]
-                if (!file) return
-
-                const hideLoading = message.loading('Uploading image...', 0)
-
-                const reader = new FileReader()
-                reader.onload = async (event) => {
-                    const base64 = event.target?.result as string
-                    if (!base64) {
-                        hideLoading()
-                        message.error('Failed to read image file')
-                        return
-                    }
-
-                    try {
-                        const uploadResult = await imagesAPI.upload(base64, file.type, file.name)
-
-                        const img = new Image()
-                        img.onload = () => {
-                            const maxSize = 800
-                            let width = img.naturalWidth
-                            let height = img.naturalHeight
-
-                            if (width > maxSize || height > maxSize) {
-                                const ratio = Math.min(maxSize / width, maxSize / height)
-                                width = Math.floor(width * ratio)
-                                height = Math.floor(height * ratio)
-                            }
-
-                            const x = Math.floor((1920 - width) / 2)
-                            const y = Math.floor((1080 - height) / 2)
-
-                            // Re-fetch current slide in case it changed
-                            const slide = getCurrentSlide()
-                            if (!slide) return
-
-                            const shapeId = crypto.randomUUID()
-                            const newShape: Shape = {
-                                id: shapeId,
-                                type: 'image',
-                                name: nextShapeName(slide.shapes, 'image'),
-                                x, y, width, height,
-                                imageId: uploadResult._id,
-                                alt: file.name,
-                            }
-
-                            updateSlideShapes(slide._id, [...slide.shapes, newShape])
-                            selectShape(shapeId)
-
-                            hideLoading()
-                            message.success('Image uploaded successfully')
-                        }
-                        img.onerror = () => {
-                            hideLoading()
-                            message.error('Failed to load image')
-                        }
-                        img.src = base64
-                    } catch (error) {
-                        hideLoading()
-                        console.error('Failed to upload image:', error)
-
-                        if (error instanceof Error) {
-                            if (error.message.includes('413') || error.message.includes('Payload Too Large')) {
-                                message.error('Image is too large. Please reduce the file size.')
-                            } else if (error.message.includes('Network')) {
-                                message.error('Network error. Please check your connection.')
-                            } else {
-                                message.error(`Upload failed: ${error.message}`)
-                            }
-                        } else {
-                            message.error('Failed to upload image. Please try again.')
-                        }
-                    }
-                }
-                reader.onerror = () => {
-                    hideLoading()
-                    message.error('Failed to read image file')
-                }
-                reader.readAsDataURL(file)
-            }
-
-            input.click()
         },
     }
 }

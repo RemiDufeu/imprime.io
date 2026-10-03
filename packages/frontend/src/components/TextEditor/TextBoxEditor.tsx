@@ -3,18 +3,20 @@ import { getRunTextStyle, PARAGRAPH_SPACING } from '@imprime/sdk';
 import { useCallback } from 'react';
 import { Editor, type BaseEditor, type Descendant } from 'slate';
 import { Slate, Editable, ReactEditor, type RenderLeafProps, type RenderElementProps } from 'slate-react';
+import type { HistoryEditor } from 'slate-history';
 import { VariableBlock } from './VariableBlock';
 import { ParagraphElement } from './ParagraphElement';
 import { ListMarkersProvider } from './ListMarkersProvider';
-import { selectionHasListItem, shiftListIndent } from '../../utils/paragraphs';
+import { selectionHasListItem, shiftListIndent, toEditorValue } from '../../utils/paragraphs';
 import { useEditorStore } from '../../store/editor/EditorStore';
+import { isRedoHotkey, isUndoHotkey } from '../../utils/hotkeys';
 import './TextBoxEditor.css';
 
 export type CustomElement = VariableElement | Paragraph;
 
 declare module 'slate' {
   interface CustomTypes {
-    Editor: BaseEditor & ReactEditor;
+    Editor: BaseEditor & ReactEditor & HistoryEditor;
     Element: CustomElement;
     Text: CustomText;
   }
@@ -43,13 +45,10 @@ export type VariableEditorProps = {
 
 export const TextBoxEditor = ({ initialContent, editor, readonly, fillHeight = true, onValueChange, onChange, onFocus }: VariableEditorProps) => {
   const fontCatalog = useEditorStore(state => state.fontCatalog);
+  const undo = useEditorStore(state => state.undo);
+  const redo = useEditorStore(state => state.redo);
 
-  const initialValue: Descendant[] = initialContent?.length ? initialContent : [
-    {
-      type: 'paragraph',
-      children: [{ text: '' }],
-    },
-  ];
+  const initialValue = toEditorValue(initialContent);
 
   const renderElement = useCallback((props: RenderElementProps) => {
     switch (props.element.type) {
@@ -94,6 +93,18 @@ export const TextBoxEditor = ({ initialContent, editor, readonly, fillHeight = t
           readOnly={readonly}
           onFocus={() => {onFocus?.()}}
           onKeyDown={(event) => {
+            // Through the store rather than Slate's own handler: once the
+            // text has nothing left to undo, the canvas history takes over.
+            if (!readonly && isUndoHotkey(event)) {
+              event.preventDefault();
+              undo();
+              return;
+            }
+            if (!readonly && isRedoHotkey(event)) {
+              event.preventDefault();
+              redo();
+              return;
+            }
             // Tab nests list items; outside a list it keeps its default.
             if (!readonly && event.key === 'Tab' && selectionHasListItem(editor)) {
               event.preventDefault();

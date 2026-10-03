@@ -13,8 +13,8 @@ import {
   variableToDTO,
 } from '../models/mappers.js'
 import type { Types } from 'mongoose'
-import type { ImageShape, Presentation, PresentationDTO, PresentationSummary, Shape } from '@imprime/common'
-import type { ImageService } from './ImageService.js'
+import type { Presentation, PresentationDTO, PresentationSummary } from '@imprime/common'
+import { collectImageIds, type ImageService } from './ImageService.js'
 import { NotFoundError } from './errors.js'
 
 export function touchPresentation(presentationId: Types.ObjectId): Promise<unknown> {
@@ -22,13 +22,6 @@ export function touchPresentation(presentationId: Types.ObjectId): Promise<unkno
     { _id: presentationId },
     { $currentDate: { updatedAt: true } }
   )
-}
-
-function collectImageIds(shapes: Shape[]): string[] {
-  return shapes
-    .filter((s): s is ImageShape => s.type === 'image')
-    .map(s => s.imageId)
-    .filter(Boolean)
 }
 
 export class PresentationService {

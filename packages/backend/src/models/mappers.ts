@@ -5,6 +5,7 @@ import type {
   Presentation,
   PresentationDTO,
   PresentationSummary,
+  Shape,
   Slide,
   SlideDTO,
   VariableData,
@@ -68,12 +69,13 @@ export function presentationUpdateToModel(
 
 export function slideCreateToModel(
   presentationId: Types.ObjectId,
-  order: number
+  order: number,
+  shapes: Shape[] = []
 ): Pick<ISlide, 'presentationId' | 'order' | 'shapes'> {
   return {
     presentationId,
     order,
-    shapes: [],
+    shapes,
   }
 }
 
@@ -152,6 +154,12 @@ export function fontCreateToModel(
 // never from the request body.
 export function fontFileCreateToModel(fontId: Types.ObjectId, variant: FontVariant, data: Buffer): IFontFile {
   return { fontId, variant, data }
+}
+
+// The 24-hex form a client may send as an id to restore. `ObjectId.isValid`
+// alone also accepts any 12-character string.
+export function isObjectIdString(id: unknown): id is string {
+  return typeof id === 'string' && /^[0-9a-f]{24}$/i.test(id)
 }
 
 export function toObjectId(id: string): Types.ObjectId {

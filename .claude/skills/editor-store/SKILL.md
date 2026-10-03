@@ -24,8 +24,10 @@ operation*. That is the organising idea worth preserving.
 |---|---|---|
 | `PresentationSlice` | the loaded presentation, load/title/slide-reorder, `isLoading`, `error` | anything about a single slide's shapes |
 | `SlideSlice` | current slide index, add/delete slide, **the shape write path** (`updateSlideShapes`, `_saveSlide`) | what a shape mutation actually computes |
-| `ShapeSlice` | selection and structural edits: update, delete, duplicate, move, copy/paste, ungroup | persistence — it calls `updateSlideShapes` |
-| `ShapeCreationSlice` | the drag-to-draw gesture and image upload → a new shape | editing an existing shape |
+| `ShapeSlice` | selection and structural edits: update, nudge, delete, duplicate, move, copy/cut/paste, ungroup | persistence — it calls `updateSlideShapes` |
+| `HistorySlice` | the undo/redo stacks and their replay: shape trees, slide existence and order, title, variables; routing undo to the text being edited first | performing the change — each kind replays through its owner's `_` action |
+| `ShapeCreationSlice` | the drag-to-draw gesture → a new shape | editing an existing shape, content from outside |
+| `ImportSlice` | shapes made from outside content: an image file (picked or pasted), pasted text | drawing |
 | `TransformationSlice` | the drag and resize gestures, including re-parenting on drop | z-order, creation |
 | `LayeringSlice` | z-order within one sibling list | anything cross-parent |
 | `ToolSlice` | which tool is active, and the resulting `contextBarType` | the attribute values the toolbar shows |
@@ -144,19 +146,50 @@ re-derive `presentation.slides[currentSlideIndex]` on its own.
 
 ## The single shape write path
 
-Every shape mutation ends in `SlideSlice.updateSlideShapes(slideId, shapes)`,
-which does three things in order:
+Every shape mutation ends in `SlideSlice.updateSlideShapes(slideId, shapes, hint?)`,
+which does four things in order:
 
 1. **reflow** — `reflowGroups(shapes)` re-applies `layoutGroupChildren` to every
    auto-layout group in the tree, so downstream consumers (rendering,
    hit-testing, selection) read final positions, not pre-layout ones;
-2. **set** — optimistic local update of the presentation;
-3. **save** — fire-and-forget `_saveSlide`, which retries twice with exponential
+2. **record** — `_recordHistory` pushes the previous tree onto the undo stack
+   and clears redo. `hint.mergeKey` folds writes closer than 500 ms into one
+   step (`updateShape` keys on shape id + updated fields, so a dragged colour
+   or a held arrow key undoes at once); `hint.selection` is the shape undo
+   selects again;
+3. **set** — optimistic local update of the presentation;
+4. **save** — fire-and-forget `_saveSlide`, which retries twice with exponential
    backoff (1s, 2s) and then sets `error`.
+
+Steps 3–4 are `_writeSlideShapes`, the path undo and redo replay through so a
+replay records nothing.
+
+The other document changes follow the same split: the public action does the
+change through a `_` half and then records what it replaced — `addSlide` /
+`deleteSlide` through `_insertSlide` / `_removeSlide`, `reorderSlides` through
+`_applySlideOrder`, the title through `_saveTitle`, variables through
+`_restoreVariable`. A history entry stores the state to restore (a slide
+snapshot or null, an id order, a title, a variable or null); replaying it
+returns the entry for the state it replaced. A deleted slide or variable comes
+back **under its id** (the API accepts `_id` on create), so steps above it and
+text runs still point to it. Steps that reach the API run one at a time, and a
+failed one goes back on its stack.
+
+None of these write the server's copy of the presentation back into the store:
+it would overwrite shape edits whose save is still in flight. Write the one
+field that changed, read from `get()` after the `await`.
 
 Consequences: the UI never awaits a save, and a shape action must not call the
 API directly. If you find yourself reaching for `presentationsAPI.updateSlide`
-inside a shape action, route it through `updateSlideShapes` instead.
+inside a shape action, route it through `updateSlideShapes` instead — a write
+that bypasses it is also a write undo cannot see.
+
+Text is the one edit that is not a shape write while it happens: a text box
+commits its paragraphs once, when its editor is let go (`SVGText`), and only if
+they changed. Until then Ctrl+Z walks the box's own Slate history; `undo()` falls
+through to the canvas stack once that is empty. When an undo replaces the text
+of a box from outside, `SVGText` reloads it into Slate, which reads its value on
+mount only.
 
 ## Shape-tree helpers
 

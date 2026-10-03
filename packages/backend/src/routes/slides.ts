@@ -12,8 +12,9 @@ router.patch('/:id/slides/:slideId', requireOwnsPresentation, async (req, res) =
 })
 
 router.post('/:id/slides', requireOwnsPresentation, async (req, res) => {
-  await slideService.create(req.params.id)
-  res.status(201).end()
+  const data: SlideDTO.Create = req.body ?? {}
+  const slide = await slideService.create(req.params.id, data)
+  res.status(201).json(slide)
 })
 
 router.delete('/:id/slides/:slideId', requireOwnsPresentation, async (req, res) => {

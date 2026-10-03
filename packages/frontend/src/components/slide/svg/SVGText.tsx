@@ -5,8 +5,15 @@ import { useMemo, useEffect, useRef } from 'react';
 import { withVariables } from '../../TextEditor/withVariables';
 import { withLists } from '../../TextEditor/withLists';
 import { withReact, ReactEditor } from 'slate-react';
-import { createEditor } from 'slate';
+import { withHistory } from 'slate-history';
+import { createEditor, type Descendant } from 'slate';
 import { useEditorStore } from '../../../store/editor/EditorStore';
+import { toEditorValue } from '../../../utils/paragraphs';
+
+// Typing then undoing it leaves new arrays with the old content: compare by
+// value once the references differ.
+const hasTextChanged = (current: Descendant[], start: Descendant[] | null) =>
+  current !== start && JSON.stringify(current) !== JSON.stringify(start)
 
 interface SVGTextProps {
   shape: TextBoxShape
@@ -14,7 +21,7 @@ interface SVGTextProps {
 }
 
 export function SVGText({ shape, readonly }: SVGTextProps) {
-  const localEditor = useMemo(() => withLists(withVariables(withReact(createEditor()))), []);
+  const localEditor = useMemo(() => withLists(withVariables(withHistory(withReact(createEditor())))), []);
 
   const currentEditor = useEditorStore(state => state.editor)
   const setEditor = useEditorStore(state => state.setEditor)
@@ -23,6 +30,7 @@ export function SVGText({ shape, readonly }: SVGTextProps) {
   const selectedShape = useEditorStore(state => state.selectedShape)
   const syncEditorToAttributes = useEditorStore(state => state.syncEditorToAttributes)
   const syncAttributesToEditor = useEditorStore(state => state.syncAttributesToEditor)
+  const syncTextHistory = useEditorStore(state => state.syncTextHistory)
   const updateShape = useEditorStore(state => state.updateShape)
 
   const isDragging = useEditorStore(state => !!state.dragData)
@@ -33,6 +41,11 @@ export function SVGText({ shape, readonly }: SVGTextProps) {
   const isReadOnly = readonly || currentEditor !== localEditor || !isSelected;
   const isTopAligned = (shape.verticalAlign ?? 'top') === 'top';
   const wasActiveRef = useRef(false);
+  // The editor's content when the current editing session began.
+  const sessionStartRef = useRef<Descendant[] | null>(null);
+  // The stored paragraphs the editor's content came from: tells an outside
+  // change (undo, redo) apart from this editor's own commit coming back.
+  const loadedRef = useRef(shape.paragraphes);
 
   // Auto-activate editor when text shape becomes selected without an active editor (e.g. right after creation)
   useEffect(() => {
@@ -45,8 +58,15 @@ export function SVGText({ shape, readonly }: SVGTextProps) {
   // Set time out required in order to focus after the state changement when local editor is available
   useEffect(() => {
     if (currentEditor === localEditor && !isReadOnly) {
-      setTimeout(() => {
+      if (!wasActiveRef.current) {
         wasActiveRef.current = true;
+        sessionStartRef.current = localEditor.children;
+        // Earlier sessions are steps of the canvas history; text undo only
+        // walks back through this one.
+        localEditor.history = { undos: [], redos: [] };
+        syncTextHistory();
+      }
+      setTimeout(() => {
         setIsFocused(true);
         try {
           ReactEditor.focus(localEditor);
@@ -55,18 +75,32 @@ export function SVGText({ shape, readonly }: SVGTextProps) {
         }
       }, 0)
     }
-  }, [currentEditor, localEditor, isReadOnly, setIsFocused])
+  }, [currentEditor, localEditor, isReadOnly, setIsFocused, syncTextHistory])
 
-  // Save when editor loses focus
+  // Once the editor is let go: commit the session if it changed the text,
+  // otherwise pick up any outside change to it. One effect, so the order is
+  // fixed — an undo that replaced this text must not be read as typing.
   useEffect(() => {
-    if (wasActiveRef.current && currentEditor !== localEditor) {
-      updateShape(shape.id, {
-        paragraphes: localEditor.children as Paragraph[]
-      })
+    if (readonly || currentEditor === localEditor) return
+    if (wasActiveRef.current) {
       wasActiveRef.current = false;
       setIsFocused(false);
+      if (hasTextChanged(localEditor.children, sessionStartRef.current)) {
+        loadedRef.current = localEditor.children as Paragraph[];
+        updateShape(shape.id, { paragraphes: loadedRef.current });
+        return;
+      }
     }
-  }, [currentEditor, localEditor, shape.id, updateShape, setIsFocused])
+    // Slate reads its value on mount only, so an undo or redo of this text
+    // has to be loaded by hand.
+    if (shape.paragraphes !== loadedRef.current) {
+      loadedRef.current = shape.paragraphes;
+      localEditor.children = toEditorValue(shape.paragraphes);
+      localEditor.selection = null;
+      localEditor.history = { undos: [], redos: [] };
+      localEditor.onChange();
+    }
+  }, [readonly, currentEditor, localEditor, shape.id, shape.paragraphes, updateShape, setIsFocused])
 
   // Subscribe to attributes changes and sync them to the editor
   useEffect(() => {
@@ -104,6 +138,10 @@ export function SVGText({ shape, readonly }: SVGTextProps) {
   }) : undefined
 
   const handleEditorChange = () => {
+    // An inactive editor only changes when its content is reloaded; that is
+    // not a selection the toolbar should follow.
+    if (currentEditor !== localEditor) return
+    syncTextHistory()
     const selection = localEditor.selection;
     setLastSelection(selection);
     syncEditorToAttributes()

@@ -22,8 +22,8 @@ const client = new ImprimeClient({
 const presentation = await client.createPresentation('My Presentation')
 
 // Add a slide
-const updated = await client.addSlide(presentation._id)
-const slideId = updated.slides[0]._id
+const slide = await client.addSlide(presentation._id)
+const slideId = slide._id
 
 // Add shapes
 await client.addRectangle(presentation._id, slideId, {
@@ -96,11 +96,14 @@ await client.deletePresentation('674abc123def456')
 
 ### Slide Methods
 
-#### `addSlide(presentationId: string)`
-Add a new blank slide to a presentation.
+#### `addSlide(presentationId: string, slide?: SlideDTO.Create)`
+Add a slide to a presentation and return it. Blank and last by default; `order`
+inserts it at that 0-based position, `shapes` gives it content, and `_id`
+restores a deleted slide under its former id (409 if that id is in use).
 
 ```typescript
-const updated = await client.addSlide('674abc123def456')
+const slide = await client.addSlide('674abc123def456')
+const second = await client.addSlide('674abc123def456', { order: 1, shapes: [] })
 ```
 
 #### `updateSlide(presentationId: string, slideId: string, shapes: Shape[])`

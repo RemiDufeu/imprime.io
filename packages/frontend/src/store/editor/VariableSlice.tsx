@@ -2,6 +2,7 @@ import { variablesAPI } from '../../api/api'
 import type { VariableData, VariableDTO } from '@imprime/sdk'
 import type { StateCreator } from 'zustand'
 import type { PresentationSlice } from './PresentationSlice'
+import type { HistorySlice } from './HistorySlice'
 import { parseApiError } from '../../utils/apiError'
 import { message } from 'antd'
 
@@ -26,9 +27,13 @@ export interface VariableSlice {
   createVariable: (variable: VariableDTO.Create) => Promise<VariableData[]>
   updateVariable: (variableId: string, updates: VariableDTO.Update) => Promise<VariableData[]>
   deleteVariable: (variableId: string) => Promise<void>
+  // Bring a variable to `snapshot`, unrecorded: what undo and redo replay.
+  // Null deletes it; a variable that is gone is created again under its id.
+  _restoreVariable: (variableId: string, snapshot: VariableData | null) => Promise<void>
+  _setVariables: (variables: VariableData[]) => void
 }
 
-type StoreWithPresentation = VariableSlice & PresentationSlice
+type StoreWithPresentation = VariableSlice & PresentationSlice & HistorySlice
 
 export const createVariableSlice: StateCreator<
   StoreWithPresentation,
@@ -59,12 +64,9 @@ export const createVariableSlice: StateCreator<
     try {
       const result = await variablesAPI.create(presentation._id, variable)
 
-      set({
-        presentation: {
-          ...presentation,
-          variableData: result.variables,
-        },
-      })
+      get()._setVariables(result.variables)
+      const created = result.variables.find(v => v.name === variable.name)
+      if (created) get()._recordHistory({ kind: 'variable', variableId: created._id, snapshot: null })
     } catch (err) {
       set({ variableError: 'Failed to create variable' })
       throw err
@@ -81,16 +83,13 @@ export const createVariableSlice: StateCreator<
     if (!presentation) return []
 
     set({ isLoadingVariables: true, variableError: null })
+    const previous = presentation.variableData?.find(v => v._id === variableId) ?? null
 
     try {
       const result = await variablesAPI.update(presentation._id, variableId, updates)
 
-      set({
-        presentation: {
-          ...presentation,
-          variableData: result.variables,
-        },
-      })
+      get()._setVariables(result.variables)
+      get()._recordHistory({ kind: 'variable', variableId, snapshot: previous })
       return result.variables
     } catch (err) {
       // Rethrown so the form can attach a name conflict to its own field
@@ -107,16 +106,13 @@ export const createVariableSlice: StateCreator<
     if (!presentation) return
 
     set({ isLoadingVariables: true, variableError: null })
+    const previous = presentation.variableData?.find(v => v._id === variableId) ?? null
 
     try {
       const result = await variablesAPI.delete(presentation._id, variableId)
 
-      set({
-        presentation: {
-          ...presentation,
-          variableData: result.variables,
-        },
-      })
+      get()._setVariables(result.variables)
+      get()._recordHistory({ kind: 'variable', variableId, snapshot: previous })
     } catch (err) {
       const { code, message: detail } = parseApiError(err)
 
@@ -130,5 +126,32 @@ export const createVariableSlice: StateCreator<
     } finally {
       set({ isLoadingVariables: false })
     }
+  },
+
+  _restoreVariable: async (variableId, snapshot) => {
+    const { presentation } = get()
+    if (!presentation) return
+    const current = presentation.variableData?.find(v => v._id === variableId)
+
+    let result: VariableDTO.List
+    if (!snapshot) {
+      if (!current) return
+      result = await variablesAPI.delete(presentation._id, variableId)
+    } else {
+      const { _id, ...definition } = snapshot
+      result = current
+        // Every field, so the update leaves nothing of the newer definition.
+        ? await variablesAPI.update(presentation._id, variableId, { ...definition, default: definition.default ?? null })
+        : await variablesAPI.create(presentation._id, { ...definition, _id })
+    }
+
+    get()._setVariables(result.variables)
+  },
+
+  _setVariables: (variables) => {
+    // Read again rather than reuse the presentation from before the request:
+    // shape edits made meanwhile would be lost.
+    const current = get().presentation
+    if (current) set({ presentation: { ...current, variableData: variables } })
   },
 })

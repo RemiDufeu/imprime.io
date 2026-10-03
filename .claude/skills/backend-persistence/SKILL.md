@@ -14,7 +14,7 @@ place a Mongoose document turns into something a client may see.
 Presentation  { title, ownerId, timestamps }
 Slide         { presentationId, order, shapes: Mixed[], timestamps }
 VariableData  { presentationId, type, name, default: Mixed, required }
-Image         { data (base64), mimeType, originalName, size, timestamps }
+Image         { data (base64), mimeType, originalName, size, orphanedAt? (TTL), timestamps }
 Font          { family, familyKey (unique), version, faces: { regular, bold?, italic?, boldItalic? } (size, name), timestamps }
 FontFile      { fontId, variant, data (binary) }   — one per face, unique (fontId, variant)
 ```
@@ -201,16 +201,29 @@ catch (error) { console.error('Failed to delete associated images:', error) }
 Orphaned image rows are preferred to a failed delete. Match that judgement for
 cleanup work; do not match it for anything the caller needs to know about.
 
+### Images are released, not deleted
+
+An image that leaves its slide — a shape write without it, or the slide's
+deletion — gets `orphanedAt` instead of being deleted, because the editor can
+undo either and shows the image again by the same id. A TTL index
+(`ORPHAN_GRACE_SECONDS`, 7 days) lets MongoDB delete it after that; a slide that
+shows it again unsets the field (`ImageService.markReferenced`). Only
+`PresentationService.delete` deletes images outright. Anything that removes an
+image from a slide goes through `markOrphaned`, never `delete`.
+
+### Restoring under a former id
+
+`SlideDTO.Create._id` and `VariableDTO.Create._id` let a client recreate a
+deleted slide or variable under its old id — the editor's undo, since text runs
+and history steps point to those ids. The service checks the 24-hex form
+(`isObjectIdString`), answers 409 when the id exists anywhere, and maps a racing
+E11000 to the same error.
+
 ## Known gaps
 
 Verify these still hold before relying on them:
 
-1. **`PresentationService.collectImageIds` does not recurse into containers.**
-   The module-level helper filters `shapes` for `type === 'image'` at the top
-   level only, while `SlideService.collectImageIds` walks the tree via
-   `isContainerShape`. Deleting a presentation therefore orphans every image
-   nested inside a group.
-2. **Images are unscoped.** No `ownerId`, no `presentationId`, and the routes do
+1. **Images are unscoped.** No `ownerId`, no `presentationId`, and the routes do
    not check ownership, so any authenticated user can read or delete any image
    by id. Closing it needs ownership at the model level plus a decision about
    images already stored without an owner — deliberately left open for now.

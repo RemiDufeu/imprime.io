@@ -10,6 +10,10 @@ export interface RichTextEditorSlice {
     isFocused: boolean;
     lastSelection: BaseSelection;
     syncSelection: boolean
+    // Depth of the active editor's own history. Slate keeps it on the editor,
+    // outside the store; mirrored here so the undo/redo buttons can follow it.
+    textHistory: { undos: number; redos: number };
+    syncTextHistory: () => void;
     setEditor: (editor: Editor | null) => void;
     setIsFocused: (isFocused: boolean) => void;
     setLastSelection: (selection: BaseSelection) => void;
@@ -30,35 +34,57 @@ export const createRichTextEditorSlice: StateCreator<
         isFocused: false,
         lastSelection: null,
         syncSelection: false,
-        setEditor: (editor) => set({ editor }),
+        textHistory: { undos: 0, redos: 0 },
+        syncTextHistory: () => {
+            const { editor, textHistory } = get();
+            const undos = editor?.history.undos.length ?? 0;
+            const redos = editor?.history.redos.length ?? 0;
+            if (undos !== textHistory.undos || redos !== textHistory.redos) {
+                set({ textHistory: { undos, redos } });
+            }
+        },
+        setEditor: (editor) => {
+            set({ editor });
+            get().syncTextHistory();
+        },
         setIsFocused: (isFocused) => set({ isFocused }),
         setLastSelection: (selection) => set({ lastSelection: selection }),
         syncEditorToAttributes: () => {
-            set({ syncSelection : true })
             const { editor, setTextAttributes } = get();
             if (!editor || !editor.selection) return;
             const marks = Editor.marks(editor);
             const paragraph = firstSelectedParagraph(editor);
-            setTextAttributes({
-                bold: marks?.bold === true,
-                italic: marks?.italic === true,
-                underline: marks?.underline === true,
-                strikethrough: marks?.strikethrough === true,
-                uppercase: marks?.uppercase === true,
-                textColor: (marks?.color as string) || '#000000',
-                fontSize: marks?.fontSize ? parseInt(marks.fontSize as string) : DEFAULT_FONT_SIZE,
-                fontFamily: (marks?.fontFamily as string) || DEFAULT_FONT,
-                ...(paragraph ? {
-                    ...getParagraphStyle(paragraph),
-                    listType: getListStyle(paragraph)?.list ?? 'none',
-                } : {}),
-            });
-            set({ syncSelection : false })
+            // Raised for the write below only, and lowered whatever happens:
+            // left up, it would silence every later toolbar change.
+            set({ syncSelection : true })
+            try {
+                setTextAttributes({
+                    bold: marks?.bold === true,
+                    italic: marks?.italic === true,
+                    underline: marks?.underline === true,
+                    strikethrough: marks?.strikethrough === true,
+                    uppercase: marks?.uppercase === true,
+                    textColor: (marks?.color as string) || '#000000',
+                    fontSize: marks?.fontSize ? parseInt(marks.fontSize as string) : DEFAULT_FONT_SIZE,
+                    fontFamily: (marks?.fontFamily as string) || DEFAULT_FONT,
+                    ...(paragraph ? {
+                        ...getParagraphStyle(paragraph),
+                        listType: getListStyle(paragraph)?.list ?? 'none',
+                    } : {}),
+                });
+            } finally {
+                set({ syncSelection : false })
+            }
         },
 
         syncAttributesToEditor: () => {
             const { editor, attributes, syncSelection } = get();
             if (!editor || !editor.selection) return;
+            // The attributes were just read from the editor: writing them back
+            // is never a no-op, since an unset mark reads as its default and
+            // would come back as an explicit one — a text change the user did
+            // not make, recorded in the text's undo history.
+            if (syncSelection) return;
 
             const marks = Editor.marks(editor);
 
@@ -113,8 +139,6 @@ export const createRichTextEditorSlice: StateCreator<
             }
 
             // Apply paragraph formatting to every paragraph in the selection.
-            // Not gated on `syncSelection`: when syncing from the editor the
-            // values were just read from this paragraph, so nothing differs.
             const paragraph = firstSelectedParagraph(editor);
             if (paragraph) {
                 const current = getParagraphStyle(paragraph);
@@ -131,7 +155,6 @@ export const createRichTextEditorSlice: StateCreator<
             }
 
             // Apply styles to variable nodes in selection
-            if(syncSelection) return;
             Transforms.setNodes(
                 editor,
                 {
