@@ -372,6 +372,11 @@ Limits worth handling:
   image, as for a missing one, and an export draws only the presentation
   owner's images. A user stores up to 500 MB of images: beyond,
   `uploadImage` fails with `413 IMAGE_QUOTA_EXCEEDED`.
+- **Images are PNG or JPEG**, the formats the PDF export draws. The format
+  is read from the data, not from `mimeType`: `uploadImage` fails with
+  `400 IMAGE_TYPE_UNSUPPORTED` for any other format, `400 IMAGE_TYPE_MISMATCH`
+  when `mimeType` (or the data URL's type) names another one, and
+  `400 IMAGE_DATA_INVALID` when `data` is not base64.
 - **Exports run a few at a time**: 4 on the server, 2 per user. Beyond, an
   export fails with `429 EXPORT_BUSY`: retry after a short wait.
 

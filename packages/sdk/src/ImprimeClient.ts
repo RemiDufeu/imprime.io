@@ -378,9 +378,10 @@ export class ImprimeClient {
   // ============================================
 
   /**
-   * Upload an image (base64)
-   * @param data - Base64 encoded image data
-   * @param mimeType - MIME type (e.g., 'image/jpeg', 'image/png')
+   * Upload a PNG or JPEG image (base64). Its format is read from the data,
+   * which must agree with `mimeType`.
+   * @param data - Base64 encoded image data, or a base64 data URL
+   * @param mimeType - 'image/png' or 'image/jpeg'
    * @param originalName - Original filename
    * @returns Image ID and metadata
    */
