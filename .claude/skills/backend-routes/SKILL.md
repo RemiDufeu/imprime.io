@@ -33,6 +33,7 @@ app.use('/api/presentations', requireAuth, variablesRouter)
 app.use('/api/export',        requireAuth, exportRouter)
 app.use('/api/images',        requireAuth, imagesRouter)
 app.use('/api/fonts',         requireAuth, fontsRouter)
+app.use('/api/settings',      requireAuth, settingsRouter)
 ```
 
 **Three routers share the `/api/presentations` mount.** That is why

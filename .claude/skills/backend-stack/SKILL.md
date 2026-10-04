@@ -84,20 +84,52 @@ process exit.
 
 ## better-auth
 
-`services/AuthService.ts` builds the instance once in the constructor and
-exposes it as `instance`. Everything about auth is configuration, assembled
-conditionally from the environment:
+`services/AuthService.ts` builds the instance in `buildAuth()` and exposes it
+as `instance`. Everything about auth is configuration, assembled conditionally
+from the environment **and from the instance settings admins store in the
+database** (`SettingsService`, passed in as `AuthSettings`):
 
 - email + password always on, `minPasswordLength: 8`, reset token 15 min;
-- Google / GitHub / Microsoft added **only if both id and secret are present**
-  (`creds()` returns `undefined` otherwise);
-- `REQUIRE_EMAIL_VERIFICATION=true` **throws at startup** if SMTP is not
-  configured — a fail-fast rather than silently unverifiable signups;
-- plugins: `apiKey()` for programmatic access, `mcp()` for the OAuth flow the
-  Claude web connector uses.
+  who may use it is `AuthSettings.passwordPolicy` (`disableSignUp` unless
+  `'open'`);
+- **the access policy lives in `databaseHooks`**: `user.create.before` refuses
+  an address outside `allowedDomains` (a provider's must also be verified),
+  and the administrator's address from a provider that does not vouch for it;
+  `session.create.before` — which runs after the credentials were checked, so
+  it leaks nothing — promotes ADMIN_EMAIL (always: role and verified
+  address), exempts admins, refuses a password
+  session under `'admins'` (only `/callback/:id` and `/sign-in/social` are
+  single sign-on), and an unlisted or unverified address. A thrown `APIError`
+  answers the request, or redirects a single sign-on to its `errorCallbackURL`
+  with the code. A Microsoft provider in the organisation's own tenant marks
+  addresses verified (`mapProfileToUser`): shared tenants do not vouch for them;
+- account linking is left to better-auth's defaults — **no `trustedProviders`**:
+  an SSO account joins an existing one only when the provider vouches for the
+  address and the local one is verified, or an account claiming an address
+  (the administrator's) could take it over;
+- Google / GitHub / Microsoft added **only while an admin has configured
+  them** (`AuthSettings.sso`, secrets decrypted; one whose secret no longer
+  decrypts is left out rather than offered broken);
+- password reset and the verification sender exist only while `MailerService`
+  has an SMTP server; `requireEmailVerification` (with `sendOnSignIn`, so
+  accounts created before it was on get a link) only with one too —
+  `SettingsService` refuses the combination rather than letting signups go
+  unverifiable;
+- plugins: `apiKey()` for programmatic access, `admin()` for the role,
+  `mcp()` for the OAuth flow the Claude web connector uses.
+
+better-auth reads its options **once**, at construction. Settings that change
+at runtime therefore take effect by building a new instance
+(`AuthService.applySettings`, always with the whole document: email and
+single sign-on together), which is why nothing may capture
+`authService.instance` at startup: `server.ts` serves `/api/auth/*` through
+`authService.handler`, and every other caller reads the getter at each use.
+Sessions live in the database, so a rebuild signs nobody out.
 
 `enabledProviders` is computed alongside and served at `GET /api/auth-providers`
-so the login page renders only what works. Add a provider in both places.
+so the login page renders only what works. Adding a provider means extending
+`SSO_PROVIDERS` in common, then following the compiler: the settings schema,
+`buildAuth`, the login buttons and the admin card.
 
 Two resolution helpers on the service, used by the auth middleware and the MCP
 router: `resolveApiKeyOwner(key)` and `resolveMcpBearerOwner(token)`. Both return
@@ -123,7 +155,7 @@ REST routes do **not** use zod. → skill `backend-routes`
 |---|---|
 | `@react-pdf/renderer` | PDF export (→ skill `pdf-export`) |
 | `express-rate-limit` | 20 requests / 15 min on `/api/auth` only |
-| `nodemailer` | `MailerService`, entirely optional — `isConfigured` is false without `SMTP_HOST`, and the features that need it turn themselves off |
+| `nodemailer` | `MailerService`, entirely optional — configured from the SMTP server stored in the database (Administration → Email), `isConfigured` is false without one, and the features that need it turn themselves off |
 | `dotenv` | loaded by `src/loadEnv.ts`, imported first in `server.ts` |
 
 ## Environment
@@ -135,8 +167,18 @@ REST routes do **not** use zod. → skill `backend-routes`
 
 Variables with real startup validation: `CORS_ORIGIN` (no `'*'` in production),
 `PUBLIC_APP_URL` (must be an absolute http(s) URL — the MCP export tool throws
-otherwise), `REQUIRE_EMAIL_VERIFICATION` (requires SMTP). Everything else
-degrades quietly, which is a reason to check `.env.example` when adding one.
+otherwise). Everything else degrades quietly, which is a reason to check
+`.env.example` when adding one.
+
+Email and single sign-on are **not** configured by the environment: the SMTP
+server, address verification and the Google / GitHub / Microsoft applications
+are instance settings, set by an admin in the app and stored in
+`InstanceSettings` (SMTP password and client secrets encrypted with the auth
+secret, `AuthService.encrypt`). `ADMIN_EMAIL` is what bootstraps that admin.
+Two server commands act on it: `npm run admin:reset-password`
+(`scripts/resetAdminPassword.ts`), the way back in when they cannot sign in,
+and `npm run admin:demote-others`, which takes the role from every other
+account after `ADMIN_EMAIL` changed.
 
 ## Build
 

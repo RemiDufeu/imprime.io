@@ -23,15 +23,23 @@ src/
     errorHandler.ts      AppError subclasses → HTTP responses
   models/
     Presentation.ts  Slide.ts  VariableData.ts  Image.ts  Font.ts  FontFile.ts
+    InstanceSettings.ts
     mappers.ts           document ↔ DTO
   routes/
     presentations.ts  slides.ts  variables.ts  export.ts  images.ts  fonts.ts
+    settings.ts
   services/
     index.ts             the singletons, wired here
     PresentationService.ts  SlideService.ts  VariableService.ts
     ImageService.ts  FontService.ts  ExportService.ts  AuthService.ts  MailerService.ts
+    SettingsService.ts
     errors.ts            AppError, NotFoundError, ValidationError, ConflictError
     pdfDownloadStore.ts  in-process single-use PDF store
+  scripts/
+    runAdminCommand.ts     shared runner: connects the auth DB, builds AuthService, sets the exit code
+    resetAdminPassword.ts  break-glass: a new password for ADMIN_EMAIL
+    demoteOtherAdmins.ts   leaves ADMIN_EMAIL as the only administrator
+                           (each command an esbuild entry, bundled to dist/scripts/ beside the server)
   mcp/
     router.ts            Streamable HTTP transport + sessions
     tools/               one file per tool + index.ts + errors.ts
@@ -67,7 +75,7 @@ and no dependency-inversion seam between service and driver.
 That is a deliberate shape for this codebase, not an omission waiting to be
 fixed: with no tests to fake a repository for, and one database, the extra layer
 would only add indirection. Do not introduce one for a single feature — it would
-be a parallel mechanism alongside seven services that do it the other way.
+be a parallel mechanism alongside eight services that do it the other way.
 
 What the service layer *does* isolate: **the DTO boundary**. Nothing above a
 service ever sees a Mongoose document. → skill `backend-persistence`
@@ -83,6 +91,7 @@ const slideService = new SlideService(imageService)
 const presentationService = new PresentationService(imageService)
 const exportService = new ExportService(imageService)
 const authService = new AuthService(mailerService)
+const settingsService = new SettingsService(mailerService, authService)
 ```
 
 Rules:

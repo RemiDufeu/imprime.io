@@ -1,5 +1,8 @@
 import mongoose, { Types } from 'mongoose'
 import type {
+  EmailSettingsDTO,
+  SsoSettingsDTO,
+  AccessSettingsDTO,
   FontDTO,
   FontVariant,
   Presentation,
@@ -13,6 +16,7 @@ import type {
 } from '@imprime/common'
 import type { FontDocument, IFont, IFontFace } from './Font.js'
 import type { IFontFile } from './FontFile.js'
+import type { IInstanceSettings, ISmtpSettings, ISsoProviderSettings } from './InstanceSettings.js'
 import type { IPresentation, PresentationDocument } from './Presentation.js'
 import type { ISlide, SlideDocument } from './Slide.js'
 import type { IVariableData, VariableDataDocument } from './VariableData.js'
@@ -154,6 +158,62 @@ export function fontCreateToModel(
 // never from the request body.
 export function fontFileCreateToModel(fontId: Types.ObjectId, variant: FontVariant, data: Buffer): IFontFile {
   return { fontId, variant, data }
+}
+
+// `email` is absent until the settings are first saved. The SMTP password
+// never leaves: the response only says whether one is stored.
+export function emailSettingsToDTO(email: IInstanceSettings['email'] | undefined): EmailSettingsDTO.Response {
+  const smtp = email?.smtp
+  return {
+    smtp: smtp
+      ? {
+          host: smtp.host,
+          port: smtp.port,
+          secure: smtp.secure,
+          user: smtp.user,
+          hasPassword: Boolean(smtp.password),
+          from: smtp.from,
+        }
+      : null,
+    requireEmailVerification: email?.requireEmailVerification ?? false,
+  }
+}
+
+// `smtp` is the validated update, and `password` the one to store, already
+// encrypted.
+export function smtpSettingsToModel(smtp: EmailSettingsDTO.SmtpUpdate, password: string | undefined): ISmtpSettings {
+  return {
+    host: smtp.host,
+    port: smtp.port,
+    secure: smtp.secure,
+    user: smtp.user,
+    password,
+    from: smtp.from,
+  }
+}
+
+// `access` is absent until settings are first saved: anyone may then use a
+// password, from any domain.
+export function accessSettingsToDTO(access: IInstanceSettings['access'] | undefined): AccessSettingsDTO.Response {
+  return {
+    passwordPolicy: access?.passwordPolicy ?? 'open',
+    allowedDomains: [...(access?.allowedDomains ?? [])],
+  }
+}
+
+// The client secret never leaves.
+export function ssoProviderToDTO(stored: ISsoProviderSettings | undefined): SsoSettingsDTO.Provider | null {
+  return stored ? { clientId: stored.clientId, tenantId: stored.tenantId } : null
+}
+
+// `provider` is the validated update, and `clientSecret` the one to store,
+// already encrypted.
+export function ssoProviderToModel(provider: SsoSettingsDTO.ProviderUpdate, clientSecret: string): ISsoProviderSettings {
+  return {
+    clientId: provider.clientId,
+    clientSecret,
+    tenantId: provider.tenantId,
+  }
 }
 
 // The 24-hex form a client may send as an id to restore. `ObjectId.isValid`

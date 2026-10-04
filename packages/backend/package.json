@@ -6,9 +6,13 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "esbuild src/server.ts --bundle --platform=node --target=node18 --format=esm --outfile=dist/server.js --packages=external",
+    "build": "esbuild src/server.ts src/scripts/resetAdminPassword.ts src/scripts/demoteOtherAdmins.ts --bundle --platform=node --target=node18 --format=esm --outdir=dist --packages=external",
     "typecheck": "tsc --noEmit",
     "start": "node dist/server.js",
+    "admin:reset-password": "node dist/scripts/resetAdminPassword.js",
+    "admin:reset-password:dev": "tsx src/scripts/resetAdminPassword.ts",
+    "admin:demote-others": "node dist/scripts/demoteOtherAdmins.js",
+    "admin:demote-others:dev": "tsx src/scripts/demoteOtherAdmins.ts",
     "lint": "eslint src --ext .ts"
   },
   "dependencies": {

@@ -5,12 +5,11 @@ import helmet from 'helmet'
 import rateLimit from 'express-rate-limit'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import { toNodeHandler } from 'better-auth/node'
 import { oAuthDiscoveryMetadata, oAuthProtectedResourceMetadata } from 'better-auth/plugins'
 import type { Server as HttpServer } from 'http'
 import { connectDatabase } from './config/database.js'
 import { connectAuthDb, closeAuthDb } from './config/authDb.js'
-import { authService, slideService } from './services/index.js'
+import { authService, settingsService, slideService } from './services/index.js'
 import { requireAuth } from './middleware/requireAuth.js'
 import presentationsRouter from './routes/presentations.js'
 import slideRouter from './routes/slides.js'
@@ -18,6 +17,7 @@ import variablesRouter from './routes/variables.js'
 import exportRouter from './routes/export.js'
 import imagesRouter from './routes/images.js'
 import fontsRouter from './routes/fonts.js'
+import settingsRouter from './routes/settings.js'
 import { createMcpRouter } from './mcp/router.js'
 import { errorHandler } from './middleware/errorHandler.js'
 
@@ -59,12 +59,14 @@ const authLimiter = rateLimit({
 })
 app.use('/api/auth', authLimiter)
 
-app.all('/api/auth/*splat', toNodeHandler(authService.instance))
+// Through the service, never a captured instance: it is rebuilt when the
+// email settings change.
+app.all('/api/auth/*splat', authService.handler)
 
 // OAuth 2.0 discovery endpoints — MUST be at root per RFC 8414 / RFC 9728 so
 // MCP clients (Claude web connector) can discover the authorization server.
-const discovery = oAuthDiscoveryMetadata(authService.instance)
-const protectedResource = oAuthProtectedResourceMetadata(authService.instance)
+const discovery = (req: globalThis.Request) => oAuthDiscoveryMetadata(authService.instance)(req)
+const protectedResource = (req: globalThis.Request) => oAuthProtectedResourceMetadata(authService.instance)(req)
 const adaptWebHandler =
   (handler: (req: globalThis.Request) => Promise<globalThis.Response>) =>
   async (req: express.Request, res: express.Response) => {
@@ -103,6 +105,7 @@ app.use('/api/presentations', requireAuth, variablesRouter)
 app.use('/api/export', requireAuth, exportRouter)
 app.use('/api/images', requireAuth, imagesRouter)
 app.use('/api/fonts', requireAuth, fontsRouter)
+app.use('/api/settings', requireAuth, settingsRouter)
 
 // MCP (owns its own sessions, outside the requireAuth pipeline for now)
 const mcp = createMcpRouter()
@@ -144,7 +147,8 @@ async function startServer() {
   try {
     await connectDatabase()
     await connectAuthDb()
-    await authService.promoteConfiguredAdmins()
+    await settingsService.load()
+    await authService.promoteConfiguredAdmin()
     const indexed = await slideService.indexImageReferences()
     if (indexed > 0) console.log(`Indexed the image references of ${indexed} slides`)
     const httpServer = app.listen(PORT, () => {

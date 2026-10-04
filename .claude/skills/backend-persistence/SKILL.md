@@ -7,7 +7,7 @@ metadata:
 
 # Persistence and Mapping
 
-Six collections, six thin schemas, and one mapper module that is the only
+Seven collections, seven thin schemas, and one mapper module that is the only
 place a Mongoose document turns into something a client may see.
 
 ```
@@ -17,6 +17,7 @@ VariableData  { presentationId, type, name, default: Mixed, required }
 Image         { data (base64), mimeType, originalName, size, orphanedAt? (TTL), timestamps }
 Font          { family, familyKey (unique), version, faces: { regular, bold?, italic?, boldItalic? } (size, name), timestamps }
 FontFile      { fontId, variant, data (binary) }   — one per face, unique (fontId, variant)
+InstanceSettings { _id: 'instance', email: { smtp? { host, port, secure, user?, password? (encrypted), from }, requireEmailVerification }, sso: { google?, github?, microsoft? } ({ clientId, clientSecret (encrypted), tenantId? }), access: { passwordPolicy ('open' | 'existing' | 'admins', default 'open'), allowedDomains (default []) }, timestamps }   — a single document, written with upserting findByIdAndUpdate
 ```
 
 ## Model file anatomy
@@ -74,7 +75,10 @@ Schema conventions in use:
 ## Ownership scoping
 
 Only `Presentation` carries `ownerId`. `Font` belongs to the instance: no
-owner, readable by everyone, written only behind `requireAdmin`. Everything
+owner, readable by everyone, written only behind `requireAdmin`.
+`InstanceSettings` too, but read by admins only, and its SMTP password never
+leaves: `emailSettingsToDTO` turns it into `hasPassword`, and
+`ssoProviderToDTO` drops the client secrets. Everything
 else is scoped **through** the presentation:
 
 - `Slide` and `VariableData` hold `presentationId`, and services query with both

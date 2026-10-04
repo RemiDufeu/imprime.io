@@ -36,6 +36,7 @@ Mounted in `packages/backend/src/server.ts`, all behind `requireAuth`:
 | `/api/export` | `export.ts` |
 | `/api/images` | `images.ts` |
 | `/api/fonts` | `fonts.ts` — instance-wide; reads open, writes behind `requireAdmin` |
+| `/api/settings` | `settings.ts` — instance settings (`/email`, `/email/test`, `/sso`, `/sso/:provider`, `/access`); reads and writes behind `requireAdmin`; no MCP tool, deliberately: instance configuration, not a document operation |
 | `/api/mcp` | MCP router — **owns its own sessions, outside the `requireAuth` pipeline** |
 
 Public: `/api/health`, `/api/auth-providers`, `/api/auth/*` (better-auth, rate
@@ -69,15 +70,19 @@ learn that someone else's presentation exists. Keep that when you add a check.
 A route that takes a `:id` presentation param and does not go through
 `requireOwnsPresentation` is a vulnerability, not a style issue.
 
-Some resources belong to the **instance**, not to a user: imported fonts today,
-instance settings later. Every authenticated user reads them; only admins
-change them, through `requireAdmin` (`middleware/requireAdmin.ts`), which
-answers **403 `ADMIN_REQUIRED`** — not 404, since the resource is visible to
-everyone anyway. The role is better-auth's (`admin` plugin, `user.role`) and is
-read from the database on each check, so it holds for API keys as for
-sessions. Accounts listed in `ADMIN_EMAILS` are promoted at startup and at
-sign-in (`AuthService.promoteConfiguredAdmins` and the `session.create` hook);
-in production only if their address is verified.
+Some resources belong to the **instance**, not to a user: imported fonts and
+the instance settings (email, single sign-on). Every authenticated user reads the fonts; only
+admins read the settings or change either, through `requireAdmin`
+(`middleware/requireAdmin.ts`), which answers **403 `ADMIN_REQUIRED`** — not
+404, since nothing about their existence is secret. The role is better-auth's
+(`admin` plugin, `user.role`) and is read from the database on each check, so
+it holds for API keys as for sessions. The account of `ADMIN_EMAIL` — one
+address — is promoted at startup and at every sign-in, by password or single
+sign-on (`AuthService.promoteConfiguredAdmin` and the `session.create` hook),
+whatever its verification state; its address is then marked verified. Whoever
+creates that account first gets the role, which the startup log warns about
+while it has none. The role stays in the database when `ADMIN_EMAIL` changes:
+`npm run admin:demote-others` takes it from every other account.
 
 ## Error contract
 
