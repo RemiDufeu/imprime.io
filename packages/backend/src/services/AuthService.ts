@@ -34,29 +34,25 @@ function hasAdminRole(user: User | null): boolean {
 
 // The part of better-auth's internal adapter promotion needs.
 interface UserStore {
-  updateUser(userId: string, data: { role: string; emailVerified: boolean }): Promise<unknown>
+  updateUser(userId: string, data: { role: string }): Promise<unknown>
 }
 
 /**
- * Makes the account of ADMIN_EMAIL the administrator, whatever happens: at
- * each sign-in, with a password or through single sign-on, and at startup.
- * Its address counts as verified, since the operator vouched for it by
- * configuring it: a provider confirming the same address is then attached to
- * that account, and email verification never locks the administrator out.
+ * Makes the account of ADMIN_EMAIL the administrator once its address is
+ * verified: at each sign-in, with a password or through single sign-on, and
+ * at startup. An unverified one is only a claim to the address — whoever
+ * typed it at sign-up — and is never promoted.
  *
- * Whoever creates that account first gets the role, so it must be signed up
- * with right after the first start — the startup log says so while it has
- * none. A provider cannot create it with an address it does not vouch for
- * (`user.create.before`).
+ * The account is created by the server (`resetAdminPassword`, which marks the
+ * address verified: the operator vouches for it) or by a provider vouching for
+ * the address; a password sign-up with it is refused (`user.create.before`).
  *
  * The role then lives in the database: changing ADMIN_EMAIL demotes no one,
  * `demoteOtherAdmins` does (`npm run admin:demote-others`).
  */
 async function promoteIfAdminAddress(store: UserStore, user: User, adminEmail: string | undefined): Promise<boolean> {
-  if (!adminEmail || user.email.toLowerCase() !== adminEmail) return false
-  if (!hasAdminRole(user) || !user.emailVerified) {
-    await store.updateUser(user.id, { role: ADMIN_ROLE, emailVerified: true })
-  }
+  if (!adminEmail || user.email.toLowerCase() !== adminEmail || !user.emailVerified) return false
+  if (!hasAdminRole(user)) await store.updateUser(user.id, { role: ADMIN_ROLE })
   return true
 }
 
@@ -100,9 +96,19 @@ function isAdminRoute(path: string): boolean {
   return path.startsWith('/admin/')
 }
 
-// Microsoft tenants shared by many organisations, which do not vouch for the
-// addresses their accounts give.
-const SHARED_MICROSOFT_TENANTS = new Set(['common', 'organizations', 'consumers'])
+/**
+ * Whether Microsoft vouches for the address of an account: its `email` claim
+ * is whatever the directory holds, which a tenant's administrators — or, in a
+ * shared tenant, anyone — may set to any address. The optional claim
+ * `xms_edov` (email domain owner verified) is true only when the address's
+ * domain is verified by the tenant the account lives in, or Microsoft checked
+ * the mailbox itself (personal accounts). It is absent unless the app
+ * registration asks for it, and comes as a boolean or as a string.
+ */
+function microsoftVouchesForEmail(profile: Record<string, unknown>): boolean {
+  const claim = profile.xms_edov
+  return claim === true || claim === 1 || claim === '1' || (typeof claim === 'string' && claim.toLowerCase() === 'true')
+}
 
 // When an account cannot be created, an OAuth callback turns the message into
 // its `error` parameter, spaces replaced: the sign-in page reads these back as
@@ -111,6 +117,16 @@ const domainNotAllowed = () =>
   new APIError('FORBIDDEN', { code: 'EMAIL_DOMAIN_NOT_ALLOWED', message: 'Email domain not allowed' })
 const addressNotVerified = () =>
   new APIError('FORBIDDEN', { code: 'ADDRESS_NOT_VERIFIED', message: 'Address not verified' })
+const adminAddressReserved = () =>
+  new APIError('FORBIDDEN', { code: 'ADMIN_ADDRESS_RESERVED', message: 'This address is reserved for the administrator' })
+
+/**
+ * The header better-auth reads the client's address from, for its rate
+ * limits. `server.ts` overwrites it on every request with the address Express
+ * resolved, so that a client cannot pick its own as it could with
+ * X-Forwarded-For.
+ */
+export const CLIENT_IP_HEADER = 'x-imprime-client-ip'
 
 /** An OAuth application, its secret decrypted. */
 export interface SsoCredentials {
@@ -133,24 +149,26 @@ export interface AuthSettings {
 // better-auth reads its options once, when the instance is built: settings
 // that change at runtime take effect by building a new one
 // (`AuthService.applySettings`).
+//
+// `proveAddress` runs when someone shows they hold an account's mailbox
+// (`AuthService.proveAddress`).
 function buildAuth(
   mailer: MailerService,
   adminEmail: string | undefined,
   settings: AuthSettings,
+  proveAddress: (userId: string) => Promise<void>,
 ) {
   const { google, github } = settings.sso
-  const microsoftTenant = settings.sso.microsoft?.tenantId || 'common'
   const microsoft = settings.sso.microsoft
     ? {
         ...settings.sso.microsoft,
-        tenantId: microsoftTenant,
-        // In the organisation's own tenant, its administrators manage the
-        // addresses, so they are trusted as verified — which the domain list
-        // needs, since Microsoft does not say so itself. A shared tenant does
-        // not vouch for them: anyone may set any address on an account there.
-        ...(SHARED_MICROSOFT_TENANTS.has(microsoftTenant.toLowerCase())
-          ? {}
-          : { mapProfileToUser: () => ({ emailVerified: true }) }),
+        tenantId: settings.sso.microsoft.tenantId || 'common',
+        // Whatever the tenant: in the organisation's own, its administrators
+        // can still give an account any address, and a guest's comes from
+        // elsewhere. Without `xms_edov`, better-auth's own reading stands,
+        // which only Microsoft's rarely sent verified_* claims satisfy.
+        mapProfileToUser: (profile: Record<string, unknown>) =>
+          microsoftVouchesForEmail(profile) ? { emailVerified: true } : {},
       }
     : undefined
   const { passwordPolicy, allowedDomains } = settings
@@ -176,6 +194,9 @@ function buildAuth(
     secret: process.env.BETTER_AUTH_SECRET,
     trustedOrigins: trustedOrigins(),
     database: mongodbAdapter(authDb, { client: authMongoClient }),
+    advanced: {
+      ipAddress: { ipAddressHeaders: [CLIENT_IP_HEADER] },
+    },
     emailAndPassword: {
       enabled: true,
       // Only new password accounts: single sign-on still creates its own.
@@ -184,6 +205,12 @@ function buildAuth(
       minPasswordLength: 8,
       maxPasswordLength: 128,
       resetPasswordTokenExpiresIn: 15 * 60,
+      // A new password closes every session, whoever opened them.
+      revokeSessionsOnPasswordReset: true,
+      // Following the reset link proves the mailbox, like a verification link.
+      onPasswordReset: async ({ user }: { user: User }) => {
+        if (!user.emailVerified) await proveAddress(user.id)
+      },
       ...(passwordResetEnabled
         ? {
             sendResetPassword: async ({
@@ -210,6 +237,11 @@ function buildAuth(
             // An emailed link would otherwise be a way in without single
             // sign-on.
             autoSignInAfterVerification: passwordPolicy !== 'admins',
+            // Runs before the session the link opens, which it leaves alone;
+            // one already open in that browser is closed with the others.
+            afterEmailVerification: async (user: User) => {
+              await proveAddress(user.id)
+            },
             sendVerificationEmail: async ({
               user,
               url,
@@ -242,8 +274,12 @@ function buildAuth(
             if (ctx && isAdminRoute(ctx.path)) return
             const fromProvider = Boolean(ctx && isSingleSignOn(ctx.path))
             if (user.email.toLowerCase() === adminEmail) {
-              // The administrator's account, from a provider that does not
-              // vouch for the address: someone else claiming it.
+              // Created by the server itself (`resetAdminPassword`), without
+              // a request; otherwise only by a provider vouching for the
+              // address. A password sign-up is anyone's claim to it, and
+              // would be promoted once a verification link — sent to the
+              // administrator, who might follow it — verifies it.
+              if (ctx && !fromProvider) throw adminAddressReserved()
               if (fromProvider && !user.emailVerified) throw addressNotVerified()
               return
             }
@@ -294,7 +330,7 @@ function buildAuth(
     ],
   })
 
-  return { instance, enabledProviders, nodeHandler: toNodeHandler(instance) }
+  return { instance, enabledProviders, allowedDomains, nodeHandler: toNodeHandler(instance) }
 }
 
 type BuiltAuth = ReturnType<typeof buildAuth>
@@ -307,12 +343,16 @@ export class AuthService {
   constructor(private readonly mailer: MailerService) {
     // Replaced at startup by the stored settings (`SettingsService.load`),
     // before the server takes a request.
-    this.built = buildAuth(mailer, this.adminEmail, {
+    this.built = this.build({
       requireEmailVerification: false,
       passwordPolicy: 'open',
       allowedDomains: [],
       sso: {},
     })
+  }
+
+  private build(settings: AuthSettings): BuiltAuth {
+    return buildAuth(this.mailer, this.adminEmail, settings, (userId) => this.proveAddress(userId))
   }
 
   /** The current instance: read it at each use, it is rebuilt when settings change. */
@@ -333,7 +373,34 @@ export class AuthService {
    * running finishes on the previous instance.
    */
   public applySettings(settings: AuthSettings): void {
-    this.built = buildAuth(this.mailer, this.adminEmail, settings)
+    this.built = this.build(settings)
+  }
+
+  /**
+   * Someone just showed they hold the mailbox of `userId`'s address, by
+   * following a verification or a password reset link: the address is marked
+   * verified, and whatever was set up while it was not — by whoever signed up
+   * with it, perhaps not its owner — is dropped: sessions, API keys and MCP
+   * tokens. Without this, signing up first with someone else's address and
+   * making a key would keep a way into their account once they claim it.
+   */
+  private async proveAddress(userId: string): Promise<void> {
+    const { internalAdapter } = await this.instance.$context
+    await internalAdapter.updateUser(userId, { emailVerified: true })
+    await this.revokeAccess(userId)
+  }
+
+  /**
+   * Closes every way into the account but its password and its providers:
+   * sessions, API keys, and the tokens MCP clients got through OAuth.
+   */
+  private async revokeAccess(userId: string): Promise<void> {
+    const { adapter, internalAdapter } = await this.instance.$context
+    await internalAdapter.deleteUserSessions(userId)
+    // The api-key plugin's model; `referenceId` is the owner's user id.
+    await adapter.deleteMany({ model: 'apikey', where: [{ field: 'referenceId', value: userId }] })
+    // The mcp plugin's model.
+    await adapter.deleteMany({ model: 'oauthAccessToken', where: [{ field: 'userId', value: userId }] })
   }
 
   /**
@@ -383,9 +450,12 @@ export class AuthService {
 
   /**
    * Break-glass access, for whoever runs the server (`scripts/resetAdminPassword.ts`),
-   * when nothing else lets the administrator in: gives the account of
-   * ADMIN_EMAIL this password — creating the account if there is none — with
-   * its role and a verified address, and signs its sessions out.
+   * and the way the administrator's account is first created: gives the
+   * account of ADMIN_EMAIL this password — creating the account if there is
+   * none — with its role and a verified address, since the operator vouches
+   * for it. Everything else that opened the account is revoked (sessions, API
+   * keys, MCP tokens): it may be someone else's way in, the reason the
+   * command was run.
    */
   public async resetAdminPassword(password: string): Promise<{ email: string; outcome: 'created' | 'updated' }> {
     const email = this.adminEmail
@@ -409,7 +479,7 @@ export class AuthService {
     } else {
       await internalAdapter.linkAccount({ userId: user.id, providerId: 'credential', accountId: user.id, password: hash })
     }
-    await internalAdapter.deleteUserSessions(user.id)
+    await this.revokeAccess(user.id)
     return { email, outcome: 'updated' }
   }
 
@@ -420,7 +490,13 @@ export class AuthService {
    * demoted are signed out, so the access rules apply to them from their next
    * sign-in. API keys are left alone.
    */
-  public async demoteOtherAdmins(): Promise<{ adminEmail: string; adminExists: boolean; demoted: string[] }> {
+  public async demoteOtherAdmins(): Promise<{
+    adminEmail: string
+    adminExists: boolean
+    // False while the account's address is unverified: nobody is administrator.
+    adminPromoted: boolean
+    demoted: string[]
+  }> {
     const adminEmail = this.adminEmail
     if (!adminEmail) throw new Error('ADMIN_EMAIL is not set: nobody would remain administrator')
     const { internalAdapter } = await this.instance.$context
@@ -445,8 +521,8 @@ export class AuthService {
     }
 
     const found = await internalAdapter.findUserByEmail(adminEmail)
-    if (found) await promoteIfAdminAddress(internalAdapter, found.user, adminEmail)
-    return { adminEmail, adminExists: Boolean(found), demoted }
+    const adminPromoted = found ? await promoteIfAdminAddress(internalAdapter, found.user, adminEmail) : false
+    return { adminEmail, adminExists: Boolean(found), adminPromoted, demoted }
   }
 
   /** Read from the database, so it holds for API keys as for sessions. */
@@ -457,9 +533,9 @@ export class AuthService {
 
   /**
    * Gives the account of ADMIN_EMAIL its role at startup, so that it need not
-   * sign in again after the variable changes, and warns while it has no
-   * account: whoever creates it first becomes the administrator. Run once,
-   * once the auth database is connected.
+   * sign in again after the variable changes, and says how to create it while
+   * it has none, or how to claim it while its address is unverified. Run
+   * once, once the auth database is connected.
    */
   public async promoteConfiguredAdmin(): Promise<void> {
     if (!this.adminEmail) {
@@ -469,24 +545,41 @@ export class AuthService {
     const { internalAdapter } = await this.instance.$context
     const found = await internalAdapter.findUserByEmail(this.adminEmail)
     if (!found) {
-      console.warn(`${this.adminEmail} has no account yet: whoever signs in first with it becomes the administrator.`)
+      console.warn(`${this.adminEmail} has no account yet: create it with \`npm run admin:reset-password\`, or sign in with a single sign-on provider that vouches for the address.`)
       return
     }
     const wasAdmin = hasAdminRole(found.user)
-    await promoteIfAdminAddress(internalAdapter, found.user, this.adminEmail)
+    if (!(await promoteIfAdminAddress(internalAdapter, found.user, this.adminEmail))) {
+      console.warn(`The account of ${this.adminEmail} has an unverified address, so it is not made administrator: \`npm run admin:reset-password\` claims it.`)
+      return
+    }
     if (!wasAdmin) console.log(`Admin role given to ${this.adminEmail} (ADMIN_EMAIL)`)
+  }
+
+  /**
+   * Whether `userId` may still use the instance outside a session — API keys,
+   * MCP tokens — which the session hooks never see: under the domain list as
+   * at sign-in, administrators exempt.
+   */
+  private async isAllowedWithoutSession(userId: string): Promise<boolean> {
+    const { internalAdapter } = await this.instance.$context
+    const user = await internalAdapter.findUserById(userId)
+    if (!user) return false
+    return hasAdminRole(user) || isAddressAllowed(user, this.built.allowedDomains)
   }
 
   public async resolveApiKeyOwner(key: string): Promise<string | null> {
     if (!key) return null
     const result = await this.instance.api.verifyApiKey({ body: { key } })
-    return result?.valid && result.key ? result.key.referenceId : null
+    const ownerId = result?.valid && result.key ? result.key.referenceId : null
+    return ownerId && (await this.isAllowedWithoutSession(ownerId)) ? ownerId : null
   }
 
   public async resolveMcpBearerOwner(bearerToken: string): Promise<string | null> {
     if (!bearerToken) return null
     const headers = new Headers({ authorization: `Bearer ${bearerToken}` })
     const session = await this.instance.api.getMcpSession({ headers })
-    return session?.userId ?? null
+    const ownerId = session?.userId ?? null
+    return ownerId && (await this.isAllowedWithoutSession(ownerId)) ? ownerId : null
   }
 }

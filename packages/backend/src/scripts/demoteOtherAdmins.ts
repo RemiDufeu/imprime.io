@@ -11,10 +11,10 @@ import { runAdminCommand } from './runAdminCommand.js'
  * (`admin:demote-others:dev` runs the source, without a build.)
  */
 await runAdminCommand(async (auth) => {
-  const { adminEmail, adminExists, demoted } = await auth.demoteOtherAdmins()
-  console.log(adminExists
-    ? `${adminEmail} is the administrator.`
-    : `${adminEmail} has no account yet: whoever signs in first with it becomes the administrator.`)
+  const { adminEmail, adminExists, adminPromoted, demoted } = await auth.demoteOtherAdmins()
+  if (adminPromoted) console.log(`${adminEmail} is the administrator.`)
+  else if (adminExists) console.log(`The account of ${adminEmail} has an unverified address, so nobody is administrator: run admin:reset-password to claim it.`)
+  else console.log(`${adminEmail} has no account yet, so nobody is administrator: run admin:reset-password to create it.`)
   console.log(demoted.length > 0
     ? `Admin role removed, and sessions signed out: ${demoted.join(', ')}`
     : 'No other account had the admin role.')

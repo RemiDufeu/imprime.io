@@ -184,9 +184,16 @@ function sameDomains(a: readonly string[], b: readonly string[]): boolean {
   return a.length === b.length && a.every(domain => b.includes(domain))
 }
 
-// A stored password belongs to the user it was entered with.
+// A stored password belongs to the server and the user it was entered with:
+// kept for another host, it would be sent there — to whoever runs it — when
+// the instance logs in, the test email included.
 function keepsStoredPassword(smtp: EmailSettingsDTO.SmtpUpdate, stored: ISmtpSettings | undefined): stored is ISmtpSettings {
-  return smtp.password === undefined && Boolean(smtp.user) && stored?.user === smtp.user
+  return smtp.password === undefined &&
+    Boolean(smtp.user) &&
+    stored !== undefined &&
+    stored.user === smtp.user &&
+    stored.host.toLowerCase() === smtp.host.toLowerCase() &&
+    stored.port === smtp.port
 }
 
 /**
@@ -225,9 +232,9 @@ export class SettingsService {
       throw new ValidationError('Email verification needs an SMTP server', 'EMAIL_VERIFICATION_REQUIRES_SMTP')
     }
 
-    const stored = (await InstanceSettingsModel.findById(INSTANCE_SETTINGS_ID))?.email.smtp
+    const before = (await InstanceSettingsModel.findById(INSTANCE_SETTINGS_ID))?.email
     const email: IInstanceSettings['email'] = {
-      smtp: smtp ? smtpSettingsToModel(smtp, await this.passwordToStore(smtp, stored)) : undefined,
+      smtp: smtp ? smtpSettingsToModel(smtp, await this.passwordToStore(smtp, before?.smtp)) : undefined,
       requireEmailVerification: data.requireEmailVerification,
     }
     const settings = await InstanceSettingsModel.findByIdAndUpdate(
@@ -237,6 +244,12 @@ export class SettingsService {
     )
 
     await this.apply(settings)
+    // Like the access settings: the rule reaches the sessions already open,
+    // not only the next sign-in.
+    if (email.requireEmailVerification && !before?.requireEmailVerification) {
+      const signedOut = await this.auth.signOutUsers(user => !user.emailVerified)
+      if (signedOut > 0) console.log(`Email verification required: ${signedOut} users with an unverified address signed out`)
+    }
     return emailSettingsToDTO(settings.email)
   }
 

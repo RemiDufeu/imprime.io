@@ -134,7 +134,7 @@ export default function EmailPage() {
     }
     modal.confirm({
       title: 'Require email verification?',
-      content: 'Accounts whose address is not verified yet will be sent a link at their next sign-in, and will not get in until they follow it. Send a test email first if you have not.',
+      content: 'Users whose address is not verified yet are signed out now; at their next sign-in they are sent a link, and do not get in until they follow it. Following it also revokes the API keys made before. Send a test email first if you have not.',
       okText: 'Require verification',
       cancelText: 'Cancel',
       onOk: () => setVerification(true),
@@ -180,7 +180,7 @@ export default function EmailPage() {
             name="secure"
             label="TLS from the start"
             valuePropName="checked"
-            extra="Always on for port 465. Leave it off for 587 or 25: the connection then upgrades through STARTTLS when the server offers it."
+            extra="Always on for port 465. Leave it off for 587 or 25: the connection then upgrades through STARTTLS when the server offers it, and must when a user and password are set."
           >
             <Switch />
           </Form.Item>
@@ -192,7 +192,7 @@ export default function EmailPage() {
               name="password"
               label="Password"
               className="email-page-grow"
-              extra={smtp?.hasPassword ? 'Leave empty to keep the stored password, unless the user changes.' : undefined}
+              extra={smtp?.hasPassword ? 'Leave empty to keep the stored password, unless the host, port or user changes.' : undefined}
             >
               <Input.Password autoComplete="new-password" placeholder={smtp?.hasPassword ? '••••••••' : undefined} />
             </Form.Item>

@@ -10,6 +10,7 @@ import type { Server as HttpServer } from 'http'
 import { connectDatabase } from './config/database.js'
 import { connectAuthDb, closeAuthDb } from './config/authDb.js'
 import { authService, settingsService, slideService } from './services/index.js'
+import { CLIENT_IP_HEADER } from './services/AuthService.js'
 import { requireAuth } from './middleware/requireAuth.js'
 import presentationsRouter from './routes/presentations.js'
 import slideRouter from './routes/slides.js'
@@ -35,6 +36,25 @@ if (IS_PRODUCTION && CORS_ORIGIN === '*') {
   )
 }
 
+/**
+ * The reverse proxies in front of the server (TRUST_PROXY): how many, or their
+ * addresses as Express takes them ("loopback", "10.0.0.0/8"). The client's
+ * address is then read from X-Forwarded-For, past them. Unset, it is the
+ * connection's: the header is anyone's to write.
+ */
+function trustProxy(): number | string | undefined {
+  const value = process.env.TRUST_PROXY?.trim()
+  if (!value) return undefined
+  if (/^\d+$/.test(value)) return Number(value)
+  if (value.toLowerCase() === 'true') {
+    throw new Error('TRUST_PROXY="true" would trust an X-Forwarded-For anyone can write: give the number of proxies, or their addresses.')
+  }
+  return value
+}
+
+const TRUST_PROXY = trustProxy()
+if (TRUST_PROXY !== undefined) app.set('trust proxy', TRUST_PROXY)
+
 app.use(
   helmet({
     contentSecurityPolicy: false,
@@ -50,14 +70,26 @@ const expressMiddleware = CORS_ORIGIN === '*'
 // CORS First
 app.use(expressMiddleware)
 
+// Per client address (`req.ip`, which TRUST_PROXY decides). Not the session
+// check, which the app makes at each page load and each time the tab regains
+// focus: counted, it would lock users out of the app they are signed into.
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 20,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
+  skip: (req) => req.path === '/get-session',
   message: { error: 'Too many authentication attempts. Please try again later.' },
 })
 app.use('/api/auth', authLimiter)
+
+// better-auth's own limits — sign-in, emails sent — key on this header:
+// written here, from the address Express resolved, whatever the client sent.
+app.use('/api/auth', (req, _res, next) => {
+  if (req.ip) req.headers[CLIENT_IP_HEADER] = req.ip
+  else delete req.headers[CLIENT_IP_HEADER]
+  next()
+})
 
 // Through the service, never a captured instance: it is rebuilt when the
 // email settings change.

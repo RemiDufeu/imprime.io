@@ -30,7 +30,7 @@ const PROVIDERS: Record<SsoProvider, ProviderInfo> = {
     label: 'Microsoft',
     icon: <WindowsOutlined />,
     consoleUrl: 'https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade',
-    setup: 'In Microsoft Entra, under App registrations, register an application with the callback URL as a Web redirect URI, then add a client secret under Certificates & secrets. The client ID is its Application (client) ID.',
+    setup: 'In Microsoft Entra, under App registrations, register an application with the callback URL as a Web redirect URI, then add a client secret under Certificates & secrets. The client ID is its Application (client) ID. Under Token configuration, add the optional claims email and xms_edov to the ID token: without xms_edov, no Microsoft address counts as verified.',
   },
 }
 

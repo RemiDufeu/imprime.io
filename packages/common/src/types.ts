@@ -358,7 +358,8 @@ export namespace EmailSettingsDTO {
     host: string
     port: number
     // TLS from the first byte, as port 465 expects (always on for 465).
-    // Otherwise the connection upgrades through STARTTLS when the server offers it.
+    // Otherwise the connection upgrades through STARTTLS when the server
+    // offers it, and must when a user and password are set.
     secure: boolean
     user?: string
     hasPassword: boolean
@@ -376,8 +377,8 @@ export namespace EmailSettingsDTO {
     port: number
     secure: boolean
     user?: string
-    // Omitted: the stored password is kept, as long as `user` is unchanged.
-    // Empty: removed, as it is along with `user`.
+    // Omitted: the stored password is kept, as long as `host`, `port` and
+    // `user` are unchanged. Empty: removed, as it is along with `user`.
     password?: string
     from: string
   }

@@ -29,8 +29,32 @@ function createTransport(config: SmtpConfig): Transporter {
     port: config.port,
     secure: config.secure,
     auth: config.auth,
+    // Credentials never travel in clear: without TLS from the start, a server
+    // that does not offer STARTTLS — or someone in between who strips it —
+    // gets no email rather than the password.
+    requireTLS: !config.secure && config.auth !== undefined,
     ...SMTP_TIMEOUTS,
   })
+}
+
+const HTML_ESCAPES: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }
+
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, char => HTML_ESCAPES[char] ?? char)
+}
+
+const MAX_GREETING_NAME_LENGTH = 50
+
+/**
+ * "Hello Ada": the name is the account's, chosen by whoever signed up — with
+ * someone else's address, possibly, to whom the email then goes from this
+ * instance's own server. So it is text on one short line, never markup or a
+ * message of its own.
+ */
+function greeting(name: string | undefined): string {
+  const oneLine = name?.replace(/\s+/g, ' ').trim() ?? ''
+  const short = oneLine.length > MAX_GREETING_NAME_LENGTH ? `${oneLine.slice(0, MAX_GREETING_NAME_LENGTH)}…` : oneLine
+  return short ? `Hello ${short}` : 'Hello'
 }
 
 /**
@@ -85,12 +109,13 @@ export class MailerService {
     user: { email: string; name?: string },
     url: string,
   ): Promise<void> {
-    const greeting = `Hello${user.name ? ' ' + user.name : ''}`
+    const hello = greeting(user.name)
+    const link = escapeHtml(url)
     await this.sendMail({
       to: user.email,
       subject: 'Verify your email address',
-      text: `${greeting},\n\nClick the following link to verify your email address:\n${url}\n`,
-      html: `<p>${greeting},</p><p>Click the following link to verify your email address:</p><p><a href="${url}">${url}</a></p>`,
+      text: `${hello},\n\nClick the following link to verify your email address:\n${url}\n`,
+      html: `<p>${escapeHtml(hello)},</p><p>Click the following link to verify your email address:</p><p><a href="${link}">${link}</a></p>`,
     })
   }
 
@@ -98,12 +123,13 @@ export class MailerService {
     user: { email: string; name?: string },
     url: string,
   ): Promise<void> {
-    const greeting = `Hello${user.name ? ' ' + user.name : ''}`
+    const hello = greeting(user.name)
+    const link = escapeHtml(url)
     await this.sendMail({
       to: user.email,
       subject: 'Reset your password',
-      text: `${greeting},\n\nClick the following link to reset your password:\n${url}\n\nIf you didn't request a password reset, you can safely ignore this email.\n`,
-      html: `<p>${greeting},</p><p>Click the following link to reset your password:</p><p><a href="${url}">${url}</a></p><p>If you didn't request a password reset, you can safely ignore this email.</p>`,
+      text: `${hello},\n\nClick the following link to reset your password:\n${url}\n\nIf you didn't request a password reset, you can safely ignore this email.\n`,
+      html: `<p>${escapeHtml(hello)},</p><p>Click the following link to reset your password:</p><p><a href="${link}">${link}</a></p><p>If you didn't request a password reset, you can safely ignore this email.</p>`,
     })
   }
 }

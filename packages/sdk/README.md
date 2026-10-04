@@ -263,7 +263,11 @@ The password is never returned: `smtp.hasPassword` says whether one is stored.
 
 #### `updateEmailSettings(settings)` — admin
 Replace both settings. Omit `smtp.password` to keep the stored one (as long as
-`smtp.user` is unchanged); send `smtp: null` to remove the server.
+`smtp.host`, `smtp.port` and `smtp.user` are unchanged: it is never sent to
+another server); send `smtp: null` to remove the server. With a user and
+password but `secure: false`, the server must offer STARTTLS, or no email is
+sent. Turning `requireEmailVerification` on signs out the users whose address
+is unverified.
 
 ```typescript
 await client.updateEmailSettings({
@@ -331,8 +335,9 @@ Who may get into the instance:
 - `allowedDomains` — e.g. `['example.com']`, exact domains: only addresses in
   them may have an account, and only once verified, by their provider or by
   email. Empty (default): any. The administrator is exempt. Google and GitHub
-  say whether an address is verified; Microsoft does only when its provider is
-  set to the organisation's own tenant.
+  say whether an address is verified; Microsoft does only when it sends the
+  optional claim `xms_edov`, which its app registration must add to the ID
+  token.
 
 ```typescript
 await client.updateAccessSettings({ passwordPolicy: 'admins', allowedDomains: ['example.com'] })
@@ -340,7 +345,8 @@ await client.updateAccessSettings({ passwordPolicy: 'admins', allowedDomains: ['
 
 Users the new settings shut out are signed out at once: everyone but
 administrators when `'admins'` is turned on, those outside the domains when the
-list changes. API keys are not revoked. Fails with `400 ACCESS_SETTINGS_INVALID`
+list changes. API keys and MCP tokens are not revoked, but stop working while
+their owner is outside the domains. Fails with `400 ACCESS_SETTINGS_INVALID`
 (with `details`). Nothing else is refused: single sign-on only without an
 active provider leaves the administrator as the only one who can sign in.
 

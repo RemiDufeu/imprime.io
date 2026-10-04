@@ -86,7 +86,7 @@ export default function AccessPage() {
       title: 'Sign out the users this shuts out?',
       content: ssoOnlyNow
         ? 'Everyone but the administrators is signed out now, and signs in again through single sign-on.'
-        : 'Users whose address is outside these domains, or not verified, are signed out now. Administrators are exempt.',
+        : 'Users whose address is outside these domains, or not verified, are signed out now, and their API keys and MCP tokens stop working. Administrators are exempt.',
       okText: 'Save and sign them out',
       cancelText: 'Cancel',
       onOk: () => save(values),
@@ -115,6 +115,14 @@ export default function AccessPage() {
           </Radio.Group>
         </Form.Item>
 
+        {policy === 'open' && !state.requireEmailVerification && (
+          <Alert
+            className="access-page-alert"
+            type="warning"
+            showIcon
+            message={<>Anyone can sign up with any address, a colleague&apos;s included, and use it unchecked: turn on email verification in <Link to="/admin/email">Email</Link>.</>}
+          />
+        )}
         {policy === 'admins' && !state.anyProviderActive && (
           <Alert
             className="access-page-alert"
@@ -158,9 +166,8 @@ export default function AccessPage() {
         {domains && domains.length > 0 && (
           <Typography.Paragraph type="secondary">
             Google and GitHub say whether an address is verified. Microsoft
-            does not: its addresses count as verified only when the Microsoft
-            provider is set to your own tenant, not "common" or
-            "organizations".
+            says so only through the optional claim xms_edov, which its app
+            registration must add to the ID token: see <Link to="/admin/sso">Single sign-on</Link>.
           </Typography.Paragraph>
         )}
 

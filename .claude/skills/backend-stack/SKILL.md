@@ -94,15 +94,27 @@ database** (`SettingsService`, passed in as `AuthSettings`):
   `'open'`);
 - **the access policy lives in `databaseHooks`**: `user.create.before` refuses
   an address outside `allowedDomains` (a provider's must also be verified),
-  and the administrator's address from a provider that does not vouch for it;
+  and the administrator's address unless a provider vouches for it — a
+  password sign-up with it is `ADMIN_ADDRESS_RESERVED`, only the server
+  (`resetAdminPassword`, no request context) creates it otherwise;
   `session.create.before` — which runs after the credentials were checked, so
-  it leaks nothing — promotes ADMIN_EMAIL (always: role and verified
-  address), exempts admins, refuses a password
+  it leaks nothing — promotes ADMIN_EMAIL **only once its address is
+  verified** (never marks it verified), exempts admins, refuses a password
   session under `'admins'` (only `/callback/:id` and `/sign-in/social` are
   single sign-on), and an unlisted or unverified address. A thrown `APIError`
   answers the request, or redirects a single sign-on to its `errorCallbackURL`
-  with the code. A Microsoft provider in the organisation's own tenant marks
-  addresses verified (`mapProfileToUser`): shared tenants do not vouch for them;
+  with the code. Microsoft addresses are verified only on the optional claim
+  `xms_edov` (`mapProfileToUser`, any tenant): its `email` claim is whatever
+  the directory holds (nOAuth);
+- **proving an address** — following a verification link
+  (`afterEmailVerification`) or a reset link on an unverified account
+  (`onPasswordReset`) — marks it verified and revokes the sessions, API keys
+  (`apikey.referenceId`) and MCP tokens (`oauthAccessToken.userId`) made
+  before (`AuthService.proveAddress`): whoever signed up with the address may
+  not own it. Every reset revokes sessions (`revokeSessionsOnPasswordReset`);
+- rate limits key on `CLIENT_IP_HEADER`, which `server.ts` overwrites with
+  `req.ip` (decided by `TRUST_PROXY`) — never on a client-written
+  X-Forwarded-For;
 - account linking is left to better-auth's defaults — **no `trustedProviders`**:
   an SSO account joins an existing one only when the provider vouches for the
   address and the local one is verified, or an account claiming an address
@@ -133,7 +145,8 @@ so the login page renders only what works. Adding a provider means extending
 
 Two resolution helpers on the service, used by the auth middleware and the MCP
 router: `resolveApiKeyOwner(key)` and `resolveMcpBearerOwner(token)`. Both return
-a user id or `null`, never throw.
+a user id or `null`, never throw, and apply the domain list to the owner —
+the session hooks never see these credentials.
 
 ## MCP SDK
 
@@ -154,8 +167,8 @@ REST routes do **not** use zod. → skill `backend-routes`
 | Library | Role |
 |---|---|
 | `@react-pdf/renderer` | PDF export (→ skill `pdf-export`) |
-| `express-rate-limit` | 20 requests / 15 min on `/api/auth` only |
-| `nodemailer` | `MailerService`, entirely optional — configured from the SMTP server stored in the database (Administration → Email), `isConfigured` is false without one, and the features that need it turn themselves off |
+| `express-rate-limit` | 20 requests / 15 min on `/api/auth` only, `get-session` excepted; keyed on `req.ip`, so behind a proxy `TRUST_PROXY` must be set |
+| `nodemailer` | `MailerService`, entirely optional — configured from the SMTP server stored in the database (Administration → Email), `isConfigured` is false without one, and the features that need it turn themselves off. `requireTLS` whenever credentials are sent; account names are escaped and shortened in emails, since whoever signs up chooses them |
 | `dotenv` | loaded by `src/loadEnv.ts`, imported first in `server.ts` |
 
 ## Environment
@@ -166,6 +179,7 @@ REST routes do **not** use zod. → skill `backend-routes`
 `config/authDb.ts` imports it again defensively.
 
 Variables with real startup validation: `CORS_ORIGIN` (no `'*'` in production),
+`TRUST_PROXY` (a number of proxies or Express addresses, never `true`),
 `PUBLIC_APP_URL` (must be an absolute http(s) URL — the MCP export tool throws
 otherwise). Everything else degrades quietly, which is a reason to check
 `.env.example` when adding one.
@@ -174,11 +188,13 @@ Email and single sign-on are **not** configured by the environment: the SMTP
 server, address verification and the Google / GitHub / Microsoft applications
 are instance settings, set by an admin in the app and stored in
 `InstanceSettings` (SMTP password and client secrets encrypted with the auth
-secret, `AuthService.encrypt`). `ADMIN_EMAIL` is what bootstraps that admin.
+secret, `AuthService.encrypt`; a stored SMTP password is kept only for the
+same host, port and user). `ADMIN_EMAIL` is what bootstraps that admin.
 Two server commands act on it: `npm run admin:reset-password`
-(`scripts/resetAdminPassword.ts`), the way back in when they cannot sign in,
-and `npm run admin:demote-others`, which takes the role from every other
-account after `ADMIN_EMAIL` changed.
+(`scripts/resetAdminPassword.ts`), which creates the account on a new
+instance and is the way back in — it revokes the account's sessions, API keys
+and MCP tokens — and `npm run admin:demote-others`, which takes the role from
+every other account after `ADMIN_EMAIL` changed.
 
 ## Build
 

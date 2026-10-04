@@ -16,6 +16,7 @@ const SIGN_IN_ERRORS: Record<string, string> = {
   EMAIL_DOMAIN_NOT_ALLOWED: "This address is not allowed on this instance. Sign in with your organisation's account.",
   ADDRESS_NOT_VERIFIED: 'Your address must be verified before you can sign in. Ask your administrator.',
   PASSWORD_SIGN_IN_DISABLED: "Sign in with your organisation's account: passwords are for administrators.",
+  ADMIN_ADDRESS_RESERVED: "This address is the administrator's: its account is created on the server, or through single sign-on.",
   // better-auth's own: the provider did not vouch for an address an existing
   // account already uses, or that account's address is not verified.
   ACCOUNT_NOT_LINKED: 'An account already uses this address: sign in the way you created it.',
@@ -26,6 +27,20 @@ const SIGN_IN_ERRORS: Record<string, string> = {
 function signInError(code: string | null | undefined): string | undefined {
   if (!code) return undefined
   return SIGN_IN_ERRORS[code.toUpperCase().replace(/[^A-Z]+/g, '_')]
+}
+
+// Where `redirect` may send a user once signed in: a page of this site, never
+// another one or a `javascript:` URL — the parameter is anyone's to write.
+// Resolved rather than matched, since the browser drops tabs and newlines
+// from a URL: "/\t/evil.example" would become "//evil.example".
+function sameOriginPath(target: string | null): string {
+  if (!target) return '/'
+  try {
+    const url = new URL(target, window.location.origin)
+    return url.origin === window.location.origin ? `${url.pathname}${url.search}${url.hash}` : '/'
+  } catch {
+    return '/'
+  }
 }
 
 type SignInValues = { email: string; password: string }
@@ -49,7 +64,7 @@ export default function LoginPage() {
     if (params.get('client_id') && params.get('response_type')) {
       return `/api/auth/mcp/authorize?${params.toString()}`
     }
-    return params.get('redirect') ?? '/'
+    return sameOriginPath(params.get('redirect'))
   }, [params])
 
   // OAuth resume URLs point at the backend, so a full navigation is required

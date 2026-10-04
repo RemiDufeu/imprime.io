@@ -79,10 +79,16 @@ admins read the settings or change either, through `requireAdmin`
 it holds for API keys as for sessions. The account of `ADMIN_EMAIL` — one
 address — is promoted at startup and at every sign-in, by password or single
 sign-on (`AuthService.promoteConfiguredAdmin` and the `session.create` hook),
-whatever its verification state; its address is then marked verified. Whoever
-creates that account first gets the role, which the startup log warns about
-while it has none. The role stays in the database when `ADMIN_EMAIL` changes:
+**only once its address is verified**. It is created by
+`npm run admin:reset-password` (address verified: the operator vouches) or by
+a provider vouching for the address; a password sign-up with it is refused
+(`ADMIN_ADDRESS_RESERVED`), or the first to sign up would claim the role. The
+role stays in the database when `ADMIN_EMAIL` changes:
 `npm run admin:demote-others` takes it from every other account.
+
+API keys and MCP tokens never meet the session hooks, so
+`resolveApiKeyOwner` / `resolveMcpBearerOwner` apply the domain list
+themselves: a new credential type must too.
 
 ## Error contract
 
