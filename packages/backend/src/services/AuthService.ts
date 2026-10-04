@@ -33,6 +33,14 @@ function hasAdminRole(user: User | null): boolean {
   return user !== null && 'role' in user && user.role === ADMIN_ROLE
 }
 
+// The admin plugin's ban, which it enforces on sessions only. A ban past its
+// `banExpires` has lapsed; none means for good.
+function isBanned(user: User): boolean {
+  if (!('banned' in user) || user.banned !== true) return false
+  const expires = 'banExpires' in user ? user.banExpires : null
+  return !(expires instanceof Date) || expires.getTime() > Date.now()
+}
+
 // The part of better-auth's internal adapter promotion needs.
 interface UserStore {
   updateUser(userId: string, data: { role: string }): Promise<unknown>
@@ -627,13 +635,13 @@ export class AuthService {
 
   /**
    * Whether `userId` may still use the instance outside a session — API keys,
-   * MCP tokens — which the session hooks never see: under the domain list as
-   * at sign-in, administrators exempt.
+   * MCP tokens — which the session hooks and the admin plugin never see: not
+   * banned, and under the domain list as at sign-in, administrators exempt.
    */
   private async isAllowedWithoutSession(userId: string): Promise<boolean> {
     const { internalAdapter } = await this.instance.$context
     const user = await internalAdapter.findUserById(userId)
-    if (!user) return false
+    if (!user || isBanned(user)) return false
     return hasAdminRole(user) || isAddressAllowed(user, this.built.allowedDomains)
   }
 

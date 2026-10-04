@@ -38,6 +38,34 @@ if (IS_PRODUCTION && CORS_ORIGIN === '*') {
 }
 
 /**
+ * PUBLIC_APP_URL is what links in emails and single sign-on callbacks are
+ * built from. Without it, better-auth takes each request's Host header —
+ * anyone's to write — so a password reset asked for with `Host: evil.example`
+ * would email the real user a link that hands the token to that site.
+ */
+function checkPublicAppUrl(): void {
+  if (!IS_PRODUCTION) return
+  const value = process.env.PUBLIC_APP_URL?.trim()
+  let url: URL | null = null
+  try {
+    url = value ? new URL(value) : null
+  } catch {
+    url = null
+  }
+  if (!url || (url.protocol !== 'https:' && url.protocol !== 'http:')) {
+    throw new Error(
+      'PUBLIC_APP_URL must be set in production to the address users open, e.g. https://imprime.example.com: without it, links in emails are built from the Host header, which anyone can write.',
+    )
+  }
+  // better-auth marks cookies Secure from the base URL's scheme.
+  if (url.protocol === 'http:') {
+    console.warn(`PUBLIC_APP_URL is ${url.origin}, not https: session cookies go without the Secure flag, readable on the network.`)
+  }
+}
+
+checkPublicAppUrl()
+
+/**
  * The reverse proxies in front of the server (TRUST_PROXY): how many, or their
  * addresses as Express takes them ("loopback", "10.0.0.0/8"). The client's
  * address is then read from X-Forwarded-For, past them. Unset, it is the
@@ -128,10 +156,10 @@ app.get('/.well-known/oauth-protected-resource', adaptWebHandler(protectedResour
 
 app.use(express.json({ limit: '10mb' }))
 
-// Request logging
-app.use((req, res, next) => {
-  const isAuthPath = req.path.startsWith('/api/auth')
-  console.log(`${req.method} ${isAuthPath ? req.path : req.originalUrl}`)
+// Request logging: the path, never the query string, which carries secrets —
+// the password reset link lands on /reset-password?token=…
+app.use((req, _res, next) => {
+  console.log(`${req.method} ${req.path}`)
   next()
 })
 

@@ -34,7 +34,7 @@ administrator's API key: see *Settings Methods* in the
 | Variable | Role |
 |---|---|
 | `BETTER_AUTH_SECRET` | Required: production refuses to start without it. It signs session cookies and encrypts the SMTP password and the SSO client secrets stored in the database. Generate one with `openssl rand -base64 32`. See [Changing the secret](#changing-the-secret) before you change it. |
-| `PUBLIC_APP_URL` | The address users open, e.g. `https://imprime.example.com`. SSO callback URLs and the links in emails are built from it. |
+| `PUBLIC_APP_URL` | Required in production: the server refuses to start without it. The address users open, e.g. `https://imprime.example.com`. SSO callback URLs and the links in emails are built from it. Without it they would be built from each request's `Host` header, which anyone can forge to have a reset link point at their own site. Use `https://`: with `http://`, session cookies lose the `Secure` flag, and the log warns about it. |
 | `CORS_ORIGIN` | Origins allowed to call the API, comma-separated. `*` is refused in production. |
 | `ADMIN_EMAIL` | The administrator's address: see [The administrator](#the-administrator). |
 | `MONGODB_URI` | Where accounts, sessions and settings live. It must be a replica set: see [MongoDB](#mongodb-must-be-a-replica-set). |
@@ -341,8 +341,8 @@ themselves. A client's name is therefore whatever its author chose.
 
 ## Limits
 
-- **API keys and MCP OAuth tokens** obey the domain list, not the password
-  policy. There is no screen yet for an administrator to revoke another
+- **API keys and MCP OAuth tokens** obey the domain list and a ban (through
+  the API: `POST /api/auth/admin/ban-user`), not the password policy. There is no screen yet for an administrator to revoke another
   user's keys. An MCP token lasts one hour, renewable for up to 7 days.
 - **Several backend processes.** Settings take effect in the process that saved
   them. Restart the other processes.

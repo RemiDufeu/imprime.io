@@ -7,7 +7,7 @@ metadata:
 
 # Backend Stack
 
-`packages/backend` — Express 5 on Node 18+, MongoDB via Mongoose, better-auth
+`packages/backend` — Express 5 on Node 20+ (24 in CI and the Docker image), MongoDB via Mongoose, better-auth
 for identity, and an MCP server. `tsx watch` in development, a single esbuild
 bundle in production.
 
@@ -168,7 +168,7 @@ REST routes do **not** use zod. → skill `backend-routes`
 |---|---|
 | `@react-pdf/renderer` | PDF export (→ skill `pdf-export`) |
 | `express-rate-limit` | 20 requests / 15 min on `/api/auth` only, `get-session` excepted; keyed on `req.ip`, so behind a proxy `TRUST_PROXY` must be set |
-| `nodemailer` | `MailerService`, entirely optional — configured from the SMTP server stored in the database (Administration → Email), `isConfigured` is false without one, and the features that need it turn themselves off. `requireTLS` whenever credentials are sent; account names are escaped and shortened in emails, since whoever signs up chooses them |
+| `nodemailer` | v10, typed by itself (no `@types/nodemailer`), needs Node 20+. `MailerService`, entirely optional — configured from the SMTP server stored in the database (Administration → Email), `isConfigured` is false without one, and the features that need it turn themselves off. `requireTLS` whenever credentials are sent; account names are escaped and shortened in emails, since whoever signs up chooses them |
 | `dotenv` | loaded by `src/loadEnv.ts`, imported first in `server.ts` |
 
 ## Environment
@@ -180,8 +180,11 @@ REST routes do **not** use zod. → skill `backend-routes`
 
 Variables with real startup validation: `CORS_ORIGIN` (no `'*'` in production),
 `TRUST_PROXY` (a number of proxies or Express addresses, never `true`),
-`PUBLIC_APP_URL` (must be an absolute http(s) URL — the MCP export tool throws
-otherwise). Everything else degrades quietly, which is a reason to check
+`PUBLIC_APP_URL` (an absolute http(s) URL, required in production: without
+it better-auth builds email links from the request's Host header, so a reset
+asked for with a forged Host mails the token to another site; a warning when
+it is http, since cookies then lose `Secure`). The request log prints paths
+only, never query strings, which carry tokens. Everything else degrades quietly, which is a reason to check
 `.env.example` when adding one.
 
 Email and single sign-on are **not** configured by the environment: the SMTP
