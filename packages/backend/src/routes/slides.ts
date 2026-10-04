@@ -7,17 +7,18 @@ const router = Router()
 
 router.patch('/:id/slides/:slideId', requireOwnsPresentation, async (req, res) => {
   const data: SlideDTO.Update = req.body
-  await slideService.updateShapes(req.params.id, req.params.slideId, data)
+  await slideService.updateShapes(req.params.id, req.user!.id, req.params.slideId, data)
   res.status(204).end()
 })
 
 router.post('/:id/slides', requireOwnsPresentation, async (req, res) => {
-  await slideService.create(req.params.id)
-  res.status(201).end()
+  const data: SlideDTO.Create = req.body ?? {}
+  const slide = await slideService.create(req.params.id, req.user!.id, data)
+  res.status(201).json(slide)
 })
 
 router.delete('/:id/slides/:slideId', requireOwnsPresentation, async (req, res) => {
-  await slideService.delete(req.params.id, req.params.slideId)
+  await slideService.delete(req.params.id, req.user!.id, req.params.slideId)
   res.status(204).end()
 })
 

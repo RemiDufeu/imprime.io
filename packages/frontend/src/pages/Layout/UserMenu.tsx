@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { Dropdown, Avatar, Typography } from 'antd'
-import { KeyOutlined, LogoutOutlined } from '@ant-design/icons'
-import { useSession, signOut } from '../../auth/authClient'
+import { ControlOutlined, KeyOutlined, LogoutOutlined } from '@ant-design/icons'
+import { isAdmin, useSession, signOut } from '../../auth/authClient'
 
 /** Stable, readable color derived from the email hash (variable hue, fixed sat/lightness). */
 function colorFromEmail(email: string): string {
@@ -13,7 +13,7 @@ function colorFromEmail(email: string): string {
   return `hsl(${hue}, 60%, 45%)`
 }
 
-/** Avatar (first-name initial, auto color) + dropdown menu (API keys, log out). */
+/** Avatar (first-name initial, auto color) + dropdown menu (API keys, administration for admins, log out). */
 export default function UserMenu() {
   const navigate = useNavigate()
   const { data } = useSession()
@@ -48,6 +48,14 @@ export default function UserMenu() {
             label: "API Keys",
             onClick: () => navigate('/settings/api-keys'),
           },
+          ...(isAdmin(data.user)
+            ? [{
+                key: 'admin',
+                icon: <ControlOutlined />,
+                label: 'Administration',
+                onClick: () => navigate('/admin'),
+              }]
+            : []),
           { type: 'divider' },
           {
             key: 'logout',

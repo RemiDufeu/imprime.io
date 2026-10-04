@@ -32,6 +32,8 @@ app.use('/api/presentations', requireAuth, slideRouter)
 app.use('/api/presentations', requireAuth, variablesRouter)
 app.use('/api/export',        requireAuth, exportRouter)
 app.use('/api/images',        requireAuth, imagesRouter)
+app.use('/api/fonts',         requireAuth, fontsRouter)
+app.use('/api/settings',      requireAuth, settingsRouter)
 ```
 
 **Three routers share the `/api/presentations` mount.** That is why
@@ -48,7 +50,13 @@ goes inside that pipeline; putting one outside it needs a stated reason
 ```
 mount:    requireAuth               → sets req.user, or 401
 handler:  requireOwnsPresentation   → 404 if req.user does not own :id
+handler:  requireAdmin              → 403 unless req.user has the admin role
 ```
+
+`requireAdmin` guards writes to instance-wide resources (`routes/fonts.ts`:
+reads open, `POST`/`PUT`/`DELETE` guarded). Type a new guard as
+`RequestHandler<Record<string, string>>` like the existing two, or Express
+widens the handler's `req.params` to `string | string[]`.
 
 Every route with a presentation `:id` carries `requireOwnsPresentation`, before
 the handler function. Authentication is not authorization — `requireAuth` only
@@ -141,13 +149,14 @@ file does.
 6. Mirror it in the SDK, the editor's `api.ts`, and an MCP tool if an agent
    should reach it. → command `/new-endpoint`
 
-## Known gap
+## Resources owned outside a presentation
 
-**`routes/images.ts` has no ownership check.** It sits behind `requireAuth`, but
-`Image` documents carry neither `ownerId` nor `presentationId`, so any
-authenticated user can `GET /api/images/:id` or `DELETE /api/images/:id` for any
-image id. Fixing it means scoping images to an owner at the model level, not
-only adding a middleware.
+**`routes/images.ts`** has no `:id` presentation to check: images belong to
+their uploader (`Image.ownerId`), and each handler passes `req.user!.id` to the
+service, which scopes the query by it — someone else's image is a 404, like a
+missing one. Any new resource owned by a user rather than a presentation needs
+the same: ownership in the model and in every query, not only a middleware.
+ObjectIds follow each other, so an id is no secret.
 
 ## Related
 

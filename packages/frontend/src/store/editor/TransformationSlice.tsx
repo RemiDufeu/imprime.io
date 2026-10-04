@@ -1,11 +1,13 @@
 import type { StateCreator } from 'zustand'
 import type { Shape } from '@imprime/sdk'
-import type { ShapeSlice } from '../../store/editor/ShapeSlice'
-import type { SlideSlice } from './SlideSlice'
+import type { ShapeSlice } from './ShapeSlice'
 import type { PresentationSlice } from './PresentationSlice'
+import type { SlideSlice } from './SlideSlice'
+import type { DocumentWriteSlice } from './DocumentWriteSlice'
+import type { SelectionSlice } from './SelectionSlice'
 import { findShapeById, findInnermostGroupAt, extractShapeById, insertShape } from '../../utils/shapeTree'
 import { resizeRect, type Rect, type ResizeHandle } from '../../utils/transform'
-import { selectCurrentSlide } from './selectors'
+import { selectCurrentSlide, selectSelectedShape } from './selectors'
 
 export type { ResizeHandle }
 
@@ -85,36 +87,22 @@ const baseDragState = (
 })
 
 export const createTransformationSlice: StateCreator<
-    ShapeSlice & TransformationSlice & SlideSlice & PresentationSlice,
+    TransformationSlice & ShapeSlice & PresentationSlice & SlideSlice & DocumentWriteSlice & SelectionSlice,
     [],
     [],
     TransformationSlice
 > = (set, get) => {
-    const commitRect = (rect: Rect, shapeId: string) => {
-        const { updateShape, selectShape } = get()
-        updateShape(shapeId, rect)
-        selectShape(shapeId)
-    }
-
     const reparent = (drag: Extract<DragState, { kind: 'translate' }>, rect: Rect, shapeId: string) => {
-        const slide = selectCurrentSlide(get())
-        if (!slide) return
-
         const newAbsX = drag.originalAbsX + (rect.x - drag.originalX)
         const newAbsY = drag.originalAbsY + (rect.y - drag.originalY)
 
-        const parentLoc = drag.hoveredGroupId !== null
-            ? findShapeById(slide.shapes, drag.hoveredGroupId)
-            : null
-        const parentAbsX = parentLoc?.absX ?? 0
-        const parentAbsY = parentLoc?.absY ?? 0
-
-        const { removed, remaining } = extractShapeById(slide.shapes, shapeId)
-        if (!removed) return
-
-        const relocated = { ...removed, x: newAbsX - parentAbsX, y: newAbsY - parentAbsY }
-        get().updateSlideShapes(slide._id, insertShape(remaining, drag.hoveredGroupId, relocated))
-        get().selectShape(shapeId)
+        get()._editSlide(shapes => {
+            const parentLoc = drag.hoveredGroupId !== null ? findShapeById(shapes, drag.hoveredGroupId) : null
+            const { removed, remaining } = extractShapeById(shapes, shapeId)
+            if (!removed) return null
+            const relocated = { ...removed, x: newAbsX - (parentLoc?.absX ?? 0), y: newAbsY - (parentLoc?.absY ?? 0) }
+            return insertShape(remaining, drag.hoveredGroupId, relocated)
+        })
     }
 
     return {
@@ -122,7 +110,7 @@ export const createTransformationSlice: StateCreator<
         dragData: null,
 
         startDrag: (svgElement, clientX, clientY) => {
-            const { selectedShape } = get()
+            const selectedShape = selectSelectedShape(get())
             if (!selectedShape) return
 
             const slide = selectCurrentSlide(get())
@@ -142,7 +130,7 @@ export const createTransformationSlice: StateCreator<
         },
 
         startResize: (svgElement, handle, clientX, clientY) => {
-            const { selectedShape } = get()
+            const selectedShape = selectSelectedShape(get())
             if (!selectedShape) return
 
             set({
@@ -155,8 +143,8 @@ export const createTransformationSlice: StateCreator<
         },
 
         onMouseMove: (clientX, clientY) => {
-            const { dragData, selectedShape } = get()
-            if (!dragData || !selectedShape) return
+            const { dragData, selectedShapeId } = get()
+            if (!dragData || !selectedShapeId) return
 
             const startSVG = clientToSVG(dragData.svgElement, dragData.startClientX, dragData.startClientY)
             const currentSVG = clientToSVG(dragData.svgElement, clientX, clientY)
@@ -184,7 +172,7 @@ export const createTransformationSlice: StateCreator<
             const slide = selectCurrentSlide(get())
             if (!slide) return
 
-            const hit = findInnermostGroupAt(slide.shapes, currentSVG.x, currentSVG.y, selectedShape.id)
+            const hit = findInnermostGroupAt(slide.shapes, currentSVG.x, currentSVG.y, selectedShapeId)
             const hoveredGroupId = hit?.id ?? null
             const highlightedGroup: GroupHighlight | null =
                 hit && hit.id !== dragData.originalParentGroupId
@@ -202,19 +190,19 @@ export const createTransformationSlice: StateCreator<
         },
 
         onMouseUp: () => {
-            const { dragData, transformationData, selectedShape } = get()
+            const { dragData, transformationData, selectedShapeId } = get()
             if (!dragData) return
 
-            if (transformationData && selectedShape) {
+            if (transformationData && selectedShapeId) {
                 // Re-parent only when the destination differs from the source
                 // parent; otherwise it's a plain move within the same container.
                 if (
                     dragData.kind === 'translate'
                     && dragData.hoveredGroupId !== dragData.originalParentGroupId
                 ) {
-                    reparent(dragData, transformationData, selectedShape.id)
+                    reparent(dragData, transformationData, selectedShapeId)
                 } else {
-                    commitRect(transformationData, selectedShape.id)
+                    get().updateShape(selectedShapeId, transformationData)
                 }
             }
 

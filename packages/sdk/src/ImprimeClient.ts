@@ -6,12 +6,24 @@ import type {
   RectangleShape,
   EllipseShape,
   TextBoxShape,
+  Paragraph,
+  TextAlign,
+  TextVerticalAlign,
+  ListType,
   ImageShape,
   ImageDTO,
+  FontDTO,
+  FontVariant,
   PresentationDTO,
+  SlideDTO,
   VariableDTO,
   VariableValueType,
   EnabledAuthProviders,
+  OAuthConsentRequest,
+  EmailSettingsDTO,
+  SsoSettingsDTO,
+  SsoProvider,
+  AccessSettingsDTO,
 } from '@imprime/common'
 
 export interface ImprimeClientOptions {
@@ -37,10 +49,10 @@ export interface ImprimeClientOptions {
  * const presentation = await client.createPresentation('My Presentation')
  *
  * // Add a slide
- * const updated = await client.addSlide(presentation._id)
+ * const slide = await client.addSlide(presentation._id)
  *
  * // Add shapes
- * await client.addRectangle(presentation._id, updated.slides[0]._id, {
+ * await client.addRectangle(presentation._id, slide._id, {
  *   x: 100, y: 100, width: 200, height: 100, fill: '#3b82f6'
  * })
  * ```
@@ -113,6 +125,15 @@ export class ImprimeClient {
     return this.request<EnabledAuthProviders>('/auth-providers')
   }
 
+  /**
+   * The authorization an OAuth consent page asks the signed-in user to allow,
+   * by the `consent_code` of its URL: the application's name and where the
+   * access goes. Fails with 404 for an unknown, expired or someone else's code.
+   */
+  async getOAuthConsent(consentCode: string): Promise<OAuthConsentRequest> {
+    return this.request<OAuthConsentRequest>(`/oauth-consent/${encodeURIComponent(consentCode)}`)
+  }
+
   // ============================================
   // Presentation Operations
   // ============================================
@@ -165,12 +186,14 @@ export class ImprimeClient {
   // ============================================
 
   /**
-   * Add a new blank slide to a presentation.
-   * The server returns no body — refetch the presentation if you need the new slide's id.
+   * Add a slide to a presentation and return it: blank and last by default,
+   * or at `slide.order` with `slide.shapes`. `slide._id` restores a deleted
+   * slide under its former id.
    */
-  async addSlide(presentationId: string): Promise<void> {
-    return this.request<void>(`/presentations/${presentationId}/slides`, {
+  async addSlide(presentationId: string, slide: SlideDTO.Create = {}): Promise<Slide> {
+    return this.request<Slide>(`/presentations/${presentationId}/slides`, {
       method: 'POST',
+      body: JSON.stringify(slide),
     })
   }
 
@@ -266,7 +289,8 @@ export class ImprimeClient {
   }
 
   /**
-   * Add a text box to a slide
+   * Add a text box to a slide. Each line of `text` becomes a paragraph (a list
+   * item when `list` is set); the formatting options apply to all of them.
    */
   async addText(
     presentationId: string,
@@ -280,21 +304,34 @@ export class ImprimeClient {
       fontSize?: number
       fontFamily?: string
       color?: string
+      align?: TextAlign
+      lineHeight?: number
+      verticalAlign?: TextVerticalAlign
+      list?: ListType
     }
   ): Promise<void> {
+    const paragraphes: Paragraph[] = options.text.split('\n').map(line => ({
+      type: 'paragraph',
+      align: options.align,
+      lineHeight: options.lineHeight,
+      list: options.list,
+      children: [{
+        text: line,
+        fontSize: options.fontSize !== undefined ? `${options.fontSize}px` : undefined,
+        fontFamily: options.fontFamily,
+        color: options.color,
+      }],
+    }))
+
     const shape: TextBoxShape = {
       id: `text-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       type: 'text',
-      x: options.x,
+      x: options.x, 
       y: options.y,
       width: options.width || 200,
       height: options.height || 50,
-      paragraphes: [
-        {
-          type : 'paragraph',
-          children : [{text : ''}]
-        }
-      ],
+      verticalAlign: options.verticalAlign,
+      paragraphes,
     }
     return this.addShape(presentationId, slideId, shape)
   }
@@ -341,9 +378,10 @@ export class ImprimeClient {
   // ============================================
 
   /**
-   * Upload an image (base64)
-   * @param data - Base64 encoded image data
-   * @param mimeType - MIME type (e.g., 'image/jpeg', 'image/png')
+   * Upload a PNG or JPEG image (base64). Its format is read from the data,
+   * which must agree with `mimeType`.
+   * @param data - Base64 encoded image data, or a base64 data URL
+   * @param mimeType - 'image/png' or 'image/jpeg'
    * @param originalName - Original filename
    * @returns Image ID and metadata
    */
@@ -393,6 +431,154 @@ export class ImprimeClient {
       alt: options.alt,
     }
     return this.addShape(presentationId, slideId, shape)
+  }
+
+  // ============================================
+  // Font Operations
+  // ============================================
+
+  /**
+   * List the font families imported into the instance. A text run uses one by
+   * setting `fontFamily` to its `family`.
+   */
+  async listFonts(): Promise<FontDTO.Response[]> {
+    return this.request<FontDTO.Response[]>('/fonts')
+  }
+
+  /**
+   * Import a font family with its regular face. Admin only.
+   * @param family - Name runs will refer to it by; unique in the instance and
+   *   distinct from the built-in fonts
+   * @param regular - Base64 TrueType (.ttf) or OpenType (.otf) file
+   */
+  async createFont(family: string, regular: FontDTO.FaceUpload): Promise<FontDTO.Response> {
+    return this.request<FontDTO.Response>('/fonts', {
+      method: 'POST',
+      body: JSON.stringify({ family, regular }),
+    })
+  }
+
+  /**
+   * Add or replace one face of an imported family. Admin only.
+   * @param variant - 'regular' | 'bold' | 'italic' | 'boldItalic'
+   */
+  async setFontFace(fontId: string, variant: FontVariant, face: FontDTO.FaceUpload): Promise<FontDTO.Response> {
+    return this.request<FontDTO.Response>(`/fonts/${fontId}/faces/${variant}`, {
+      method: 'PUT',
+      body: JSON.stringify(face),
+    })
+  }
+
+  /**
+   * Get the file of one face, base64-encoded
+   */
+  async getFontFace(fontId: string, variant: FontVariant): Promise<FontDTO.FaceData> {
+    return this.request<FontDTO.FaceData>(`/fonts/${fontId}/faces/${variant}`)
+  }
+
+  /**
+   * Remove an optional face; runs asking for it fall back to the closest face
+   * left. The regular face cannot be removed. Admin only.
+   */
+  async deleteFontFace(fontId: string, variant: Exclude<FontVariant, 'regular'>): Promise<FontDTO.Response> {
+    return this.request<FontDTO.Response>(`/fonts/${fontId}/faces/${variant}`, {
+      method: 'DELETE',
+    })
+  }
+
+  /**
+   * Delete an imported family. Text using it, in every presentation, is drawn
+   * in the default font. Admin only.
+   */
+  async deleteFont(fontId: string): Promise<void> {
+    return this.request<void>(`/fonts/${fontId}`, {
+      method: 'DELETE',
+    })
+  }
+
+  // ============================================
+  // Settings Operations
+  // ============================================
+
+  /**
+   * Get the instance's email settings: its SMTP server, and whether accounts
+   * must verify their address. The SMTP password is never returned. Admin only.
+   */
+  async getEmailSettings(): Promise<EmailSettingsDTO.Response> {
+    return this.request<EmailSettingsDTO.Response>('/settings/email')
+  }
+
+  /**
+   * Replace the instance's email settings. They apply at once, without a
+   * restart. Omit `smtp.password` to keep the stored one (same user only). Admin only.
+   */
+  async updateEmailSettings(settings: EmailSettingsDTO.Update): Promise<EmailSettingsDTO.Response> {
+    return this.request<EmailSettingsDTO.Response>('/settings/email', {
+      method: 'PUT',
+      body: JSON.stringify(settings),
+    })
+  }
+
+  /**
+   * Send a test email through `request.smtp`, or through the stored server
+   * when it is omitted. Nothing is saved. Admin only.
+   */
+  async sendTestEmail(request: EmailSettingsDTO.TestRequest): Promise<void> {
+    return this.request<void>('/settings/email/test', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    })
+  }
+
+  /**
+   * Get the instance's single sign-on providers: for each, the callback URL to
+   * register with the provider and the stored application, if any. Client
+   * secrets are never returned. Admin only.
+   */
+  async getSsoSettings(): Promise<SsoSettingsDTO.Response> {
+    return this.request<SsoSettingsDTO.Response>('/settings/sso')
+  }
+
+  /**
+   * Configure one provider. It is offered on the sign-in page at once,
+   * without a restart. Omit `clientSecret` to keep the stored one (same
+   * `clientId` only). Admin only.
+   */
+  async updateSsoProvider(
+    provider: SsoProvider,
+    data: SsoSettingsDTO.ProviderUpdate,
+  ): Promise<SsoSettingsDTO.ProviderStatus> {
+    return this.request<SsoSettingsDTO.ProviderStatus>(`/settings/sso/${provider}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
+  }
+
+  /**
+   * Who may get into the instance: the password policy, and the domains
+   * whose addresses may have an account. Admin only.
+   */
+  async getAccessSettings(): Promise<AccessSettingsDTO.Response> {
+    return this.request<AccessSettingsDTO.Response>('/settings/access')
+  }
+
+  /**
+   * Replace the access settings, at once. Users they now shut out are signed
+   * out: everyone but administrators when single sign-on becomes the only
+   * way in, those outside the domains when the list changes. Admin only.
+   */
+  async updateAccessSettings(settings: AccessSettingsDTO.Update): Promise<AccessSettingsDTO.Response> {
+    return this.request<AccessSettingsDTO.Response>('/settings/access', {
+      method: 'PUT',
+      body: JSON.stringify(settings),
+    })
+  }
+
+  /** Remove one provider's application: it leaves the sign-in page at once. Admin only. */
+  async removeSsoProvider(provider: SsoProvider): Promise<SsoSettingsDTO.ProviderStatus> {
+    return this.request<SsoSettingsDTO.ProviderStatus>(`/settings/sso/${provider}`, {
+      method: 'DELETE',
+    })
   }
 
   // ============================================

@@ -50,7 +50,7 @@ Three configuration facts that are easy to break:
 2. **`<App>` wraps the tree** inside `ConfigProvider` (`AntdProvider.tsx`). It is
    what makes the `message`/`modal`/`notification` hooks work under React 19.
    Slices import the static `message` from `antd` (`VariableSlice`,
-   `ShapeCreationSlice`) — that works because of the patch, but inside a
+   `ImportSlice`, `HistorySlice`) — that works because of the patch, but inside a
    component prefer `App.useApp()`.
 3. **`cssVar: true`** is set on the theme, which is what publishes every design
    token as a `--ant-*` CSS custom property for the stylesheets to consume.
@@ -94,9 +94,10 @@ better-auth needs an absolute URL, hence the `window.location.origin` fallback.
 ## Slate
 
 Rich text inside a text box only. `TextBoxEditor.tsx`, `withVariables.ts`,
-`VariableBlock.tsx`, and the `RichTextEditorSlice`. Each `SVGText` owns its own
-editor instance via `useMemo`; the *active* one is held in the store so toolbars
-can act on it. Slate document shape is the domain type `Paragraph[]`, not a
+`withLists.ts`, `VariableBlock.tsx`, and the `TextEditorSlice`. Each `SVGText`
+owns its own editor instance via `useMemo` (with `withHistory`); the *active*
+one is held in the store, as an editing session the store begins and ends, so
+toolbars can act on it and the typing is committed synchronously. Slate document shape is the domain type `Paragraph[]`, not a
 Slate-specific format — that is what lets the PDF renderer walk the same data.
 → skill `variable-system`
 

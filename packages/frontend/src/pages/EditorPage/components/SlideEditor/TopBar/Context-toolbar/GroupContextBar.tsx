@@ -1,7 +1,7 @@
 import { Select, InputNumber, Divider } from 'antd'
 import type { GroupAlign, GroupJustify, GroupLayoutDirection } from '@imprime/sdk'
-import { useCurrentSlide, useEditorStore } from '../../../../../../store/editor/EditorStore'
-import { findShapeById } from '../../../../../../utils/shapeTree'
+import { useEditorStore } from '../../../../../../store/editor/EditorStore'
+import { selectSelectedShape } from '../../../../../../store/editor/selectors'
 
 const LAYOUT_OPTIONS: { value: GroupLayoutDirection; label: string }[] = [
   { value: 'none', label: 'None' },
@@ -25,19 +25,10 @@ const ALIGN_OPTIONS: { value: GroupAlign; label: string }[] = [
 ]
 
 export function GroupContextBar() {
-  const selectedShapeId = useEditorStore(state => state.selectedShape?.id)
-  const selectedShapeType = useEditorStore(state => state.selectedShape?.type)
+  const group = useEditorStore(selectSelectedShape)
   const updateShape = useEditorStore(state => state.updateShape)
-  const currentSlide = useCurrentSlide()
 
-  if (!selectedShapeId || selectedShapeType !== 'group') return null
-
-  // Read the live shape from the tree rather than the store's `selectedShape`
-  // snapshot — updateShape doesn't refresh that snapshot, so controls bound
-  // to it would appear to ignore every change.
-  const loc = currentSlide ? findShapeById(currentSlide.shapes, selectedShapeId) : null
-  if (!loc || loc.shape.type !== 'group') return null
-  const group = loc.shape
+  if (group?.type !== 'group') return null
 
   const layout = group.layout ?? 'none'
   const justify = group.justify ?? 'start'

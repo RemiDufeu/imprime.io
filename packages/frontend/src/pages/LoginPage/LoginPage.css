@@ -1,0 +1,9 @@
+.login-page-error {
+  margin-bottom: var(--space-m);
+  text-align: left;
+}
+
+.login-page-admin-link {
+  margin-top: var(--space-m);
+  margin-bottom: 0;
+}

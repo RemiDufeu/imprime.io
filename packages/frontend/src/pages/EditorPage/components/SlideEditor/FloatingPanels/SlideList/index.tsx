@@ -1,9 +1,10 @@
-import { Button, Popconfirm } from "antd";
+import { Button, Tooltip } from "antd";
 import { PlusOutlined, DeleteOutlined } from "@ant-design/icons";
 import "./SlideList.css";
 import { useRef, useState, useLayoutEffect } from "react";
 import { SlideCanvas } from "../../../../../../components/slide/SlideCanvas";
 import { useEditorStore } from "../../../../../../store/editor/EditorStore";
+import { MOD_LABEL } from "../../../../../../utils/hotkeys";
 
 export default function SlideList() {
 
@@ -172,27 +173,21 @@ export default function SlideList() {
                                 />
                             </div>
                         </div>
+                        {/* No confirmation: a deleted slide is one undo away. */}
                         {presentation.slides.length > 1 && (
-                            <Popconfirm
-                                title="Delete this slide?"
-                                description="This action is irreversible."
-                                onConfirm={(e) => {
-                                    e?.stopPropagation();
-                                    deleteSlide(slide._id);
-                                }}
-                                okText="Delete"
-                                cancelText="Cancel"
-                                okButtonProps={{ danger: true }}
-                            >
+                            <Tooltip title={`Delete slide (undo: ${MOD_LABEL}+Z)`} mouseEnterDelay={0.4}>
                                 <Button
                                     type="text"
                                     danger
                                     icon={<DeleteOutlined />}
                                     size="small"
                                     className="slide-thumbnail-delete"
-                                    onClick={(e) => e.stopPropagation()}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        deleteSlide(slide._id);
+                                    }}
                                 />
-                            </Popconfirm>
+                            </Tooltip>
                         )}
                     </div>
                 </div>))}

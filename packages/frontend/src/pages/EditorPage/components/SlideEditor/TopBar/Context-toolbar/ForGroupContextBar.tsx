@@ -1,7 +1,7 @@
 import { Select, InputNumber, Divider } from 'antd'
 import type { GroupAlign, GroupJustify, GroupLayoutDirection } from '@imprime/sdk'
 import { useCurrentSlide, useEditorStore } from '../../../../../../store/editor/EditorStore'
-import { findShapeById } from '../../../../../../utils/shapeTree'
+import { selectSelectedShape } from '../../../../../../store/editor/selectors'
 import {
   decodeItemFieldValue,
   encodeItemFieldValue,
@@ -28,17 +28,12 @@ const ALIGN_OPTIONS: { value: GroupAlign; label: string }[] = [
 ]
 
 export function ForGroupContextBar() {
-  const selectedShapeId = useEditorStore(state => state.selectedShape?.id)
-  const selectedShapeType = useEditorStore(state => state.selectedShape?.type)
+  const group = useEditorStore(selectSelectedShape)
   const updateShape = useEditorStore(state => state.updateShape)
   const variables = useEditorStore(state => state.presentation?.variableData) ?? []
   const currentSlide = useCurrentSlide()
 
-  if (!selectedShapeId || selectedShapeType !== 'for-group') return null
-
-  const loc = currentSlide ? findShapeById(currentSlide.shapes, selectedShapeId) : null
-  if (!loc || loc.shape.type !== 'for-group') return null
-  const group = loc.shape
+  if (group?.type !== 'for-group') return null
 
   // Two ways to bind a repeat: a list variable, or a list field of an item an
   // enclosing for-group is already iterating. The second is what makes nesting

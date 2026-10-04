@@ -10,9 +10,13 @@ import type {
   TextBoxShape,
   ImageShape,
   CustomText,
+  Paragraph,
+  ListStyle,
+  ListMarker,
   TextFormatting,
   VariableValueType,
-  ResolveContext
+  ResolveContext,
+  FontCatalog
 } from '@imprime/common'
 import {
   SLIDE_WIDTH,
@@ -23,26 +27,68 @@ import {
   isEmptyVariableValue,
   stringifyVariableValue,
   getEllipseGeometry,
-  getRectangleCornerRadius
+  getRectangleCornerRadius,
+  getParagraphStyle,
+  getRunTextStyle,
+  resolveFontFace,
+  createFontCatalog,
+  getVerticalJustify,
+  getListStyle,
+  getListMarkers,
+  getListMarkerFormatting,
+  getListLayout,
+  getBulletBox,
+  PARAGRAPH_SPACING
 } from '@imprime/common'
 import type { ImageService } from './ImageService.js'
+import type { FontService } from './FontService.js'
 import { AppError, ValidationError } from './errors.js'
-import { normalizeFontFamily, getFontStyleProps, initializeFonts } from '../config/fonts.js'
+import { isImportedFontRegistered, registerBuiltinFonts, registerImportedFonts } from '../config/fonts.js'
 import type { Style } from '@react-pdf/types'
 
-// Initialize fonts on module load
-initializeFonts()
-
-const DEFAULT_FONT_SIZE = 16
-const LINE_HEIGHT = 1.5
-const PARAGRAPH_SPACING = 8
+registerBuiltinFonts()
 
 export interface RenderOptions {
   variableValues?: Record<string, VariableValueType>
 }
 
+// What one export fetched before drawing: image data URLs by image id, and the
+// fonts its runs can resolve to.
+interface RenderAssets {
+  images: Map<string, string>
+  fonts: FontCatalog
+}
+
+// A render holds the CPU, and the timeout cannot stop one: it only stops
+// waiting for it. How many run at once is capped, overall and per user, so
+// that one account — through the API or MCP — cannot starve the others.
+const MAX_RENDERS = 4
+const MAX_RENDERS_PER_OWNER = 2
+
 export class ExportService {
-  constructor(private imageService: ImageService) { }
+  private renders = 0
+  private rendersByOwner = new Map<string, number>()
+
+  constructor(private imageService: ImageService, private fontService: FontService) { }
+
+  /** Takes a render slot for `ownerId`, or refuses with 429; returns its release. */
+  private acquireRenderSlot(ownerId: string): () => void {
+    const own = this.rendersByOwner.get(ownerId) ?? 0
+    if (this.renders >= MAX_RENDERS || own >= MAX_RENDERS_PER_OWNER) {
+      throw new AppError('Too many PDF exports in progress: try again in a moment', 429, 'EXPORT_BUSY')
+    }
+    this.renders++
+    this.rendersByOwner.set(ownerId, own + 1)
+    let released = false
+    return () => {
+      if (released) return
+      released = true
+      this.renders--
+      const left = (this.rendersByOwner.get(ownerId) ?? 1) - 1
+      if (left > 0) this.rendersByOwner.set(ownerId, left)
+      else this.rendersByOwner.delete(ownerId)
+    }
+  }
 
   private validateVariables(presentation: Presentation, variableValues: Record<string, VariableValueType>): void {
     const requiredVariables = presentation.variableData?.filter(v => v.required) || []
@@ -54,7 +100,9 @@ export class ExportService {
     }
   }
 
-  private async fetchImageData(resolvedSlides: Slide[]): Promise<Map<string, string>> {
+  // Only `ownerId`'s images: a shape's image id is anyone's to write, and an
+  // export must not draw someone else's. One not found is left out.
+  private async fetchImageData(resolvedSlides: Slide[], ownerId: string): Promise<Map<string, string>> {
     const imageIds = new Set<string>()
 
     for (const slide of resolvedSlides) {
@@ -72,7 +120,7 @@ export class ExportService {
 
     const imagePromises = Array.from(imageIds).map(async (imageId) => {
       try {
-        const image = await this.imageService.getById(imageId)
+        const image = await this.imageService.getById(imageId, ownerId)
         let cleanData = image.data.replace(/[\s\n\r]/g, '')
         let dataUrl: string
         if (cleanData.startsWith('data:')) {
@@ -97,6 +145,28 @@ export class ExportService {
     }
 
     return imageDataMap
+  }
+
+  /**
+   * Registers the imported fonts that the runs ask for, and returns the
+   * catalog they resolve against. A family that is not imported (or no longer
+   * is) is left out and drawn in the default font, as the editor draws it.
+   */
+  private async loadFonts(resolvedSlides: Slide[]): Promise<FontCatalog> {
+    const families = new Set<string>()
+    for (const slide of resolvedSlides) {
+      for (const shape of slide.shapes) {
+        if (shape.type !== 'text') continue
+        for (const paragraph of shape.paragraphes) {
+          for (const run of paragraph.children) {
+            if (run.fontFamily) families.add(run.fontFamily)
+          }
+        }
+      }
+    }
+
+    const imported = await this.fontService.getForExport([...families], isImportedFontRegistered)
+    return createFontCatalog(registerImportedFonts(imported))
   }
 
   /**
@@ -171,23 +241,90 @@ export class ExportService {
   /**
    * Style of one text run. Literal text and variable runs carry the same
    * `TextFormatting` props, so both go through here.
+   *
+   * `lineHeight` is the enclosing paragraph's and must be set on every run:
+   * react-pdf multiplies a unitless line height by the font size of the element
+   * that declares it and passes the product down, so a run left to inherit the
+   * paragraph's would get a height computed from the default font size.
    */
-  private inlineTextStyle(node: TextFormatting): Style {
+  private inlineTextStyle(node: TextFormatting, lineHeight: number, fonts: FontCatalog): Style {
     const color = this.parseColor(node.color, '#000000')
 
     return {
-      fontFamily: normalizeFontFamily(node.fontFamily),
-      fontSize: node.fontSize ? parseInt(node.fontSize) : DEFAULT_FONT_SIZE,
+      ...getRunTextStyle(node, fonts),
       color: color.color,
       opacity: color.opacity,
-      lineHeight: LINE_HEIGHT,
-      textDecoration: node.underline ? 'underline' : undefined,
-      ...getFontStyleProps(node.bold, node.italic)
-    } as Style
+      lineHeight,
+    }
   }
 
-  private renderTextBox(shape: TextBoxShape, ctx: ResolveContext): React.ReactElement {
+  /**
+   * A list item: a box padded to the item's text indent, holding the text and,
+   * absolutely positioned in that padding, the marker — the geometry
+   * `getListLayout` describes, which the editor builds the same way.
+   */
+  private renderListItem(
+    key: number,
+    paragraph: Paragraph,
+    style: ListStyle,
+    marker: ListMarker,
+    marginBottom: number,
+    text: React.ReactElement,
+    fonts: FontCatalog
+  ): React.ReactElement {
+    const layout = getListLayout(paragraph, style)
+    const formatting = getListMarkerFormatting(paragraph)
+    const color = this.parseColor(formatting.color, '#000000')
+
+    let markerElement: React.ReactElement
+    if (marker.kind === 'bullet') {
+      const bullet = getBulletBox(marker.shape, layout)
+      markerElement = React.createElement(View, {
+        key: 'marker',
+        fixed: true,
+        style: {
+          position: 'absolute',
+          left: bullet.left,
+          top: bullet.top,
+          width: bullet.size,
+          height: bullet.size,
+          borderRadius: bullet.borderRadius,
+          borderWidth: bullet.borderWidth,
+          borderColor: color.color,
+          backgroundColor: bullet.filled ? color.color : undefined,
+          opacity: color.opacity,
+        }
+      })
+    } else {
+      markerElement = React.createElement(PDFText, {
+        key: 'marker',
+        fixed: true,
+        style: {
+          position: 'absolute',
+          left: layout.markerLeft,
+          top: 0,
+          ...resolveFontFace(formatting, fonts),
+          fontSize: layout.fontSize,
+          lineHeight: layout.lineHeight,
+          color: color.color,
+          opacity: color.opacity,
+        }
+      }, marker.text)
+    }
+
+    return React.createElement(View, {
+      key,
+      fixed: true,
+      style: { paddingLeft: layout.textIndent, marginBottom }
+    }, [text, markerElement])
+  }
+
+  private renderTextBox(shape: TextBoxShape, ctx: ResolveContext, fonts: FontCatalog): React.ReactElement {
+    const markers = getListMarkers(shape.paragraphes)
+
     const paragraphElements = shape.paragraphes.map((paragraph, pIndex) => {
+      const paragraphStyle = getParagraphStyle(paragraph)
+
       const textSegments = paragraph.children.map((child, cIndex) => {
         const content = 'type' in child && child.type === 'variable'
           ? stringifyVariableValue(resolveVariable(child.variableId, ctx))
@@ -196,21 +333,37 @@ export class ExportService {
         return React.createElement(PDFText, {
           key: `${pIndex}-${cIndex}`,
           fixed: true,
-          style: this.inlineTextStyle(child)
+          style: this.inlineTextStyle(child, paragraphStyle.lineHeight, fonts)
         }, content)
       })
 
-      return React.createElement(PDFText, {
-        key: pIndex,
+      const marginBottom = pIndex < shape.paragraphes.length - 1 ? PARAGRAPH_SPACING : 0
+      const listStyle = getListStyle(paragraph)
+      const marker = markers[pIndex]
+
+      if (!listStyle || !marker) {
+        return React.createElement(PDFText, {
+          key: pIndex,
+          fixed: true,
+          style: { marginBottom, ...paragraphStyle }
+        }, textSegments)
+      }
+
+      const text = React.createElement(PDFText, {
+        key: 'text',
         fixed: true,
-        style: {
-          marginBottom: pIndex < shape.paragraphes.length - 1 ? PARAGRAPH_SPACING : 0,
-          lineHeight: LINE_HEIGHT,
-          ...paragraph.style
-        }
+        style: { ...paragraphStyle }
       }, textSegments)
+
+      return this.renderListItem(pIndex, paragraph, listStyle, marker, marginBottom, text, fonts)
     })
 
+    // The outer View is the box and places the text vertically; the inner one
+    // holds the text. The inner View is absolute and has no height on purpose:
+    // react-pdf truncates (with an ellipsis) any text taller than the height it
+    // is measured against, whereas an absolute child is measured unconstrained
+    // and still positioned by the parent's `justifyContent`. Text taller than
+    // the box therefore overflows it, as the editor's flex column does.
     return React.createElement(View, {
       key: shape.id,
       fixed: true,
@@ -219,8 +372,17 @@ export class ExportService {
         left: shape.x,
         top: shape.y,
         width: shape.width,
+        height: shape.height,
+        justifyContent: getVerticalJustify(shape.verticalAlign),
       }
-    }, paragraphElements)
+    }, React.createElement(View, {
+      fixed: true,
+      style: {
+        position: 'absolute',
+        left: 0,
+        width: shape.width,
+      }
+    }, paragraphElements))
   }
 
   private renderImage(shape: ImageShape, imageDataMap: Map<string, string>): React.ReactElement {
@@ -268,7 +430,7 @@ export class ExportService {
   // tree into leaves before rendering starts.
   private renderShape(
     shape: Shape,
-    imageDataMap: Map<string, string>,
+    assets: RenderAssets,
     ctx: ResolveContext
   ): React.ReactElement {
     switch (shape.type) {
@@ -277,9 +439,9 @@ export class ExportService {
       case 'ellipse':
         return this.renderEllipse(shape)
       case 'text':
-        return this.renderTextBox(shape, ctx)
+        return this.renderTextBox(shape, ctx, assets.fonts)
       case 'image':
-        return this.renderImage(shape, imageDataMap)
+        return this.renderImage(shape, assets.images)
       default:
         return React.createElement(View, {})
     }
@@ -287,10 +449,10 @@ export class ExportService {
 
   private renderSlide(
     slide: Slide,
-    imageDataMap: Map<string, string>,
+    assets: RenderAssets,
     ctx: ResolveContext
   ): React.ReactElement {
-    const shapes = slide.shapes.map(shape => this.renderShape(shape, imageDataMap, ctx))
+    const shapes = slide.shapes.map(shape => this.renderShape(shape, assets, ctx))
 
     return React.createElement(Page, {
       key: slide._id,
@@ -305,7 +467,8 @@ export class ExportService {
     }, shapes)
   }
 
-  public async exportToPDF(presentation: Presentation, options: RenderOptions = {}): Promise<Buffer> {
+  /** `ownerId` owns the presentation: only their images are drawn. */
+  public async exportToPDF(presentation: Presentation, ownerId: string, options: RenderOptions = {}): Promise<Buffer> {
     const variableValues = options.variableValues || {}
 
     this.validateVariables(presentation, variableValues)
@@ -317,14 +480,23 @@ export class ExportService {
         .filter(s => s.y < SLIDE_HEIGHT && s.x < SLIDE_WIDTH),
     }))
 
-    const imageDataMap = await this.fetchImageData(resolvedSlides)
-    const pages = resolvedSlides.map(slide => this.renderSlide(slide, imageDataMap, ctx))
+    const [images, fonts] = await Promise.all([
+      this.fetchImageData(resolvedSlides, ownerId),
+      this.loadFonts(resolvedSlides),
+    ])
+    const assets: RenderAssets = { images, fonts }
+    const pages = resolvedSlides.map(slide => this.renderSlide(slide, assets, ctx))
 
     const doc = React.createElement(Document, {}, pages)
 
+    // Held until the render itself ends, not the wait for it.
+    const release = this.acquireRenderSlot(ownerId)
+    const rendering = renderToBuffer(doc)
+    void rendering.then(release, release)
+
     const TIMEOUT_MS = 30_000
     const pdfBuffer = await Promise.race([
-      renderToBuffer(doc),
+      rendering,
       new Promise<never>((_, reject) =>
         setTimeout(() => reject(new AppError('PDF generation timed out after 30s', 408)), TIMEOUT_MS)
       )

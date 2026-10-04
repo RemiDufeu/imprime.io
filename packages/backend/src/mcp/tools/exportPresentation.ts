@@ -72,7 +72,7 @@ export function registerExportPresentation(server: McpServer, ownerId: string): 
       try {
         await assertOwnsPresentation(presentationId, ownerId)
         const presentation = await presentationService.getById(presentationId)
-        const pdfBuffer = await exportService.exportToPDF(presentation, {
+        const pdfBuffer = await exportService.exportToPDF(presentation, ownerId, {
           variableValues: variableValues ?? {},
         })
 

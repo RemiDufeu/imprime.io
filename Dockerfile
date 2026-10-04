@@ -1,5 +1,5 @@
 # BUILD
-FROM node:18-alpine AS builder
+FROM node:24-alpine AS builder
 
 WORKDIR /app
 
@@ -22,7 +22,7 @@ RUN npm run build:frontend
 RUN npm run build:backend
 
 # RUN
-FROM node:18-alpine
+FROM node:24-alpine
 
 WORKDIR /app
 
@@ -40,5 +40,7 @@ COPY --from=builder /app/packages/frontend/dist ./packages/frontend/dist
 COPY --from=builder /app/packages/common/src/assets/fonts ./packages/common/src/assets/fonts
 
 EXPOSE 3023
+
+USER node
 
 CMD ["npm", "run", "start", "--workspace=@imprime/backend"]
