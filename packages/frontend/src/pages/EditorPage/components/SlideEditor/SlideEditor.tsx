@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import LayeringToolbar from '../LayeringToolbar/LayeringToolbar'
 import { CanvasArea } from './CanvasArea/CanvasArea'
 import { TopBar } from './TopBar/TopBar'
@@ -15,15 +16,16 @@ export default function SlideEditor() {
   const layersOpen = useEditorStore(state => state.layersPanelOpen)
   const setSlidesOpen = useEditorStore(state => state.setSlidesPanelOpen)
   const setLayersOpen = useEditorStore(state => state.setLayersPanelOpen)
+  const containerRef = useRef<HTMLDivElement>(null)
 
-  useEditorShortcuts()
+  useEditorShortcuts(containerRef)
 
   if (!currentSlide) {
     return null
   }
 
   return (
-    <div className='editor-container'>
+    <div className='editor-container' ref={containerRef}>
       <CanvasArea slide={currentSlide} />
 
       <div className='actions-layer'>

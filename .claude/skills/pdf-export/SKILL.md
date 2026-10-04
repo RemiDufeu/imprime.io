@@ -17,14 +17,18 @@ metadata:
 ## Pipeline
 
 ```
-exportToPDF(presentation, { variableValues })
+exportToPDF(presentation, ownerId, { variableValues })
   validateVariables          required variables must be non-empty (no default fallback)
   resolveShapes per slide    containers flattened → absolute leaves
   filter                     drop shapes whose x or y is past the slide edge
-  fetchImageData             one batched pass, imageId → data URL
+  fetchImageData             one batched pass, imageId → data URL, ownerId's images only
   renderSlide per slide      Page (1920×1080) + one element per shape
+  acquireRenderSlot          4 renders at once, 2 per owner → AppError(429 EXPORT_BUSY)
   renderToBuffer             raced against a 30s timeout → AppError(408)
 ```
+
+The timeout stops the wait, not the render, which keeps its slot until it
+really ends: the cap is what bounds the CPU.
 
 `renderShape` never sees a container — `resolveShapes` has already expanded
 them. If you add a container type, it is handled in the resolver, not here.
@@ -57,37 +61,59 @@ positioned box across pages. Slides are fixed-size pages; there is no flow.
 **not** `height` — it grows with its content, which is how a long substituted
 variable overflows rather than clipping.
 
-**Text metrics differ from the browser.** Wrapping will not match the editor
-exactly. `LINE_HEIGHT` (1.5), `PARAGRAPH_SPACING` (8) and `DEFAULT_FONT_SIZE`
-(16) are hard-coded here with no counterpart in the editor's CSS — if you change
-one, the two drift further apart, so change both or neither.
+**Text metrics differ from the browser.** react-pdf breaks lines with its own
+algorithm, so wrapping can still differ from the editor by a word.
+`DEFAULT_LINE_HEIGHT` (1.5), `PARAGRAPH_SPACING` (8) and `DEFAULT_FONT_SIZE`
+(24) live in `common/rendering/slideContentStyles.ts` and both renderers read
+them — change them there, never locally. Hyphenation is off on purpose (see
+Fonts): the browser never hyphenates.
 
 ## Fonts
 
-`packages/common/src/fonts.ts` is the single registry: `AVAILABLE_FONTS`,
-`DEFAULT_FONT` (`Roboto`), and `FONT_FILES` mapping each family to its
-regular/bold/italic/boldItalic file stems. Files live in
-`packages/common/src/assets/fonts/`.
+Two kinds of family, one resolution.
 
-`packages/backend/src/config/fonts.ts` registers them with react-pdf at module
-load. Things to know:
+- **Built-in** — `BUILTIN_FONTS` in `packages/common/src/fonts.ts` gives each
+  family a `category` (the font menu groups by it) and the file of each face
+  it has: `regular` always, `bold`, `italic`, `boldItalic` when shipped. Full
+  file names (`.ttf` or `.otf`), in `packages/common/src/assets/fonts/`, with
+  each family's license in `licenses/` (the Docker image copies the folder).
+  Files must be **static** instances — react-pdf cannot use a variable font.
+  Adding a family is the files, the license and one entry; nothing else lists
+  families. `assets/fonts/README.md` has the download recipe.
+- **Imported** — instance-wide, managed by admins: metadata in the `Font`
+  collection, each face's file in its own `FontFile` document (so a family is
+  not bound by MongoDB's 16 MB document limit), checked with fontkit at upload,
+  `MAX_FONT_FILE_SIZE_MB` (5) per file. Registered under `importedFontFamilyName(font)` =
+  `imprime-font-<id>-<version>`: the version changes with every face update,
+  because react-pdf's registry is process-wide and cannot unregister a family.
 
-- **No font substitution by design** — a requested family that is not registered
-  does not silently become Roboto at registration time; `normalizeFontFamily`
-  decides the fallback explicitly.
+A run's face comes from `resolveFontFace(run, catalog)` (or `getRunTextStyle`)
+in `common/rendering/slideContentStyles.ts`, against
+`createFontCatalog(importedFonts)`. An unset or unknown family is drawn in
+`DEFAULT_FONT` (Roboto); a face the family lacks falls back to the closest one
+(`resolveFontVariant`: bold italic → bold → italic → regular). **Never build
+`fontFamily`/`fontWeight`/`fontStyle` from the run's marks directly**: react-pdf
+throws `Could not resolve font for X, fontWeight …, fontStyle …` for a style
+the family did not register, and cannot synthesise one. The editor matches
+that by setting `font-synthesis: none` on the text wrapper.
+
+`packages/backend/src/config/fonts.ts`:
+
+- `registerBuiltinFonts()` runs at `ExportService` module load. It also turns
+  off react-pdf's hyphenation (`registerHyphenationCallback(word => [word])`),
+  which otherwise splits long words with English rules whatever the language.
+- `registerImportedFonts()` runs per export, for the families the runs ask for
+  (`ExportService.loadFonts`), as base64
+  data URLs; each name once, kept for the life of the process.
 - The fonts directory is resolved by probing two candidate paths, because
   `tsx` runs from `src/config/` and the esbuild bundle runs from `dist/` — one
   directory level apart. A change to the build output location breaks font
   loading at runtime with no compile error.
-- Extensions are per-family: `Crimson Text` ships `.otf`, everything else
-  `.ttf`. Adding a family means adding files, the `FONT_FILES` entry, and
-  checking that extension branch.
-- Bold and italic come from `getFontStyleProps`, not from a synthesized weight.
-  A family without a bold file will not render bold.
 
-**Adding a font to the editor toolbar without registering it for the PDF is the
-classic silent-divergence bug.** Both sides read `AVAILABLE_FONTS`, so add it
-there and ship the files.
+The editor registers the same files under the same names, weights and styles
+with the CSS Font Loading API, in `packages/frontend/src/fonts.ts`: built-ins
+at startup (URLs from `import.meta.glob`), imported fonts when the editor opens
+(`FontSlice.loadFonts`), which enter the catalog only once loaded.
 
 ## Download store
 

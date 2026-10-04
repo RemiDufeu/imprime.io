@@ -22,7 +22,7 @@ router.post('/:id/pdf', requireOwnsPresentation, async (req, res) => {
   const payload: ExportDTO.PdfRequest = { variableValues: req.body || {} }
 
   const startTime = Date.now()
-  const pdfBuffer = await exportService.exportToPDF(presentation, payload)
+  const pdfBuffer = await exportService.exportToPDF(presentation, req.user!.id, payload)
   const duration = Date.now() - startTime
 
   setPdfDownloadHeaders(res, pdfBuffer, `${presentation.title || 'presentation'}.pdf`)

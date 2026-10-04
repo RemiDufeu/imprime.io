@@ -33,13 +33,13 @@ export function SVGSelectionWrapper({ shape, readonly, children }: SVGSelectionW
     const { token } = theme.useToken()
     const svgRef = useRef<SVGGElement>(null)
 
-    const selectedShapeId = useEditorStore((s) => s.selectedShape?.id)
+    const selectedShapeId = useEditorStore((s) => s.selectedShapeId)
     const selectedTool = useEditorStore((s) => s.selectedTool)
     const transformationData = useEditorStore((s) =>
-        s.selectedShape?.id === shape.id ? s.transformationData : null
+        s.selectedShapeId === shape.id ? s.transformationData : null
     )
     const isTransforming = useEditorStore((s) =>
-        s.selectedShape?.id === shape.id && s.dragData !== null
+        s.selectedShapeId === shape.id && s.dragData !== null
     )
 
     const selectShape = useEditorStore((s) => s.selectShape)

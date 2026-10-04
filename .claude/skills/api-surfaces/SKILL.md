@@ -21,7 +21,7 @@ packages/common/src/types.ts   (DTO namespaces)
 ```
 
 `frontend/src/api/api.ts` instantiates one `ImprimeClient` and re-exports it as
-`presentationsAPI` / `imagesAPI` / `variablesAPI`. The frontend therefore
+`presentationsAPI` / `imagesAPI` / `fontsAPI` / `variablesAPI`. The frontend therefore
 consumes the *same* client third parties do — if a method is missing from the
 SDK, the editor cannot use it either. That is a feature: it keeps the public
 API honest.
@@ -34,7 +34,10 @@ Mounted in `packages/backend/src/server.ts`, all behind `requireAuth`:
 |---|---|
 | `/api/presentations` | `presentations.ts`, `slides.ts`, `variables.ts` (three routers, same mount) |
 | `/api/export` | `export.ts` |
-| `/api/images` | `images.ts` |
+| `/api/images` | `images.ts` — the uploader's own images (`Image.ownerId`), 500 MB each |
+| `/api/oauth-consent` | `oauthConsent.ts` — the pending OAuth authorization the consent page shows, to the user it was asked of |
+| `/api/fonts` | `fonts.ts` — instance-wide; reads open, writes behind `requireAdmin` |
+| `/api/settings` | `settings.ts` — instance settings (`/email`, `/email/test`, `/sso`, `/sso/:provider`, `/access`); reads and writes behind `requireAdmin`; no MCP tool, deliberately: instance configuration, not a document operation |
 | `/api/mcp` | MCP router — **owns its own sessions, outside the `requireAuth` pipeline** |
 
 Public: `/api/health`, `/api/auth-providers`, `/api/auth/*` (better-auth, rate
@@ -68,6 +71,26 @@ learn that someone else's presentation exists. Keep that when you add a check.
 A route that takes a `:id` presentation param and does not go through
 `requireOwnsPresentation` is a vulnerability, not a style issue.
 
+Some resources belong to the **instance**, not to a user: imported fonts and
+the instance settings (email, single sign-on). Every authenticated user reads the fonts; only
+admins read the settings or change either, through `requireAdmin`
+(`middleware/requireAdmin.ts`), which answers **403 `ADMIN_REQUIRED`** — not
+404, since nothing about their existence is secret. The role is better-auth's
+(`admin` plugin, `user.role`) and is read from the database on each check, so
+it holds for API keys as for sessions. The account of `ADMIN_EMAIL` — one
+address — is promoted at startup and at every sign-in, by password or single
+sign-on (`AuthService.promoteConfiguredAdmin` and the `session.create` hook),
+**only once its address is verified**. It is created by
+`npm run admin:reset-password` (address verified: the operator vouches) or by
+a provider vouching for the address; a password sign-up with it is refused
+(`ADMIN_ADDRESS_RESERVED`), or the first to sign up would claim the role. The
+role stays in the database when `ADMIN_EMAIL` changes:
+`npm run admin:demote-others` takes it from every other account.
+
+API keys and MCP tokens never meet the session hooks, so
+`resolveApiKeyOwner` / `resolveMcpBearerOwner` apply the domain list
+themselves: a new credential type must too.
+
 ## Error contract
 
 Throw, never hand-build a response:
@@ -75,6 +98,7 @@ Throw, never hand-build a response:
 | Class | Status | Use |
 |---|---|---|
 | `NotFoundError` | 404 | missing **or** not owned |
+| `ForbiddenError` | 403 | authenticated but lacking a role (`ADMIN_REQUIRED`); never for owned resources |
 | `ValidationError` | 400 | bad input; carries optional `details: string[]` |
 | `ConflictError` | 409 | uniqueness violations (e.g. `VARIABLE_NAME_EXISTS`) |
 | `AppError` | any | anything else (`exportToPDF` timeout uses 408) |
@@ -90,10 +114,22 @@ message is never leaked.
 ## MCP
 
 `packages/backend/src/mcp/router.ts` implements Streamable HTTP with a session
-map, a 30-minute idle timeout and a 5-minute sweep. Tools are registered
-per-session in `mcp/tools/index.ts`, **bound to the `ownerId` resolved from the
-API key** — the tool closes over the owner, so it cannot be tricked into acting
-for someone else by its arguments.
+map, a 30-minute idle timeout, a 5-minute sweep and at most 10 sessions per
+owner (the oldest is closed). Tools are registered per-session in
+`mcp/tools/index.ts`, **bound to the `ownerId` resolved from the Bearer token
+or API key** — the tool closes over the owner, so it cannot be tricked into
+acting for someone else by its arguments. **Every request re-resolves its
+credentials** and must match the session's owner: a session id alone is no
+credential, and a revoked key or an expired token ends the sessions it opened
+(401, or 404 for someone else's session).
+
+The OAuth flow interactive clients use (`/api/auth/mcp/*`, better-auth's MCP
+plugin) lets anyone register a client, anonymously, with any redirect URI —
+MCP clients need it. `server.ts` therefore forces `prompt=consent` on
+`/mcp/authorize`, without which the plugin sends the code straight to the
+redirect URI; the consent page shows where the access goes from
+`GET /api/oauth-consent/:code` (`AuthService.getOAuthConsent`), never from its
+own URL.
 
 A tool has: a zod `inputSchema` and `outputSchema` with `.describe()` on every
 field (that text is what the agent reads), `assertOwnsPresentation` first,

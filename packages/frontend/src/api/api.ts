@@ -1,5 +1,5 @@
 import { ImprimeClient } from '@imprime/sdk'
-import type { Presentation, PresentationSummary, Shape, ImageDTO, VariableDTO, VariableValueType } from '@imprime/sdk'
+import type { Presentation, PresentationSummary, Shape, Slide, SlideDTO, ImageDTO, FontDTO, FontVariant, VariableDTO, VariableValueType, EmailSettingsDTO, SsoSettingsDTO, SsoProvider, AccessSettingsDTO } from '@imprime/sdk'
 import { API_BASE } from '../config'
 
 // Create a single SDK client instance
@@ -38,8 +38,8 @@ export const presentationsAPI = {
     return client.updateSlide(presentationId, slideId, shapes)
   },
 
-  async addSlide(presentationId: string): Promise<void> {
-    return client.addSlide(presentationId)
+  async addSlide(presentationId: string, slide?: SlideDTO.Create): Promise<Slide> {
+    return client.addSlide(presentationId, slide)
   },
 
   async deleteSlide(presentationId: string, slideId: string): Promise<void> {
@@ -65,6 +65,72 @@ export const imagesAPI = {
 
   async getById(imageId: string): Promise<ImageDTO.ResponseWithData> {
     return client.getImage(imageId)
+  },
+}
+
+/**
+ * Fonts API using Imprime SDK
+ */
+export const fontsAPI = {
+  async list(): Promise<FontDTO.Response[]> {
+    return client.listFonts()
+  },
+
+  async create(family: string, regular: FontDTO.FaceUpload): Promise<FontDTO.Response> {
+    return client.createFont(family, regular)
+  },
+
+  async setFace(fontId: string, variant: FontVariant, face: FontDTO.FaceUpload): Promise<FontDTO.Response> {
+    return client.setFontFace(fontId, variant, face)
+  },
+
+  async getFace(fontId: string, variant: FontVariant): Promise<FontDTO.FaceData> {
+    return client.getFontFace(fontId, variant)
+  },
+
+  async deleteFace(fontId: string, variant: Exclude<FontVariant, 'regular'>): Promise<FontDTO.Response> {
+    return client.deleteFontFace(fontId, variant)
+  },
+
+  async delete(fontId: string): Promise<void> {
+    return client.deleteFont(fontId)
+  },
+}
+
+/**
+ * Instance settings API using Imprime SDK (admins only)
+ */
+export const settingsAPI = {
+  async getEmail(): Promise<EmailSettingsDTO.Response> {
+    return client.getEmailSettings()
+  },
+
+  async updateEmail(settings: EmailSettingsDTO.Update): Promise<EmailSettingsDTO.Response> {
+    return client.updateEmailSettings(settings)
+  },
+
+  async sendTestEmail(request: EmailSettingsDTO.TestRequest): Promise<void> {
+    return client.sendTestEmail(request)
+  },
+
+  async getAccess(): Promise<AccessSettingsDTO.Response> {
+    return client.getAccessSettings()
+  },
+
+  async updateAccess(settings: AccessSettingsDTO.Update): Promise<AccessSettingsDTO.Response> {
+    return client.updateAccessSettings(settings)
+  },
+
+  async getSso(): Promise<SsoSettingsDTO.Response> {
+    return client.getSsoSettings()
+  },
+
+  async updateSsoProvider(provider: SsoProvider, data: SsoSettingsDTO.ProviderUpdate): Promise<SsoSettingsDTO.ProviderStatus> {
+    return client.updateSsoProvider(provider, data)
+  },
+
+  async removeSsoProvider(provider: SsoProvider): Promise<SsoSettingsDTO.ProviderStatus> {
+    return client.removeSsoProvider(provider)
   },
 }
 

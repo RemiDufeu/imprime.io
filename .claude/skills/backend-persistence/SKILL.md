@@ -7,14 +7,17 @@ metadata:
 
 # Persistence and Mapping
 
-Four collections, four thin schemas, and one mapper module that is the only
+Seven collections, seven thin schemas, and one mapper module that is the only
 place a Mongoose document turns into something a client may see.
 
 ```
 Presentation  { title, ownerId, timestamps }
 Slide         { presentationId, order, shapes: Mixed[], timestamps }
 VariableData  { presentationId, type, name, default: Mixed, required }
-Image         { data (base64), mimeType, originalName, size, timestamps }
+Image         { data (base64), mimeType, originalName, size, orphanedAt? (TTL), timestamps }
+Font          { family, familyKey (unique), version, faces: { regular, bold?, italic?, boldItalic? } (size, name), timestamps }
+FontFile      { fontId, variant, data (binary) }   — one per face, unique (fontId, variant)
+InstanceSettings { _id: 'instance', email: { smtp? { host, port, secure, user?, password? (encrypted), from }, requireEmailVerification }, sso: { google?, github?, microsoft? } ({ clientId, clientSecret (encrypted), tenantId? }), access: { passwordPolicy ('open' | 'existing' | 'admins', default 'open'), allowedDomains (default []) }, timestamps }   — a single document, written with upserting findByIdAndUpdate
 ```
 
 ## Model file anatomy
@@ -71,7 +74,12 @@ Schema conventions in use:
 
 ## Ownership scoping
 
-Only `Presentation` carries `ownerId`. Everything else is scoped **through** it:
+Only `Presentation` carries `ownerId`. `Font` belongs to the instance: no
+owner, readable by everyone, written only behind `requireAdmin`.
+`InstanceSettings` too, but read by admins only, and its SMTP password never
+leaves: `emailSettingsToDTO` turns it into `hasPassword`, and
+`ssoProviderToDTO` drops the client secrets. Everything
+else is scoped **through** the presentation:
 
 - `Slide` and `VariableData` hold `presentationId`, and services query with both
   ids together (`findOne({ _id, presentationId })`) so a child cannot be reached
@@ -190,27 +198,54 @@ feature.
 Best-effort side effects are wrapped and logged rather than propagated:
 
 ```ts
-try { await this.imageService.deleteMany(imageIds) }
+try { await this.imageService.deleteUnused(imageIds, presentation.ownerId) }
 catch (error) { console.error('Failed to delete associated images:', error) }
 ```
 
 Orphaned image rows are preferred to a failed delete. Match that judgement for
 cleanup work; do not match it for anything the caller needs to know about.
 
+### Images are released, not deleted
+
+An image is **shared**: duplicating or pasting an image shape keeps its
+`imageId`, on any slide of any presentation. So "is it still used?" is asked of
+every slide, through `Slide.imageIds` — derived from `shapes` by a pre-save hook
+on the model, indexed, and backfilled at startup for slides saved before it
+existed (`SlideService.indexImageReferences`). `updateOne` and `bulkWrite` skip
+that hook: never use them to write `shapes`.
+
+An image that leaves its slide — a shape write without it, or the slide's
+deletion — is **released** (`ImageService.release`): if no slide shows it any
+more it gets `orphanedAt` instead of being deleted, because the editor can undo
+either and shows the image again by the same id. A TTL index
+(`ORPHAN_GRACE_SECONDS`, 7 days) lets MongoDB delete it after that. Every save
+unsets the field on all the images its tree shows (`markReferenced`), which also
+repairs a release that raced another save. Release **after** the write that
+removed the image, so that slide no longer counts as showing it.
+`PresentationService.delete` deletes its slides first, then the images no other
+presentation shows (`deleteUnused`). Nothing calls `delete` on an image a slide
+dropped.
+
+### Restoring under a former id
+
+`SlideDTO.Create._id` and `VariableDTO.Create._id` let a client recreate a
+deleted slide or variable under its old id — the editor's undo, since text runs
+and history steps point to those ids. The service checks the 24-hex form
+(`isObjectIdString`), answers 409 when the id exists anywhere, and maps a racing
+E11000 to the same error.
+
 ## Known gaps
 
 Verify these still hold before relying on them:
 
-1. **`PresentationService.collectImageIds` does not recurse into containers.**
-   The module-level helper filters `shapes` for `type === 'image'` at the top
-   level only, while `SlideService.collectImageIds` walks the tree via
-   `isContainerShape`. Deleting a presentation therefore orphans every image
-   nested inside a group.
-2. **Images are unscoped.** No `ownerId`, no `presentationId`, and the routes do
-   not check ownership, so any authenticated user can read or delete any image
-   by id. Closing it needs ownership at the model level plus a decision about
-   images already stored without an owner — deliberately left open for now.
-   → skill `backend-routes`
+1. **Images belong to their uploader, not to a presentation.** `Image.ownerId`
+   is set at upload and every `ImageService` method takes the `ownerId` to
+   scope by — reads, deletes, and the reference bookkeeping, since the image
+   ids a slide holds are anyone's to write. The export draws only the
+   presentation owner's images. Images stored before the field existed have
+   no owner and answer 404 to everyone: no backfill was written (not in
+   production then). ObjectIds follow each other, so an unscoped lookup by id
+   is an enumerable one. → skill `backend-routes`
 
 ## Related
 

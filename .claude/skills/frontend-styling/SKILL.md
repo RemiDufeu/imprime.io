@@ -151,12 +151,11 @@ component token (`Button.controlHeight`, `Card.borderRadiusLG`, …) instead.
 - One `.css` per component folder, same base name, imported at the top of the
   `.tsx`. `Toolbars.css` is the one shared sheet, at the common ancestor of the
   toolbar, zoom bar and context bar.
-- Global order in `main.tsx` matters: `antd/dist/reset.css`, then `index.css`,
-  then `fonts.css`.
-- `fonts.css` declares `@font-face` against
-  `packages/common/src/assets/fonts/` — the same files the PDF renderer
-  registers. A font added for the editor must be added there too, or the PDF
-  falls back silently. → skill `pdf-export`
+- Global order in `main.tsx` matters: `antd/dist/reset.css`, then `index.css`.
+- There is no `@font-face` stylesheet. `src/fonts.ts` registers every face
+  with `document.fonts`, generated from `BUILTIN_FONTS` in common — the same
+  files the PDF renderer registers — plus the instance's imported fonts. A font
+  is added in common, never in CSS. → skill `pdf-export`
 - Indentation is inconsistent across files (2 and 4 spaces). Match the file you
   are editing; do not reformat.
 - There is no dark mode. `index.css` has an empty

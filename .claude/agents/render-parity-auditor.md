@@ -50,8 +50,10 @@ to `api-surface-reviewer`.
   (`SVGShape` switch / `renderShape` switch / `resolveShapes`).
 - A colour-carrying property in the export that bypasses `parseColor` — alpha
   will be dropped or the whole colour ignored.
-- A font offered in the editor that is absent from `AVAILABLE_FONTS` /
-  `FONT_FILES` / the fonts directory.
+- A font offered in the editor that is absent from `BUILTIN_FONTS` / the fonts
+  directory, or a run styled from its own `fontFamily` / `bold` / `italic`
+  instead of through `resolveFontFace` / `getRunTextStyle` (the export throws
+  on a face the family lacks; the browser fakes it).
 
 ### HIGH — likely divergence
 

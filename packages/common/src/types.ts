@@ -1,3 +1,5 @@
+import type { PasswordPolicy, SsoProvider } from './auth.js'
+
 export interface BaseShape {
   // Client-generated UUID (not a MongoDB _id). The front assigns it on creation
   // so it can apply optimistic updates and track selection without waiting for
@@ -34,10 +36,18 @@ export interface TextFormatting {
   bold?: boolean;
   underline?: boolean;
   italic?: boolean;
+  strikethrough?: boolean;
+  // Rendered upper-case by both renderers (CSS / react-pdf `textTransform`);
+  // the stored text keeps its original case.
+  uppercase?: boolean;
   fontFamily?: string;
   fontSize?: string;
   color?: string;
 }
+
+export type TextAlign = 'left' | 'center' | 'right' | 'justify'
+export type TextVerticalAlign = 'top' | 'middle' | 'bottom'
+export type ListType = 'bullet' | 'number'
 
 export type CustomText = TextFormatting & {
   text: string;
@@ -57,13 +67,31 @@ export type VariableElement = TextFormatting & {
 
 export interface Paragraph {
   type: 'paragraph';
-  style?: Record<string, string | number>; // CSS styles
+  // Stored documents may still carry a free-form `style` object from an
+  // earlier API; no renderer reads it any more. The typed fields below replace
+  // it, so both renderers agree on every paragraph property.
+  //
+  // Block-level formatting. Unset means 'left' and DEFAULT_LINE_HEIGHT, which
+  // is how every paragraph rendered before these fields existed. Read them
+  // through `getParagraphStyle`, which also sanitises values written via the API.
+  align?: TextAlign;
+  lineHeight?: number; // unitless multiplier of each run's font size
+  // List membership. Lists are flat: an item is a paragraph carrying `list`,
+  // and nesting is its `indent` level (0 to MAX_LIST_LEVEL), ignored outside a
+  // list. Unset `list` is a plain paragraph, which every paragraph was before
+  // lists existed. Numbering is derived from the surrounding paragraphs by
+  // `getListMarkers`, never stored. Read through `getListStyle`.
+  list?: ListType;
+  indent?: number;
   children: (CustomText | VariableElement)[];
 }
 
 export interface TextBoxShape extends BaseShape {
   type: 'text'
   paragraphes: Paragraph[]
+  // Position of the paragraph stack inside the box. Unset means 'top', the
+  // only behaviour text boxes had before this field existed.
+  verticalAlign?: TextVerticalAlign
 }
 
 export interface ImageShape extends BaseShape {
@@ -226,12 +254,21 @@ export namespace SlideDTO {
   }
 
   export interface Create {
+    // Position among the presentation's slides, 0-based; the end when absent.
+    // The slides from there on move down one.
     order?: number
+    shapes?: Shape[]
+    // Restores a deleted slide under its former id, so references to it stay
+    // valid (the editor's undo). Rejected with 409 when the id is in use.
+    _id?: string
   }
 }
 
 export namespace VariableDTO {
   export interface Create {
+    // Restores a deleted variable under its former id, which text runs and
+    // containers point to (the editor's undo). Rejected with 409 when in use.
+    _id?: string
     type: VariableType
     name: string
     default?: VariableValueType
@@ -272,6 +309,140 @@ export namespace ImageDTO {
 
   export interface ResponseWithData extends Response {
     data: string
+  }
+}
+
+// The four faces a font family may provide. A run asks for one through its
+// `bold` and `italic` marks; a family missing it is drawn with the closest face
+// it has (see `resolveFontFace`).
+export type FontVariant = 'regular' | 'bold' | 'italic' | 'boldItalic'
+
+export namespace FontDTO {
+  // A TrueType or OpenType file, base64-encoded.
+  export interface FaceUpload {
+    data: string
+    originalName?: string
+  }
+
+  export interface Create {
+    family: string
+    regular: FaceUpload
+  }
+
+  export interface FaceInfo {
+    size: number
+    originalName?: string
+  }
+
+  // A font family imported into the instance, shared by every user. Runs
+  // refer to it by `family`; `version` changes whenever one of its faces does.
+  export interface Response {
+    _id: string
+    family: string
+    version: number
+    faces: { regular: FaceInfo } & Partial<Record<Exclude<FontVariant, 'regular'>, FaceInfo>>
+    createdAt?: Date
+    updatedAt?: Date
+  }
+
+  export interface FaceData {
+    data: string
+  }
+}
+
+// How the instance sends email, set by its admins. Sign-up verification and
+// password reset both need the SMTP server.
+export namespace EmailSettingsDTO {
+  // The password is write-only: a response only says whether one is stored.
+  export interface Smtp {
+    host: string
+    port: number
+    // TLS from the first byte, as port 465 expects (always on for 465).
+    // Otherwise the connection upgrades through STARTTLS when the server
+    // offers it, and must when a user and password are set.
+    secure: boolean
+    user?: string
+    hasPassword: boolean
+    from: string
+  }
+
+  export interface Response {
+    // null while the instance has no SMTP server.
+    smtp: Smtp | null
+    requireEmailVerification: boolean
+  }
+
+  export interface SmtpUpdate {
+    host: string
+    port: number
+    secure: boolean
+    user?: string
+    // Omitted: the stored password is kept, as long as `host`, `port` and
+    // `user` are unchanged. Empty: removed, as it is along with `user`.
+    password?: string
+    from: string
+  }
+
+  export interface Update {
+    // null removes the SMTP server, which requires verification to be off.
+    smtp: SmtpUpdate | null
+    requireEmailVerification: boolean
+  }
+
+  // One email sent to `to` through `smtp`, or through the stored server when
+  // omitted, so a configuration can be checked before it is saved.
+  export interface TestRequest {
+    to: string
+    smtp?: SmtpUpdate
+  }
+}
+
+// The instance's single sign-on providers, set by its admins: each one is an
+// OAuth application registered with the provider.
+export namespace SsoSettingsDTO {
+  // The client secret is write-only, and never returned.
+  export interface Provider {
+    clientId: string
+    // Microsoft only: whose accounts may sign in. 'common' (the default, any
+    // account), 'organizations', 'consumers', or one tenant's id or domain.
+    tenantId?: string
+  }
+
+  export interface ProviderStatus {
+    // The redirect URI to register with the provider; null while the server
+    // has no PUBLIC_APP_URL to build it from.
+    callbackUrl: string | null
+    // null while the provider is not configured.
+    config: Provider | null
+    // Offered on the sign-in page. False for a configured provider whose
+    // stored secret no longer decrypts (BETTER_AUTH_SECRET changed).
+    active: boolean
+  }
+
+  export type Response = Record<SsoProvider, ProviderStatus>
+
+  export interface ProviderUpdate {
+    clientId: string
+    // Omitted: the stored secret is kept, as long as `clientId` is unchanged.
+    clientSecret?: string
+    tenantId?: string
+  }
+}
+
+// Who may get into the instance, and how, set by its admins.
+export namespace AccessSettingsDTO {
+  export interface Response {
+    passwordPolicy: PasswordPolicy
+    // Domains whose addresses may have an account, lower-cased, exactly:
+    // "example.com" does not admit "eu.example.com". Empty: any. An address
+    // counts only once verified, by its provider or by email; administrators
+    // are exempt.
+    allowedDomains: string[]
+  }
+
+  export interface Update {
+    passwordPolicy: PasswordPolicy
+    allowedDomains: string[]
   }
 }
 

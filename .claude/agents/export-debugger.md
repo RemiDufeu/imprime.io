@@ -30,8 +30,9 @@ already gone; do not guess at react-pdf.
 | Repeated block appears once, or not at all | stage 2 — `itemsVariable` resolves to a string, not `string[]` |
 | Content off-slide or clipped | stage 3, or `expandForGroup`'s bbox-origin subtraction, or `renderInSvgLayer` clamping |
 | Colour flat / opacity lost / shape invisible | `parseColor` — 8-digit hex and `rgba()` must be split into colour + opacity |
-| Wrong or fallback font | `AVAILABLE_FONTS` / `FONT_FILES` / the resolved fonts directory (probed at two depths for dev vs bundled) |
-| Bold or italic ignored | that family has no bold/italic file; `getFontStyleProps` cannot synthesize |
+| Wrong or fallback font | family not in the catalog: absent from `BUILTIN_FONTS`, or an imported font since deleted or renamed — see `ExportService.loadFonts`; or the fonts directory probe (two depths, dev vs bundled) |
+| Bold or italic ignored | the family has no file for that face; `resolveFontVariant` falls back to the closest one by design, and the editor shows the same |
+| `Could not resolve font for …` | a style built from the run's marks instead of `resolveFontFace` asked react-pdf for a face the family never registered |
 | Text wraps differently from the editor | expected — browser vs react-pdf metrics. Confirm the box width, not a bug in the code |
 | Text box overflows | it sets `width` but no `height` by design; a substituted variable got longer than authored |
 | Stroke clipped at an edge | `renderInSvgLayer` clamps the layer to the page; the editor does not |

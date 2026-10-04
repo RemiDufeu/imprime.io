@@ -2,17 +2,21 @@ import { PresentationModel } from '../models/Presentation.js'
 import { SlideModel } from '../models/Slide.js'
 import { VariableDataModel } from '../models/VariableData.js'
 import {
+  isObjectIdString,
   toObjectId,
   variableCreateToModel,
   variableToDTO,
   variableUpdateToModel,
 } from '../models/mappers.js'
 import type { VariableDTO, VariableData } from '@imprime/common'
+import { collectVariableIds } from '@imprime/common'
 import { touchPresentation } from './PresentationService.js'
 import { NotFoundError, ConflictError, ValidationError } from './errors.js'
 
 const nameConflict = () =>
   new ConflictError('Variable name already exists in this presentation', 'VARIABLE_NAME_EXISTS')
+
+const variableIdTaken = () => new ConflictError('Variable id already in use', 'VARIABLE_ID_TAKEN')
 
 function isDuplicateName(err: unknown): boolean {
   return typeof err === 'object' && err !== null && (err as { code?: number }).code === 11000
@@ -25,6 +29,15 @@ export class VariableService {
       throw new NotFoundError('Presentation not found', 'PRESENTATION_NOT_FOUND')
     }
 
+    if (data._id !== undefined) {
+      if (!isObjectIdString(data._id)) {
+        throw new ValidationError('Invalid variable id', 'INVALID_VARIABLE_ID')
+      }
+      if (await VariableDataModel.exists({ _id: toObjectId(data._id) })) {
+        throw variableIdTaken()
+      }
+    }
+
     const exists = await VariableDataModel.exists({
       presentationId: presentation._id,
       name: data.name,
@@ -34,7 +47,10 @@ export class VariableService {
     }
 
     try {
-      await VariableDataModel.create(variableCreateToModel(presentation._id, data))
+      await VariableDataModel.create({
+        ...variableCreateToModel(presentation._id, data),
+        ...(data._id !== undefined ? { _id: toObjectId(data._id) } : {}),
+      })
     } catch (err) {
       if (isDuplicateName(err)) throw nameConflict()
       throw err
@@ -104,7 +120,7 @@ export class VariableService {
       throw new ValidationError(
         `Cannot delete variable that is currently in use`,
         'VARIABLE_IN_USE',
-        [`Variable "${variable.name}" is being used in one or more text boxes`]
+        [`Variable "${variable.name}" is used by text, a condition or a repeated group`]
       )
     }
 
@@ -120,20 +136,13 @@ export class VariableService {
     return variables.map(variableToDTO)
   }
 
+  // Anywhere in the trees: text runs inside containers, if-group conditions
+  // and for-group lists all point at the variable by id.
   private async isVariableInUse(presentationId: string, variableId: string): Promise<boolean> {
     const slides = await SlideModel.find({
       presentationId: toObjectId(presentationId),
     }).select('shapes')
 
-    return slides.some(slide =>
-      (slide.shapes).some(shape => {
-        if (shape.type !== 'text') return false
-        return shape.paragraphes?.some(paragraph =>
-          paragraph.children?.some(child =>
-            'type' in child && child.type === 'variable' && child.variableId === variableId
-          )
-        )
-      })
-    )
+    return slides.some(slide => collectVariableIds(slide.shapes).has(variableId))
   }
 }

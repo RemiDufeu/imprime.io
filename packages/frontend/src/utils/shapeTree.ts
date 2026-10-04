@@ -156,6 +156,20 @@ export function cloneShapeWithNewIds(shape: Shape): Shape {
   return { ...shape, id: nextId }
 }
 
+// `shapes` with `shape` placed at absolute (x, y), right after `anchorId` in
+// the anchor's container — the slide root when there is no anchor or it is
+// not in the tree. Duplicate and paste both put the copy next to its source.
+export function insertNear(shapes: Shape[], shape: Shape, x: number, y: number, anchorId: string | null): Shape[] {
+  const anchor = anchorId !== null ? findShapeById(shapes, anchorId) : null
+  const parentId = anchor?.parentGroupId ?? null
+  const parent = parentId !== null ? findShapeById(shapes, parentId) : null
+  const siblings = getSiblingList(shapes, parentId)
+  const anchorIndex = siblings.findIndex(s => s.id === anchorId)
+  const index = anchorIndex === -1 ? siblings.length : anchorIndex + 1
+  const placed = { ...shape, x: x - (parent?.absX ?? 0), y: y - (parent?.absY ?? 0) }
+  return insertShapeAt(shapes, parentId, index, placed)
+}
+
 // True when `ancestorId` is an ancestor of `shapeId` in the tree (or the shape
 // itself). Used to reject illegal drops (a group cannot be moved into itself).
 export function isDescendantOf(shapes: Shape[], shapeId: string, ancestorId: string): boolean {

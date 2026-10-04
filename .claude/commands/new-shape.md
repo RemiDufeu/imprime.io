@@ -44,10 +44,10 @@ only works if nothing suppresses it with `as` or a `default:` case.
 ### 4. `packages/frontend`
 
 - `components/slide/svg/SVGX.tsx` + the `SVGShape` switch
-- `store/editor/ToolSlice.tsx` — `ToolType` and `contextBarForShapeType`
-- `store/editor/ShapeCreationSlice.tsx` — drawing gesture → shape
-- `store/editor/ShapeSlice.tsx` — the `contextBarType` branch in `selectShape`
-- `store/editor/ToolAttributeSlice.tsx` — `ContextBarType`, `shapeToAttributesHelper`
+- `store/editor/ToolSlice.tsx` — `ToolType`, and the `drawnShape` switch that
+  turns a drag into the shape (exhaustive: the compiler flags a missing tool)
+- `store/editor/selectors.ts` — `ContextBarType` and `contextBarFor`, which
+  `selectContextBar` derives the bar from
 - `components/slide/SlideCanvas.tsx` — the drawing-tool list, if drag-drawn
 - `pages/.../TopBar/Context-toolbar/` — a context bar + the `index.tsx` switch
 - `pages/.../TopBar/Toolbar/Toolbar.tsx` — the tool button
@@ -71,9 +71,9 @@ database boundary, so a malformed shape persists silently and fails at render.
 4. Work through them. Resist adding a `default:` to quiet a switch.
 5. Check by hand the editor sites the compiler does **not** find, because they
    test tool or shape type as a string rather than exhausting the union:
-   the toolbar button list (`Toolbar.tsx`), the drawing-tool guards in
-   `ShapeCreationSlice.finishDrawing` and `SlideCanvas.handleMouseDown`, the
-   `shapeIcon.tsx` switch, and `contextBarForShapeType`.
+   the toolbar button list (`Toolbar.tsx`), the drawing-tool list in
+   `SlideCanvas.handleMouseDown`, the `shapeIcon.tsx` switch, and
+   `contextBarFor` in `selectors.ts` (it has a `default`).
 6. `/parity` — including the manual editor-vs-PDF comparison.
 7. `/review`.
 

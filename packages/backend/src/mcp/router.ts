@@ -8,11 +8,52 @@ import { authService } from '../services/index.js'
 
 interface SessionMeta {
   transport: StreamableHTTPServerTransport
+  // Whose credentials opened it: every later request must carry theirs.
+  ownerId: string
   lastActivity: number
 }
 
 const SESSION_IDLE_MS = 30 * 60 * 1000
 const SESSION_SWEEP_MS = 5 * 60 * 1000
+// Each session holds a server in memory. A client that reconnects without
+// closing its previous session would hit a refusal, so the oldest goes.
+const MAX_SESSIONS_PER_OWNER = 10
+
+/**
+ * Who the request is from: an OAuth Bearer token (MCP web connectors) or an
+ * API key (CLI/SDK). Checked on every request, not only the one that opens
+ * the session, so that a revoked key, an expired token or a user the access
+ * rules now shut out loses the sessions they opened too.
+ */
+async function resolveOwner(req: Request): Promise<string | null> {
+  const authHeader = req.headers.authorization
+  const apiKeyHeader = req.headers['x-api-key']
+  if (typeof authHeader === 'string' && authHeader.toLowerCase().startsWith('bearer ')) {
+    return authService.resolveMcpBearerOwner(authHeader.slice(7).trim())
+  }
+  if (typeof apiKeyHeader === 'string') {
+    return authService.resolveApiKeyOwner(apiKeyHeader)
+  }
+  return null
+}
+
+function sendUnauthorized(res: Response): void {
+  // RFC 9728: point clients to the protected-resource metadata so they can
+  // discover the authorization server.
+  const base = process.env.PUBLIC_APP_URL ?? ''
+  res.setHeader(
+    'WWW-Authenticate',
+    `Bearer resource_metadata="${base}/.well-known/oauth-protected-resource"`,
+  )
+  res.status(401).json({
+    jsonrpc: '2.0',
+    error: {
+      code: -32001,
+      message: 'Unauthorized: OAuth Bearer token or x-api-key header required',
+    },
+    id: null,
+  })
+}
 
 export interface McpRouter {
   router: Router
@@ -23,10 +64,42 @@ export function createMcpRouter(): McpRouter {
   const router = Router()
   const sessions = new Map<string, SessionMeta>()
 
-  const touch = (sessionId: string | undefined): SessionMeta | undefined => {
-    if (!sessionId) return undefined
+  const closeSession = (id: string, meta: SessionMeta) => {
+    sessions.delete(id)
+    void meta.transport.close?.()
+  }
+
+  // Makes room for one more session of `ownerId`'s.
+  const evictOldestSessions = (ownerId: string) => {
+    const own = [...sessions].filter(([, meta]) => meta.ownerId === ownerId)
+    own.sort(([, a], [, b]) => a.lastActivity - b.lastActivity)
+    for (const [id, meta] of own.slice(0, Math.max(0, own.length - MAX_SESSIONS_PER_OWNER + 1))) {
+      closeSession(id, meta)
+    }
+  }
+
+  // The session the request names, once its credentials prove it is the
+  // owner's; otherwise the response is sent and undefined returned. As the
+  // MCP transport specifies: 400 without a session id, 404 for an unknown
+  // one, which tells the client to start a new session. Someone else's
+  // session answers as an unknown one.
+  const authorizedSession = async (req: Request, res: Response): Promise<SessionMeta | undefined> => {
+    const sessionId = req.headers['mcp-session-id']
+    if (typeof sessionId !== 'string') {
+      res.status(400).json({ error: 'Missing session ID' })
+      return undefined
+    }
+    const ownerId = await resolveOwner(req)
+    if (!ownerId) {
+      sendUnauthorized(res)
+      return undefined
+    }
     const meta = sessions.get(sessionId)
-    if (meta) meta.lastActivity = Date.now()
+    if (!meta || meta.ownerId !== ownerId) {
+      res.status(404).json({ error: 'Session not found' })
+      return undefined
+    }
+    meta.lastActivity = Date.now()
     return meta
   }
 
@@ -42,20 +115,14 @@ export function createMcpRouter(): McpRouter {
   sweepTimer.unref()
 
   const handleSessionRequest = async (req: Request, res: Response) => {
-    const sessionId = req.headers['mcp-session-id'] as string | undefined
-    const meta = touch(sessionId)
-    if (!meta) {
-      res.status(400).json({ error: 'Invalid or missing session ID' })
-      return
-    }
-    await meta.transport.handleRequest(req, res)
+    const meta = await authorizedSession(req, res)
+    if (meta) await meta.transport.handleRequest(req, res)
   }
 
   router.post('/', async (req: Request, res: Response) => {
-    const sessionId = req.headers['mcp-session-id'] as string | undefined
-    const existing = touch(sessionId)
-    if (existing) {
-      await existing.transport.handleRequest(req, res, req.body)
+    if (req.headers['mcp-session-id'] !== undefined) {
+      const meta = await authorizedSession(req, res)
+      if (meta) await meta.transport.handleRequest(req, res, req.body)
       return
     }
 
@@ -68,38 +135,17 @@ export function createMcpRouter(): McpRouter {
       return
     }
 
-    // Resolve owner: OAuth Bearer (MCP web connectors) or x-api-key (CLI/SDK)
-    const authHeader = req.headers.authorization
-    const apiKeyHeader = req.headers['x-api-key']
-    let ownerId: string | null = null
-    if (typeof authHeader === 'string' && authHeader.toLowerCase().startsWith('bearer ')) {
-      ownerId = await authService.resolveMcpBearerOwner(authHeader.slice(7).trim())
-    } else if (typeof apiKeyHeader === 'string') {
-      ownerId = await authService.resolveApiKeyOwner(apiKeyHeader)
-    }
+    const ownerId = await resolveOwner(req)
     if (!ownerId) {
-      // RFC 9728: point clients to the protected-resource metadata so they can
-      // discover the authorization server.
-      const base = process.env.PUBLIC_APP_URL ?? ''
-      res.setHeader(
-        'WWW-Authenticate',
-        `Bearer resource_metadata="${base}/.well-known/oauth-protected-resource"`,
-      )
-      res.status(401).json({
-        jsonrpc: '2.0',
-        error: {
-          code: -32001,
-          message: 'Unauthorized: OAuth Bearer token or x-api-key header required',
-        },
-        id: null,
-      })
+      sendUnauthorized(res)
       return
     }
+    evictOldestSessions(ownerId)
 
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: () => randomUUID(),
       onsessioninitialized: (id) => {
-        sessions.set(id, { transport, lastActivity: Date.now() })
+        sessions.set(id, { transport, ownerId, lastActivity: Date.now() })
       },
     })
 

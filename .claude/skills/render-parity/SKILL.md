@@ -33,7 +33,8 @@ Anything where "the editor and the PDF must agree" is the requirement:
 | `groupLayout.ts` | `distributeMainAxis`, `crossAxisOffset`, `layoutGroupChildren` — the flexbox subset |
 | `shapeResolver.ts` | `resolveShapes`, `childrenBBox` — container expansion |
 | `variables.ts` | `resolveVariable`, `isEmptyVariableValue`, `stringifyVariableValue` |
-| `slideContentStyles.ts` | `getSlideContentWrapperStyles` — text box content styling |
+| `slideContentStyles.ts` | text formatting: `getSlideContentWrapperStyles` (box, vertical alignment), `getParagraphStyle` (alignment, line height, sanitised), `getTextDecoration`, `getTextTransform`, `parseFontSize`, `DEFAULT_FONT_SIZE`, `DEFAULT_LINE_HEIGHT`, `PARAGRAPH_SPACING` |
+| `listStyles.ts` | lists: `getListStyle` (sanitised), `getListMarkers` (numbering), `getListMarkerFormatting`, `getListLayout` / `getBulletBox` (item and marker geometry) |
 
 Everything exported here is re-exported from `packages/common/src/rendering/index.ts`
 and reachable as `@imprime/common` (backend) or `@imprime/sdk` (frontend).
@@ -117,9 +118,33 @@ check both call sites still agree.
 - **Colour with alpha.** `@react-pdf/renderer` parses neither `#RRGGBBAA` nor
   `rgba()`; `ExportService.parseColor` splits them into `color` + `opacity`.
   Any new colour-carrying property must go through it.
-- **Paragraph spacing and line height.** Hard-coded in `ExportService`
-  (`LINE_HEIGHT`, `PARAGRAPH_SPACING`, `DEFAULT_FONT_SIZE`) with no counterpart
-  in the editor's CSS. Changing one without the other widens the gap.
+- **Line height is per run in the PDF.** react-pdf multiplies a unitless
+  `lineHeight` by the declaring element's own font size and passes the product
+  down, so `ExportService.inlineTextStyle` sets the paragraph's line height on
+  every run — CSS inherits the multiplier instead, and that is what keeps the
+  two in step with mixed font sizes.
+- **Never give the PDF text a height.** react-pdf truncates (with an ellipsis)
+  text taller than the height it is measured against. The text box is an outer
+  View with the box height (for vertical alignment) around an *absolute* inner
+  View with none, which is measured unconstrained, so overflowing text spills
+  out as it does in the editor.
+- **Hyphenation.** react-pdf hyphenates long words by default; the browser
+  does not. Line breaks differ on long text even with identical metrics.
+- **List markers are drawn, not typed.** None of the bundled PDF fonts has ◦
+  or ▪ (only • and –), and the browser would silently borrow the glyph from
+  another font. Bullets are boxes (`getBulletBox`); numbers are text, since
+  digits and letters exist everywhere.
+- **List item structure.** Both renderers pad the item to `textIndent` and
+  position the marker absolutely in that padding, top-aligned with the first
+  line. Absolute, so a marker wider than its slot overflows on one line
+  instead of wrapping (react-pdf would wrap it inside a fixed-width column).
+- **List numbering in the editor.** An item's number depends on its
+  neighbours, but Slate re-renders an element only when it changes, so the
+  editor computes all markers per box (`ListMarkersProvider`, selecting
+  `editor.children`) and hands them down through context.
+- **Paragraph spacing.** `PARAGRAPH_SPACING` is shared, and applies between
+  paragraphs only. The editor enforces "not after the last" in CSS
+  (`TextBoxEditor.css`, `:last-child`) because Slate memoises element renders.
 
 ## Related
 

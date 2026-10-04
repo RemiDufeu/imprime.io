@@ -1,56 +1,33 @@
 import { InputNumber, Select, Divider } from 'antd'
 import { useEditorStore } from '../../../../../../store/editor/EditorStore'
+import { selectSelectedShape } from '../../../../../../store/editor/selectors'
+import type { DrawStyle, StrokeStyle } from '../../../../../../store/editor/ToolSlice'
 import { DebouncedColorPicker } from '../../../../../../components/common'
 
+// Styles a selected rectangle or ellipse, or — with a drawing tool active —
+// the ones about to be drawn. One write, to whichever is shown.
 export function ShapeContextBar() {
   const selectedTool = useEditorStore(state => state.selectedTool)
-  const selectedShape = useEditorStore(state => state.selectedShape)
+  const selected = useEditorStore(selectSelectedShape)
+  const drawStyle = useEditorStore(state => state.drawStyle)
+  const setDrawStyle = useEditorStore(state => state.setDrawStyle)
   const updateShape = useEditorStore(state => state.updateShape)
 
-  const attributes = useEditorStore(state => state.attributes)
-  const setFillColor = useEditorStore(state => state.setFillColor)
-  const setStrokeColor = useEditorStore(state => state.setStrokeColor)
-  const setStrokeWidth = useEditorStore(state => state.setStrokeWidth)
-  const setStrokeStyle = useEditorStore(state => state.setStrokeStyle)
-  const setCornerRadius = useEditorStore(state => state.setCornerRadius)
+  const shape = selected?.type === 'rectangle' || selected?.type === 'ellipse' ? selected : null
+  const style: DrawStyle = shape
+    ? {
+        fill: shape.fill,
+        stroke: shape.stroke ?? drawStyle.stroke,
+        strokeWidth: shape.strokeWidth ?? 0,
+        strokeStyle: shape.strokeStyle ?? 'solid',
+        cornerRadius: shape.type === 'rectangle' ? shape.cornerRadius ?? 0 : 0,
+      }
+    : drawStyle
+  const isRectangleContext = shape ? shape.type === 'rectangle' : selectedTool === 'rectangle'
 
-  const isRectangleContext = selectedTool === 'rectangle' || selectedShape?.type === 'rectangle'
-
-  const handleColorChange = (hex: string) => {
-    setFillColor(hex)
-    if (selectedShape && (selectedShape.type === 'rectangle' || selectedShape.type === 'ellipse')) {
-      updateShape(selectedShape.id, { fill: hex })
-    }
-  }
-
-  const handleStrokeColorChange = (hex: string) => {
-    setStrokeColor(hex)
-    if (selectedShape && (selectedShape.type === 'rectangle' || selectedShape.type === 'ellipse')) {
-      updateShape(selectedShape.id, { stroke: hex })
-    }
-  }
-
-  const handleStrokeWidthChange = (value: number | null) => {
-    const width = value ?? 0
-    setStrokeWidth(width)
-    if (selectedShape && (selectedShape.type === 'rectangle' || selectedShape.type === 'ellipse')) {
-      updateShape(selectedShape.id, { strokeWidth: width })
-    }
-  }
-
-  const handleStrokeStyleChange = (value: 'solid' | 'dashed' | 'dotted') => {
-    setStrokeStyle(value)
-    if (selectedShape && (selectedShape.type === 'rectangle' || selectedShape.type === 'ellipse')) {
-      updateShape(selectedShape.id, { strokeStyle: value })
-    }
-  }
-
-  const handleCornerRadiusChange = (value: number | null) => {
-    const radius = value ?? 0
-    setCornerRadius(radius)
-    if (selectedShape && selectedShape.type === 'rectangle') {
-      updateShape(selectedShape.id, { cornerRadius: radius })
-    }
+  const apply = (patch: Partial<DrawStyle>) => {
+    if (shape) updateShape(shape.id, patch)
+    else setDrawStyle(patch)
   }
 
   return (
@@ -59,10 +36,10 @@ export function ShapeContextBar() {
       <div className="toolbar-item">
         <span className="toolbar-label">Fill</span>
         <DebouncedColorPicker
-          value={attributes.fillColor}
-          onChange={handleColorChange}
+          value={style.fill}
+          onChange={(fill: string) => apply({ fill })}
           size="small"
-          showText
+          showText={false}
         />
       </div>
 
@@ -73,23 +50,23 @@ export function ShapeContextBar() {
         <span className="toolbar-label">Stroke</span>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           <DebouncedColorPicker
-            value={attributes.strokeColor}
-            onChange={handleStrokeColorChange}
+            value={style.stroke}
+            onChange={(stroke: string) => apply({ stroke })}
             size="small"
-            showText
+            showText={false}
           />
           <InputNumber
             min={0}
             max={20}
-            value={attributes.strokeWidth}
-            onChange={handleStrokeWidthChange}
+            value={style.strokeWidth}
+            onChange={(value: number | null) => apply({ strokeWidth: value ?? 0 })}
             style={{ width: '60px' }}
             size="small"
             placeholder="Width"
           />
           <Select
-            value={attributes.strokeStyle}
-            onChange={handleStrokeStyleChange}
+            value={style.strokeStyle}
+            onChange={(strokeStyle: StrokeStyle) => apply({ strokeStyle })}
             style={{ width: '90px' }}
             size="small"
             options={[
@@ -110,8 +87,8 @@ export function ShapeContextBar() {
             <InputNumber
               min={0}
               max={100}
-              value={attributes.cornerRadius}
-              onChange={handleCornerRadiusChange}
+              value={style.cornerRadius}
+              onChange={(value: number | null) => apply({ cornerRadius: value ?? 0 })}
               style={{ width: '60px' }}
               size="small"
             />

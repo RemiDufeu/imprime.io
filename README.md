@@ -67,6 +67,9 @@ Both paths land on the same server and expose the same tools — plug Imprime in
 
 ![MCP](./doc/mcp.png)
 
+## Sign-in and access control
+Sign in with an email and a password, or with Google, GitHub or Microsoft. The administrator sets everything up from the app — SMTP server, single sign-on providers, who may sign in and from which domains — and a single `ADMIN_EMAIL` in the environment is all it takes to get started. See [Authentication and access](./doc/authentication.md).
+
 # Roadmap
 
 Imprime is currently under active development. Here are the main planned updates:

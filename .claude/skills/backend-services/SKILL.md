@@ -11,7 +11,7 @@ The service layer holds all the business logic. It is also the persistence
 boundary — there is no repository layer, services talk to Mongoose models
 directly. → skill `backend-structure`
 
-Seven services, wired once in `services/index.ts`:
+Eight services, wired once in `services/index.ts`:
 
 | Service | Owns |
 |---|---|
@@ -20,8 +20,9 @@ Seven services, wired once in `services/index.ts`:
 | `VariableService` | variable CRUD, name uniqueness, in-use guard |
 | `ImageService` | base64 image storage |
 | `ExportService` | PDF rendering (→ skill `pdf-export`) |
-| `AuthService` | the better-auth instance and id resolution |
+| `AuthService` | the better-auth instance (rebuilt when instance settings change), id resolution, admin promotion, encryption with the auth secret |
 | `MailerService` | optional SMTP, self-disabling when unconfigured |
+| `SettingsService` | the instance settings admins manage (email, single sign-on, access): validation, storage, applying them to `MailerService` and `AuthService` |
 
 ## Class shape
 
@@ -142,8 +143,8 @@ because the schema stores shapes as `Mixed`.
 ### Clean up best-effort, log, continue
 
 ```ts
-try { await this.imageService.delete(imageId) }
-catch (error) { console.error(`Failed to delete image ${imageId}:`, error) }
+try { await this.imageService.release(collectImageIds(slide.shapes), ownerId) }
+catch (error) { console.error('Failed to release the images of a deleted slide:', error) }
 ```
 
 Orphaned rows beat a failed user operation. Use this shape for cleanup only —

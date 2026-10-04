@@ -1,11 +1,13 @@
-import { DownloadOutlined, LeftOutlined, ThunderboltFilled } from "@ant-design/icons";
+import { DownloadOutlined, LeftOutlined, RedoOutlined, ThunderboltFilled, UndoOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom"
 import { useState, useEffect } from "react";
 import { presentationsAPI } from "../../api/api";
-import { Button, Input, message, Modal, Form, Switch, Dropdown } from "antd";
+import { Button, Input, message, Modal, Form, Switch, Dropdown, Space, Tooltip } from "antd";
 import type { VariableValueType } from "@imprime/sdk";
 import "./EditorHeader.css";
 import { useEditorStore } from "../../store/editor/EditorStore";
+import { MOD_LABEL } from "../../utils/hotkeys";
+import { selectCanRedo, selectCanUndo } from "../../store/editor/selectors";
 import { ItemListInput } from "../../components/common";
 import { DropdownVariablesContent } from "../EditorPage/components/SlideEditor/TopBar/Context-toolbar/DropdownVariablesContent/DropdownVariablesContent";
 import { VariableFormModal } from "../EditorPage/components/SlideEditor/TopBar/Context-toolbar/DropdownVariablesContent/VariableFormModal";
@@ -14,6 +16,10 @@ export default function EditorHeader() {
     const navigate = useNavigate();
     const presentation = useEditorStore(state => state.presentation);
     const updatePresentationTitle = useEditorStore(state => state.updatePresentationTitle);
+    const undo = useEditorStore(state => state.undo);
+    const redo = useEditorStore(state => state.redo);
+    const canUndo = useEditorStore(selectCanUndo);
+    const canRedo = useEditorStore(selectCanRedo);
     const [localTitle, setLocalTitle] = useState(presentation?.title ?? '');
     const [isExporting, setIsExporting] = useState(false);
     const [isVariableModalOpen, setIsVariableModalOpen] = useState(false);
@@ -117,6 +123,14 @@ export default function EditorHeader() {
                 placeholder="Presentation title"
                 size="large"
                 className="inputBtn"/>
+            <Space>
+                <Tooltip title={`Undo (${MOD_LABEL}+Z)`}>
+                    <Button size="large" icon={<UndoOutlined />} disabled={!canUndo} onClick={undo} />
+                </Tooltip>
+                <Tooltip title={`Redo (${MOD_LABEL}+Shift+Z)`}>
+                    <Button size="large" icon={<RedoOutlined />} disabled={!canRedo} onClick={redo} />
+                </Tooltip>
+            </Space>
         </div>
         <div className="gap-header">
             <Dropdown

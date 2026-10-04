@@ -6,9 +6,13 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "esbuild src/server.ts --bundle --platform=node --target=node18 --format=esm --outfile=dist/server.js --packages=external",
+    "build": "esbuild src/server.ts src/scripts/resetAdminPassword.ts src/scripts/demoteOtherAdmins.ts --bundle --platform=node --target=node18 --format=esm --outdir=dist --packages=external",
     "typecheck": "tsc --noEmit",
     "start": "node dist/server.js",
+    "admin:reset-password": "node dist/scripts/resetAdminPassword.js",
+    "admin:reset-password:dev": "tsx src/scripts/resetAdminPassword.ts",
+    "admin:demote-others": "node dist/scripts/demoteOtherAdmins.js",
+    "admin:demote-others:dev": "tsx src/scripts/demoteOtherAdmins.ts",
     "lint": "eslint src --ext .ts"
   },
   "dependencies": {
@@ -21,17 +25,18 @@
     "dotenv": "^16.4.7",
     "express": "^5.2.1",
     "express-rate-limit": "^8.6.1",
+    "fontkit": "^2.0.4",
     "helmet": "^8.3.0",
     "mongodb": "^6.20.0",
     "mongoose": "^8.9.5",
-    "nodemailer": "^6.10.1",
+    "nodemailer": "^10.0.14",
     "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
+    "@types/fontkit": "^2.0.9",
     "@types/node": "^22.10.5",
-    "@types/nodemailer": "^6.4.24",
     "esbuild": "^0.28.1",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"
