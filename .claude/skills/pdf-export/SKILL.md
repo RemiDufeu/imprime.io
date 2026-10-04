@@ -17,14 +17,18 @@ metadata:
 ## Pipeline
 
 ```
-exportToPDF(presentation, { variableValues })
+exportToPDF(presentation, ownerId, { variableValues })
   validateVariables          required variables must be non-empty (no default fallback)
   resolveShapes per slide    containers flattened → absolute leaves
   filter                     drop shapes whose x or y is past the slide edge
-  fetchImageData             one batched pass, imageId → data URL
+  fetchImageData             one batched pass, imageId → data URL, ownerId's images only
   renderSlide per slide      Page (1920×1080) + one element per shape
+  acquireRenderSlot          4 renders at once, 2 per owner → AppError(429 EXPORT_BUSY)
   renderToBuffer             raced against a 30s timeout → AppError(408)
 ```
+
+The timeout stops the wait, not the render, which keeps its slot until it
+really ends: the cap is what bounds the CPU.
 
 `renderShape` never sees a container — `resolveShapes` has already expanded
 them. If you add a container type, it is handled in the resolver, not here.

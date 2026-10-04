@@ -34,7 +34,8 @@ Mounted in `packages/backend/src/server.ts`, all behind `requireAuth`:
 |---|---|
 | `/api/presentations` | `presentations.ts`, `slides.ts`, `variables.ts` (three routers, same mount) |
 | `/api/export` | `export.ts` |
-| `/api/images` | `images.ts` |
+| `/api/images` | `images.ts` — the uploader's own images (`Image.ownerId`), 500 MB each |
+| `/api/oauth-consent` | `oauthConsent.ts` — the pending OAuth authorization the consent page shows, to the user it was asked of |
 | `/api/fonts` | `fonts.ts` — instance-wide; reads open, writes behind `requireAdmin` |
 | `/api/settings` | `settings.ts` — instance settings (`/email`, `/email/test`, `/sso`, `/sso/:provider`, `/access`); reads and writes behind `requireAdmin`; no MCP tool, deliberately: instance configuration, not a document operation |
 | `/api/mcp` | MCP router — **owns its own sessions, outside the `requireAuth` pipeline** |
@@ -113,10 +114,22 @@ message is never leaked.
 ## MCP
 
 `packages/backend/src/mcp/router.ts` implements Streamable HTTP with a session
-map, a 30-minute idle timeout and a 5-minute sweep. Tools are registered
-per-session in `mcp/tools/index.ts`, **bound to the `ownerId` resolved from the
-API key** — the tool closes over the owner, so it cannot be tricked into acting
-for someone else by its arguments.
+map, a 30-minute idle timeout, a 5-minute sweep and at most 10 sessions per
+owner (the oldest is closed). Tools are registered per-session in
+`mcp/tools/index.ts`, **bound to the `ownerId` resolved from the Bearer token
+or API key** — the tool closes over the owner, so it cannot be tricked into
+acting for someone else by its arguments. **Every request re-resolves its
+credentials** and must match the session's owner: a session id alone is no
+credential, and a revoked key or an expired token ends the sessions it opened
+(401, or 404 for someone else's session).
+
+The OAuth flow interactive clients use (`/api/auth/mcp/*`, better-auth's MCP
+plugin) lets anyone register a client, anonymously, with any redirect URI —
+MCP clients need it. `server.ts` therefore forces `prompt=consent` on
+`/mcp/authorize`, without which the plugin sends the code straight to the
+redirect URI; the consent page shows where the access goes from
+`GET /api/oauth-consent/:code` (`AuthService.getOAuthConsent`), never from its
+own URL.
 
 A tool has: a zod `inputSchema` and `outputSchema` with `.describe()` on every
 field (that text is what the agent reads), `assertOwnsPresentation` first,

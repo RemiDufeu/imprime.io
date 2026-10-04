@@ -5,9 +5,10 @@ import { symmetricDecrypt, symmetricEncrypt } from 'better-auth/crypto'
 import { toNodeHandler } from 'better-auth/node'
 import { admin, mcp } from 'better-auth/plugins'
 import { apiKey } from '@better-auth/api-key'
-import type { EnabledAuthProviders, PasswordPolicy, SsoProvider } from '@imprime/common'
+import type { EnabledAuthProviders, OAuthConsentRequest, PasswordPolicy, SsoProvider } from '@imprime/common'
 import { authDb, authMongoClient } from '../config/authDb.js'
 import type { MailerService } from './MailerService.js'
+import { NotFoundError } from './errors.js'
 
 function trustedOrigins(): string[] {
   return (
@@ -119,6 +120,46 @@ const addressNotVerified = () =>
   new APIError('FORBIDDEN', { code: 'ADDRESS_NOT_VERIFIED', message: 'Address not verified' })
 const adminAddressReserved = () =>
   new APIError('FORBIDDEN', { code: 'ADMIN_ADDRESS_RESERVED', message: 'This address is reserved for the administrator' })
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+// What better-auth's MCP plugin stores under a consent code while the user
+// has not answered (`/mcp/authorize` with `prompt=consent`).
+interface PendingAuthorization {
+  clientId: string
+  redirectURI: string
+  userId: string
+  scopes: string[]
+}
+
+function parsePendingAuthorization(value: string): PendingAuthorization | null {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(value)
+  } catch {
+    return null
+  }
+  if (!isRecord(parsed)) return null
+  const { clientId, redirectURI, userId, scope, requireConsent } = parsed
+  if (typeof clientId !== 'string' || typeof redirectURI !== 'string' || typeof userId !== 'string') return null
+  // Once answered, the same row holds the code the client exchanges.
+  if (requireConsent !== true) return null
+  const scopes = Array.isArray(scope) ? scope.filter((s): s is string => typeof s === 'string') : []
+  return { clientId, redirectURI, userId, scopes }
+}
+
+// "https://claude.ai", or the whole URI when it has no origin to show: an
+// application's own scheme, such as "vscode://…".
+function redirectTarget(redirectURI: string): string | null {
+  try {
+    const url = new URL(redirectURI)
+    return url.origin !== 'null' ? url.origin : `${url.protocol}//${url.host}${url.pathname}`
+  } catch {
+    return null
+  }
+}
 
 /**
  * The header better-auth reads the client's address from, for its rate
@@ -554,6 +595,34 @@ export class AuthService {
       return
     }
     if (!wasAdmin) console.log(`Admin role given to ${this.adminEmail} (ADMIN_EMAIL)`)
+  }
+
+  /**
+   * The authorization `consentCode` awaits, for the consent page: only to
+   * `userId`, the user it was asked of, and only while it awaits an answer.
+   * The application's name is its own claim; where the access goes is what
+   * the user can judge it by.
+   */
+  public async getOAuthConsent(consentCode: string, userId: string): Promise<OAuthConsentRequest> {
+    const notFound = () => new NotFoundError('Authorization request not found or expired', 'OAUTH_CONSENT_NOT_FOUND')
+    const { adapter, internalAdapter } = await this.instance.$context
+    const verification = await internalAdapter.findVerificationValue(consentCode)
+    if (!verification || verification.expiresAt < new Date()) throw notFound()
+    const pending = parsePendingAuthorization(verification.value)
+    if (!pending || pending.userId !== userId) throw notFound()
+    const redirectTo = redirectTarget(pending.redirectURI)
+    if (!redirectTo) throw notFound()
+
+    // The mcp plugin's model for registered clients.
+    const client = await adapter.findOne<{ name?: string | null }>({
+      model: 'oauthApplication',
+      where: [{ field: 'clientId', value: pending.clientId }],
+    })
+    return {
+      clientName: client?.name?.trim() || null,
+      redirectTo,
+      keepsAccess: pending.scopes.includes('offline_access'),
+    }
   }
 
   /**

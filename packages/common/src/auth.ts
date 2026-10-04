@@ -21,6 +21,22 @@ export const PASSWORD_POLICIES = ['open', 'existing', 'admins'] as const
 export type PasswordPolicy = (typeof PASSWORD_POLICIES)[number]
 
 /**
+ * What the consent page asks the signed-in user to allow, read on the server
+ * from the pending authorization — never from the page's URL, which anyone
+ * can write.
+ */
+export interface OAuthConsentRequest {
+  // The name the application registered with, which anyone may choose; null
+  // when it gave none.
+  clientName: string | null
+  // Where the access goes once allowed: the redirect URI's origin, or the
+  // whole URI for an application's own scheme ("vscode://…").
+  redirectTo: string
+  // Asks to keep access (`offline_access`): renewable for up to 7 days.
+  keepsAccess: boolean
+}
+
+/**
  * Auth providers enabled on the server, exposed to the UI so it only shows
  * the options that are actually available.
  */

@@ -2,6 +2,9 @@ import mongoose, { Schema, Document } from 'mongoose'
 
 export interface ImageDocument extends Document {
   _id: mongoose.Types.ObjectId
+  // The user who uploaded it: the only one who reads it, deletes it, or has
+  // it drawn in an export. Image ids are ObjectIds, which follow each other.
+  ownerId: string
   data: string // base64 encoded image
   mimeType: string // image/jpeg, image/png, etc.
   originalName?: string
@@ -13,6 +16,7 @@ export interface ImageDocument extends Document {
 }
 
 const ImageSchema = new Schema({
+  ownerId: { type: String, required: true, index: true },
   data: { type: String, required: true },
   mimeType: { type: String, required: true, default: 'image/jpeg' },
   originalName: { type: String },

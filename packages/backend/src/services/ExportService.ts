@@ -59,8 +59,36 @@ interface RenderAssets {
   fonts: FontCatalog
 }
 
+// A render holds the CPU, and the timeout cannot stop one: it only stops
+// waiting for it. How many run at once is capped, overall and per user, so
+// that one account — through the API or MCP — cannot starve the others.
+const MAX_RENDERS = 4
+const MAX_RENDERS_PER_OWNER = 2
+
 export class ExportService {
+  private renders = 0
+  private rendersByOwner = new Map<string, number>()
+
   constructor(private imageService: ImageService, private fontService: FontService) { }
+
+  /** Takes a render slot for `ownerId`, or refuses with 429; returns its release. */
+  private acquireRenderSlot(ownerId: string): () => void {
+    const own = this.rendersByOwner.get(ownerId) ?? 0
+    if (this.renders >= MAX_RENDERS || own >= MAX_RENDERS_PER_OWNER) {
+      throw new AppError('Too many PDF exports in progress: try again in a moment', 429, 'EXPORT_BUSY')
+    }
+    this.renders++
+    this.rendersByOwner.set(ownerId, own + 1)
+    let released = false
+    return () => {
+      if (released) return
+      released = true
+      this.renders--
+      const left = (this.rendersByOwner.get(ownerId) ?? 1) - 1
+      if (left > 0) this.rendersByOwner.set(ownerId, left)
+      else this.rendersByOwner.delete(ownerId)
+    }
+  }
 
   private validateVariables(presentation: Presentation, variableValues: Record<string, VariableValueType>): void {
     const requiredVariables = presentation.variableData?.filter(v => v.required) || []
@@ -72,7 +100,9 @@ export class ExportService {
     }
   }
 
-  private async fetchImageData(resolvedSlides: Slide[]): Promise<Map<string, string>> {
+  // Only `ownerId`'s images: a shape's image id is anyone's to write, and an
+  // export must not draw someone else's. One not found is left out.
+  private async fetchImageData(resolvedSlides: Slide[], ownerId: string): Promise<Map<string, string>> {
     const imageIds = new Set<string>()
 
     for (const slide of resolvedSlides) {
@@ -90,7 +120,7 @@ export class ExportService {
 
     const imagePromises = Array.from(imageIds).map(async (imageId) => {
       try {
-        const image = await this.imageService.getById(imageId)
+        const image = await this.imageService.getById(imageId, ownerId)
         let cleanData = image.data.replace(/[\s\n\r]/g, '')
         let dataUrl: string
         if (cleanData.startsWith('data:')) {
@@ -437,7 +467,8 @@ export class ExportService {
     }, shapes)
   }
 
-  public async exportToPDF(presentation: Presentation, options: RenderOptions = {}): Promise<Buffer> {
+  /** `ownerId` owns the presentation: only their images are drawn. */
+  public async exportToPDF(presentation: Presentation, ownerId: string, options: RenderOptions = {}): Promise<Buffer> {
     const variableValues = options.variableValues || {}
 
     this.validateVariables(presentation, variableValues)
@@ -450,7 +481,7 @@ export class ExportService {
     }))
 
     const [images, fonts] = await Promise.all([
-      this.fetchImageData(resolvedSlides),
+      this.fetchImageData(resolvedSlides, ownerId),
       this.loadFonts(resolvedSlides),
     ])
     const assets: RenderAssets = { images, fonts }
@@ -458,9 +489,14 @@ export class ExportService {
 
     const doc = React.createElement(Document, {}, pages)
 
+    // Held until the render itself ends, not the wait for it.
+    const release = this.acquireRenderSlot(ownerId)
+    const rendering = renderToBuffer(doc)
+    void rendering.then(release, release)
+
     const TIMEOUT_MS = 30_000
     const pdfBuffer = await Promise.race([
-      renderToBuffer(doc),
+      rendering,
       new Promise<never>((_, reject) =>
         setTimeout(() => reject(new AppError('PDF generation timed out after 30s', 408)), TIMEOUT_MS)
       )

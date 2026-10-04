@@ -149,13 +149,14 @@ file does.
 6. Mirror it in the SDK, the editor's `api.ts`, and an MCP tool if an agent
    should reach it. → command `/new-endpoint`
 
-## Known gap
+## Resources owned outside a presentation
 
-**`routes/images.ts` has no ownership check.** It sits behind `requireAuth`, but
-`Image` documents carry neither `ownerId` nor `presentationId`, so any
-authenticated user can `GET /api/images/:id` or `DELETE /api/images/:id` for any
-image id. Fixing it means scoping images to an owner at the model level, not
-only adding a middleware.
+**`routes/images.ts`** has no `:id` presentation to check: images belong to
+their uploader (`Image.ownerId`), and each handler passes `req.user!.id` to the
+service, which scopes the query by it — someone else's image is a 404, like a
+missing one. Any new resource owned by a user rather than a presentation needs
+the same: ownership in the model and in every query, not only a middleware.
+ObjectIds follow each other, so an id is no secret.
 
 ## Related
 

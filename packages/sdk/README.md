@@ -366,6 +366,15 @@ try {
 }
 ```
 
+Limits worth handling:
+
+- **Images are their uploader's.** `getImage` answers 404 for another user's
+  image, as for a missing one, and an export draws only the presentation
+  owner's images. A user stores up to 500 MB of images: beyond,
+  `uploadImage` fails with `413 IMAGE_QUOTA_EXCEEDED`.
+- **Exports run a few at a time**: 4 on the server, 2 per user. Beyond, an
+  export fails with `429 EXPORT_BUSY`: retry after a short wait.
+
 ## TypeScript Support
 
 The SDK is written in TypeScript and includes full type definitions:

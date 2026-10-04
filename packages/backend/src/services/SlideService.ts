@@ -18,7 +18,9 @@ function isDuplicateKey(err: unknown): boolean {
 export class SlideService {
   constructor(private imageService: ImageService) { }
 
-  async create(presentationId: string, data: SlideDTO.Create = {}): Promise<Slide> {
+  // `ownerId` owns the presentation (the route checked it): the images its
+  // shapes keep or release are that user's only.
+  async create(presentationId: string, ownerId: string, data: SlideDTO.Create = {}): Promise<Slide> {
     const presentation = await PresentationModel.findById(presentationId).select('_id')
     if (!presentation) {
       throw new NotFoundError('Presentation not found', 'PRESENTATION_NOT_FOUND')
@@ -67,7 +69,7 @@ export class SlideService {
     }
 
     try {
-      await this.imageService.markReferenced(collectImageIds(shapes))
+      await this.imageService.markReferenced(collectImageIds(shapes), ownerId)
     } catch (error) {
       console.error('Failed to keep the images of a restored slide:', error)
     }
@@ -78,6 +80,7 @@ export class SlideService {
 
   async updateShapes(
     presentationId: string,
+    ownerId: string,
     slideId: string,
     data: SlideDTO.Update
   ): Promise<void> {
@@ -101,14 +104,14 @@ export class SlideService {
     const imageIds = collectImageIds(data.shapes)
     const kept = new Set(imageIds)
     try {
-      await this.imageService.release(previousImageIds.filter(id => !kept.has(id)))
-      await this.imageService.markReferenced(imageIds)
+      await this.imageService.release(previousImageIds.filter(id => !kept.has(id)), ownerId)
+      await this.imageService.markReferenced(imageIds, ownerId)
     } catch (error) {
       console.error('Failed to update image references:', error)
     }
   }
 
-  async delete(presentationId: string, slideId: string): Promise<void> {
+  async delete(presentationId: string, ownerId: string, slideId: string): Promise<void> {
     const slide = await SlideModel.findOne({
       _id: toObjectId(slideId),
       presentationId: toObjectId(presentationId),
@@ -122,7 +125,7 @@ export class SlideService {
 
     // Released rather than deleted, so restoring the slide shows them again.
     try {
-      await this.imageService.release(collectImageIds(slide.shapes))
+      await this.imageService.release(collectImageIds(slide.shapes), ownerId)
     } catch (error) {
       console.error('Failed to release the images of a deleted slide:', error)
     }

@@ -143,7 +143,7 @@ because the schema stores shapes as `Mixed`.
 ### Clean up best-effort, log, continue
 
 ```ts
-try { await this.imageService.release(collectImageIds(slide.shapes)) }
+try { await this.imageService.release(collectImageIds(slide.shapes), ownerId) }
 catch (error) { console.error('Failed to release the images of a deleted slide:', error) }
 ```
 

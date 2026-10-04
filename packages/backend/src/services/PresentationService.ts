@@ -93,7 +93,7 @@ export class PresentationService {
     await SlideModel.deleteMany({ presentationId: presentation._id })
     if (imageIds.length) {
       try {
-        await this.imageService.deleteUnused(imageIds)
+        await this.imageService.deleteUnused(imageIds, presentation.ownerId)
       } catch (error) {
         console.error('Failed to delete associated images:', error)
       }

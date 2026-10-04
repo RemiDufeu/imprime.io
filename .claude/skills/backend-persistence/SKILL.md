@@ -198,7 +198,7 @@ feature.
 Best-effort side effects are wrapped and logged rather than propagated:
 
 ```ts
-try { await this.imageService.deleteMany(imageIds) }
+try { await this.imageService.deleteUnused(imageIds, presentation.ownerId) }
 catch (error) { console.error('Failed to delete associated images:', error) }
 ```
 
@@ -238,11 +238,14 @@ E11000 to the same error.
 
 Verify these still hold before relying on them:
 
-1. **Images are unscoped.** No `ownerId`, no `presentationId`, and the routes do
-   not check ownership, so any authenticated user can read or delete any image
-   by id. Closing it needs ownership at the model level plus a decision about
-   images already stored without an owner — deliberately left open for now.
-   → skill `backend-routes`
+1. **Images belong to their uploader, not to a presentation.** `Image.ownerId`
+   is set at upload and every `ImageService` method takes the `ownerId` to
+   scope by — reads, deletes, and the reference bookkeeping, since the image
+   ids a slide holds are anyone's to write. The export draws only the
+   presentation owner's images. Images stored before the field existed have
+   no owner and answer 404 to everyone: no backfill was written (not in
+   production then). ObjectIds follow each other, so an unscoped lookup by id
+   is an enumerable one. → skill `backend-routes`
 
 ## Related
 

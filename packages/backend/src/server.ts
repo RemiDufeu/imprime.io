@@ -19,6 +19,7 @@ import exportRouter from './routes/export.js'
 import imagesRouter from './routes/images.js'
 import fontsRouter from './routes/fonts.js'
 import settingsRouter from './routes/settings.js'
+import oauthConsentRouter from './routes/oauthConsent.js'
 import { createMcpRouter } from './mcp/router.js'
 import { errorHandler } from './middleware/errorHandler.js'
 
@@ -91,6 +92,20 @@ app.use('/api/auth', (req, _res, next) => {
   next()
 })
 
+// better-auth's MCP plugin asks the user only when the client sends exactly
+// `prompt=consent`; otherwise the authorization code goes straight to the
+// client's redirect URI. Anyone may register a client — MCP clients do so
+// themselves, anonymously — so without this, one link opened by a signed-in
+// user would hand a stranger's site their access, unseen. Rewritten here,
+// before better-auth reads the URL, and kept through the sign-in it may
+// detour by.
+app.get('/api/auth/mcp/authorize', (req, _res, next) => {
+  const url = new URL(req.url, 'http://localhost')
+  url.searchParams.set('prompt', 'consent')
+  req.url = `${url.pathname}${url.search}`
+  next()
+})
+
 // Through the service, never a captured instance: it is rebuilt when the
 // email settings change.
 app.all('/api/auth/*splat', authService.handler)
@@ -138,6 +153,7 @@ app.use('/api/export', requireAuth, exportRouter)
 app.use('/api/images', requireAuth, imagesRouter)
 app.use('/api/fonts', requireAuth, fontsRouter)
 app.use('/api/settings', requireAuth, settingsRouter)
+app.use('/api/oauth-consent', requireAuth, oauthConsentRouter)
 
 // MCP (owns its own sessions, outside the requireAuth pipeline for now)
 const mcp = createMcpRouter()

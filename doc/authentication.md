@@ -11,7 +11,7 @@ are easy to miss.
 | Email and password | People, in the browser | Always available; who may use it: **Administration → Access** | Password reset and email verification need an SMTP server |
 | Single sign-on: Google, GitHub, Microsoft | People, in the browser | **Administration → Single sign-on** | The first sign-in creates the account |
 | API key | Scripts, the SDK, headless MCP clients | Each user, in **Settings → API Keys** | Sent in the `x-api-key` header. The domain list applies to it, the password policy does not |
-| MCP OAuth | Interactive AI clients, such as the Claude connector | Nothing to set up | The user signs in on the usual sign-in page, then the client holds a token |
+| MCP OAuth | Interactive AI clients, such as the Claude connector | Nothing to set up | The user signs in on the usual sign-in page and allows the client on a consent page, then the client holds a token. See [MCP clients](#mcp-clients) |
 
 ## Where things are configured
 
@@ -299,6 +299,23 @@ signs anyone out. API keys and MCP tokens are checked against the domain list
 each time they are used, so they stop working for the users it shuts out, and
 work again if the list lets them back in. *Single sign-on only* does not affect
 them: they are not passwords.
+
+## MCP clients
+
+An AI client registers itself with Imprime, then sends the user to sign in.
+Registration is open to anyone, without an account, because MCP clients do it
+themselves. A client's name is therefore whatever its author chose.
+
+- **Consent every time.** Before a client gets access, the user sees a consent
+  page with the client's name and **where the access goes**: the address of
+  its redirect URI, such as `https://claude.ai`. That address is the one to
+  check, since the name can be anything. A link that would hand over access
+  without that page does not exist.
+- **What a client can do.** Read the user's presentations and export them to
+  PDF. With `offline_access`, for up to 7 days.
+- **Every request is checked.** A client's session lasts as long as its token
+  or API key: revoking the key, or the token expiring, ends it. A user can
+  have at most 10 sessions open; opening another closes the oldest.
 
 ## Recipes
 

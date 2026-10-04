@@ -19,6 +19,7 @@ import type {
   VariableDTO,
   VariableValueType,
   EnabledAuthProviders,
+  OAuthConsentRequest,
   EmailSettingsDTO,
   SsoSettingsDTO,
   SsoProvider,
@@ -122,6 +123,15 @@ export class ImprimeClient {
    */
   async getAuthProviders(): Promise<EnabledAuthProviders> {
     return this.request<EnabledAuthProviders>('/auth-providers')
+  }
+
+  /**
+   * The authorization an OAuth consent page asks the signed-in user to allow,
+   * by the `consent_code` of its URL: the application's name and where the
+   * access goes. Fails with 404 for an unknown, expired or someone else's code.
+   */
+  async getOAuthConsent(consentCode: string): Promise<OAuthConsentRequest> {
+    return this.request<OAuthConsentRequest>(`/oauth-consent/${encodeURIComponent(consentCode)}`)
   }
 
   // ============================================
