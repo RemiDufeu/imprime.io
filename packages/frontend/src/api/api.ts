@@ -1,5 +1,5 @@
 import { ImprimeClient } from '@imprime/sdk'
-import type { Presentation, PresentationSummary, Shape, Slide, SlideDTO, ImageDTO, FontDTO, FontVariant, VariableDTO, VariableValueType } from '@imprime/sdk'
+import type { Presentation, PresentationSummary, Shape, Slide, SlideDTO, ImageDTO, FontDTO, FontVariant, VariableDTO, VariableValueType, EmailSettingsDTO, SsoSettingsDTO, SsoProvider, AccessSettingsDTO } from '@imprime/sdk'
 import { API_BASE } from '../config'
 
 // Create a single SDK client instance
@@ -94,6 +94,43 @@ export const fontsAPI = {
 
   async delete(fontId: string): Promise<void> {
     return client.deleteFont(fontId)
+  },
+}
+
+/**
+ * Instance settings API using Imprime SDK (admins only)
+ */
+export const settingsAPI = {
+  async getEmail(): Promise<EmailSettingsDTO.Response> {
+    return client.getEmailSettings()
+  },
+
+  async updateEmail(settings: EmailSettingsDTO.Update): Promise<EmailSettingsDTO.Response> {
+    return client.updateEmailSettings(settings)
+  },
+
+  async sendTestEmail(request: EmailSettingsDTO.TestRequest): Promise<void> {
+    return client.sendTestEmail(request)
+  },
+
+  async getAccess(): Promise<AccessSettingsDTO.Response> {
+    return client.getAccessSettings()
+  },
+
+  async updateAccess(settings: AccessSettingsDTO.Update): Promise<AccessSettingsDTO.Response> {
+    return client.updateAccessSettings(settings)
+  },
+
+  async getSso(): Promise<SsoSettingsDTO.Response> {
+    return client.getSsoSettings()
+  },
+
+  async updateSsoProvider(provider: SsoProvider, data: SsoSettingsDTO.ProviderUpdate): Promise<SsoSettingsDTO.ProviderStatus> {
+    return client.updateSsoProvider(provider, data)
+  },
+
+  async removeSsoProvider(provider: SsoProvider): Promise<SsoSettingsDTO.ProviderStatus> {
+    return client.removeSsoProvider(provider)
   },
 }
 

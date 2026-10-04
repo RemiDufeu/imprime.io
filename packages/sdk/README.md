@@ -249,6 +249,105 @@ Remove an optional face (not `'regular'`).
 #### `deleteFont(fontId)` — admin
 Delete a family. Text that uses it, in every presentation, is drawn in Roboto.
 
+### Settings Methods
+
+Email and single sign-on are set by the instance's admins, not by the
+environment, and apply at once, without a restart. Every method is admin only
+(other users get `403 ADMIN_REQUIRED`).
+
+Email covers the SMTP server, and whether accounts must verify their address.
+
+#### `getEmailSettings()` — admin
+The SMTP server (`null` when there is none) and `requireEmailVerification`.
+The password is never returned: `smtp.hasPassword` says whether one is stored.
+
+#### `updateEmailSettings(settings)` — admin
+Replace both settings. Omit `smtp.password` to keep the stored one (as long as
+`smtp.user` is unchanged); send `smtp: null` to remove the server.
+
+```typescript
+await client.updateEmailSettings({
+  smtp: {
+    host: 'smtp.example.com',
+    port: 587,
+    secure: false,          // TLS from the start; always on for port 465
+    user: 'imprime@example.com',
+    password: '…',
+    from: 'Imprime <no-reply@example.com>',
+  },
+  requireEmailVerification: true,
+})
+```
+
+Fails with `400 EMAIL_VERIFICATION_REQUIRES_SMTP` when verification is required
+without a server, and `400 EMAIL_SETTINGS_INVALID` (with `details`) for a
+malformed server.
+
+#### `sendTestEmail({ to, smtp? })` — admin
+Send one email through `smtp`, or through the stored server when it is
+omitted, without saving anything — to check a configuration before saving it.
+Fails with `502 SMTP_TEST_FAILED`, carrying the SMTP server's own error, or
+`400 SMTP_NOT_CONFIGURED` when there is no server to test.
+
+Single sign-on is set the same way: one OAuth application per provider,
+`'google' | 'github' | 'microsoft'` (the list is exported as `SSO_PROVIDERS`).
+A provider appears on the sign-in page as soon as it is saved.
+
+#### `getSsoSettings()` — admin
+For each provider: `callbackUrl`, the redirect URI to register with it;
+`config`, the stored application (`null` when there is none) without its
+secret; and `active`, whether it is offered on the sign-in page — false for a
+stored application whose secret no longer decrypts, after `BETTER_AUTH_SECRET`
+changed.
+
+#### `updateSsoProvider(provider, data)` — admin
+Store a provider's application. Omit `clientSecret` to keep the stored one (as
+long as `clientId` is unchanged). `tenantId` is for Microsoft only:
+`'common'` (the default), `'organizations'`, `'consumers'`, or a tenant ID.
+
+```typescript
+await client.updateSsoProvider('github', {
+  clientId: 'Iv1.0123456789abcdef',
+  clientSecret: '…',
+})
+```
+
+Fails with `400 SSO_SETTINGS_INVALID` (with `details`) for a malformed
+application or a missing secret, and `400 SSO_PROVIDER_INVALID` for an unknown
+provider.
+
+#### `removeSsoProvider(provider)` — admin
+Remove a provider's application: it leaves the sign-in page at once. Accounts
+that only signed in with it can still set a password through password reset,
+when the instance sends email.
+
+#### `getAccessSettings()` / `updateAccessSettings(settings)` — admin
+Who may get into the instance:
+
+- `passwordPolicy` — `'open'` (default): anyone signs up and signs in with an
+  email and a password; `'existing'`: no new password accounts, existing ones
+  keep signing in; `'admins'`: single sign-on only, administrators keep their
+  password as the way back in.
+- `allowedDomains` — e.g. `['example.com']`, exact domains: only addresses in
+  them may have an account, and only once verified, by their provider or by
+  email. Empty (default): any. The administrator is exempt. Google and GitHub
+  say whether an address is verified; Microsoft does only when its provider is
+  set to the organisation's own tenant.
+
+```typescript
+await client.updateAccessSettings({ passwordPolicy: 'admins', allowedDomains: ['example.com'] })
+```
+
+Users the new settings shut out are signed out at once: everyone but
+administrators when `'admins'` is turned on, those outside the domains when the
+list changes. API keys are not revoked. Fails with `400 ACCESS_SETTINGS_INVALID`
+(with `details`). Nothing else is refused: single sign-on only without an
+active provider leaves the administrator as the only one who can sign in.
+
+Refused sign-ins answer `403` with `PASSWORD_SIGN_IN_DISABLED`,
+`EMAIL_DOMAIN_NOT_ALLOWED` or `ADDRESS_NOT_VERIFIED`; a refused single sign-on
+redirects to the sign-in page with the code in its `error` parameter.
+
 ## Error Handling
 
 The SDK throws errors for failed requests:

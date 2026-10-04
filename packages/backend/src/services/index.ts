@@ -6,6 +6,7 @@ import { PresentationService } from './PresentationService.js'
 import { ExportService } from './ExportService.js'
 import { MailerService } from './MailerService.js'
 import { AuthService } from './AuthService.js'
+import { SettingsService } from './SettingsService.js'
 
 // Instantiate services with dependency injection
 const imageService = new ImageService()
@@ -16,6 +17,7 @@ const presentationService = new PresentationService(imageService)
 const exportService = new ExportService(imageService, fontService)
 const mailerService = new MailerService()
 const authService = new AuthService(mailerService)
+const settingsService = new SettingsService(mailerService, authService)
 
 export {
   imageService,
@@ -26,5 +28,6 @@ export {
   exportService,
   mailerService,
   authService,
+  settingsService,
 }
 export { AppError, NotFoundError, ForbiddenError, ValidationError, ConflictError } from './errors.js'

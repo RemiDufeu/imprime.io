@@ -1,3 +1,5 @@
+import type { PasswordPolicy, SsoProvider } from './auth.js'
+
 export interface BaseShape {
   // Client-generated UUID (not a MongoDB _id). The front assigns it on creation
   // so it can apply optimistic updates and track selection without waiting for
@@ -345,6 +347,101 @@ export namespace FontDTO {
 
   export interface FaceData {
     data: string
+  }
+}
+
+// How the instance sends email, set by its admins. Sign-up verification and
+// password reset both need the SMTP server.
+export namespace EmailSettingsDTO {
+  // The password is write-only: a response only says whether one is stored.
+  export interface Smtp {
+    host: string
+    port: number
+    // TLS from the first byte, as port 465 expects (always on for 465).
+    // Otherwise the connection upgrades through STARTTLS when the server offers it.
+    secure: boolean
+    user?: string
+    hasPassword: boolean
+    from: string
+  }
+
+  export interface Response {
+    // null while the instance has no SMTP server.
+    smtp: Smtp | null
+    requireEmailVerification: boolean
+  }
+
+  export interface SmtpUpdate {
+    host: string
+    port: number
+    secure: boolean
+    user?: string
+    // Omitted: the stored password is kept, as long as `user` is unchanged.
+    // Empty: removed, as it is along with `user`.
+    password?: string
+    from: string
+  }
+
+  export interface Update {
+    // null removes the SMTP server, which requires verification to be off.
+    smtp: SmtpUpdate | null
+    requireEmailVerification: boolean
+  }
+
+  // One email sent to `to` through `smtp`, or through the stored server when
+  // omitted, so a configuration can be checked before it is saved.
+  export interface TestRequest {
+    to: string
+    smtp?: SmtpUpdate
+  }
+}
+
+// The instance's single sign-on providers, set by its admins: each one is an
+// OAuth application registered with the provider.
+export namespace SsoSettingsDTO {
+  // The client secret is write-only, and never returned.
+  export interface Provider {
+    clientId: string
+    // Microsoft only: whose accounts may sign in. 'common' (the default, any
+    // account), 'organizations', 'consumers', or one tenant's id or domain.
+    tenantId?: string
+  }
+
+  export interface ProviderStatus {
+    // The redirect URI to register with the provider; null while the server
+    // has no PUBLIC_APP_URL to build it from.
+    callbackUrl: string | null
+    // null while the provider is not configured.
+    config: Provider | null
+    // Offered on the sign-in page. False for a configured provider whose
+    // stored secret no longer decrypts (BETTER_AUTH_SECRET changed).
+    active: boolean
+  }
+
+  export type Response = Record<SsoProvider, ProviderStatus>
+
+  export interface ProviderUpdate {
+    clientId: string
+    // Omitted: the stored secret is kept, as long as `clientId` is unchanged.
+    clientSecret?: string
+    tenantId?: string
+  }
+}
+
+// Who may get into the instance, and how, set by its admins.
+export namespace AccessSettingsDTO {
+  export interface Response {
+    passwordPolicy: PasswordPolicy
+    // Domains whose addresses may have an account, lower-cased, exactly:
+    // "example.com" does not admit "eu.example.com". Empty: any. An address
+    // counts only once verified, by its provider or by email; administrators
+    // are exempt.
+    allowedDomains: string[]
+  }
+
+  export interface Update {
+    passwordPolicy: PasswordPolicy
+    allowedDomains: string[]
   }
 }
 

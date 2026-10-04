@@ -19,6 +19,10 @@ import type {
   VariableDTO,
   VariableValueType,
   EnabledAuthProviders,
+  EmailSettingsDTO,
+  SsoSettingsDTO,
+  SsoProvider,
+  AccessSettingsDTO,
 } from '@imprime/common'
 
 export interface ImprimeClientOptions {
@@ -477,6 +481,91 @@ export class ImprimeClient {
    */
   async deleteFont(fontId: string): Promise<void> {
     return this.request<void>(`/fonts/${fontId}`, {
+      method: 'DELETE',
+    })
+  }
+
+  // ============================================
+  // Settings Operations
+  // ============================================
+
+  /**
+   * Get the instance's email settings: its SMTP server, and whether accounts
+   * must verify their address. The SMTP password is never returned. Admin only.
+   */
+  async getEmailSettings(): Promise<EmailSettingsDTO.Response> {
+    return this.request<EmailSettingsDTO.Response>('/settings/email')
+  }
+
+  /**
+   * Replace the instance's email settings. They apply at once, without a
+   * restart. Omit `smtp.password` to keep the stored one (same user only). Admin only.
+   */
+  async updateEmailSettings(settings: EmailSettingsDTO.Update): Promise<EmailSettingsDTO.Response> {
+    return this.request<EmailSettingsDTO.Response>('/settings/email', {
+      method: 'PUT',
+      body: JSON.stringify(settings),
+    })
+  }
+
+  /**
+   * Send a test email through `request.smtp`, or through the stored server
+   * when it is omitted. Nothing is saved. Admin only.
+   */
+  async sendTestEmail(request: EmailSettingsDTO.TestRequest): Promise<void> {
+    return this.request<void>('/settings/email/test', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    })
+  }
+
+  /**
+   * Get the instance's single sign-on providers: for each, the callback URL to
+   * register with the provider and the stored application, if any. Client
+   * secrets are never returned. Admin only.
+   */
+  async getSsoSettings(): Promise<SsoSettingsDTO.Response> {
+    return this.request<SsoSettingsDTO.Response>('/settings/sso')
+  }
+
+  /**
+   * Configure one provider. It is offered on the sign-in page at once,
+   * without a restart. Omit `clientSecret` to keep the stored one (same
+   * `clientId` only). Admin only.
+   */
+  async updateSsoProvider(
+    provider: SsoProvider,
+    data: SsoSettingsDTO.ProviderUpdate,
+  ): Promise<SsoSettingsDTO.ProviderStatus> {
+    return this.request<SsoSettingsDTO.ProviderStatus>(`/settings/sso/${provider}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
+  }
+
+  /**
+   * Who may get into the instance: the password policy, and the domains
+   * whose addresses may have an account. Admin only.
+   */
+  async getAccessSettings(): Promise<AccessSettingsDTO.Response> {
+    return this.request<AccessSettingsDTO.Response>('/settings/access')
+  }
+
+  /**
+   * Replace the access settings, at once. Users they now shut out are signed
+   * out: everyone but administrators when single sign-on becomes the only
+   * way in, those outside the domains when the list changes. Admin only.
+   */
+  async updateAccessSettings(settings: AccessSettingsDTO.Update): Promise<AccessSettingsDTO.Response> {
+    return this.request<AccessSettingsDTO.Response>('/settings/access', {
+      method: 'PUT',
+      body: JSON.stringify(settings),
+    })
+  }
+
+  /** Remove one provider's application: it leaves the sign-in page at once. Admin only. */
+  async removeSsoProvider(provider: SsoProvider): Promise<SsoSettingsDTO.ProviderStatus> {
+    return this.request<SsoSettingsDTO.ProviderStatus>(`/settings/sso/${provider}`, {
       method: 'DELETE',
     })
   }

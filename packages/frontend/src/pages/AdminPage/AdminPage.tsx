@@ -1,12 +1,15 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { Menu, Typography } from 'antd'
-import { FontSizeOutlined } from '@ant-design/icons'
+import { FontSizeOutlined, LockOutlined, LoginOutlined, MailOutlined } from '@ant-design/icons'
 import RegularPageContainer from '../../components/Layout/RegularPageContainer/RegularPageContainer'
 import './AdminPage.css'
 
 // One entry per administration page, keyed by its path under /admin.
 const SECTIONS = [
   { key: 'fonts', icon: <FontSizeOutlined />, label: <NavLink to="fonts">Fonts</NavLink> },
+  { key: 'email', icon: <MailOutlined />, label: <NavLink to="email">Email</NavLink> },
+  { key: 'sso', icon: <LoginOutlined />, label: <NavLink to="sso">Single sign-on</NavLink> },
+  { key: 'access', icon: <LockOutlined />, label: <NavLink to="access">Access</NavLink> },
 ]
 
 /** Shell of the administration pages: section navigation beside the page. */
