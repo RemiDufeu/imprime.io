@@ -72,17 +72,21 @@ Both paths land on the same server and expose the same tools — plug Imprime in
 Imprime is currently under active development. Here are the main planned updates:
 
 ## Block enhancements
-- **`else`** branch for conditional blocks
-- **Rich media** blocks (dynamic images, QR codes...)
+- *image variable
+- condition on slide (if and for)
 
 ## Editor usability
-- Remaining keyboard shortcuts: **cut / undo / redo**
 - Multiple block selection and grouped operations
 
 ## Document format
 - Change the resolution
 - Add text document format in addition to current presentation format
-- Add code on presentation
+- Add default style (font and bg color)
+- Add pagination
+
+## Automation
+- MCP edition
+- test API
 
 ---
 
