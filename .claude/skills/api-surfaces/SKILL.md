@@ -21,7 +21,7 @@ packages/common/src/types.ts   (DTO namespaces)
 ```
 
 `frontend/src/api/api.ts` instantiates one `ImprimeClient` and re-exports it as
-`presentationsAPI` / `imagesAPI` / `fontsAPI` / `variablesAPI`. The frontend therefore
+`templatesAPI` / `imagesAPI` / `fontsAPI` / `variablesAPI`. The frontend therefore
 consumes the *same* client third parties do — if a method is missing from the
 SDK, the editor cannot use it either. That is a feature: it keeps the public
 API honest.
@@ -32,7 +32,7 @@ Mounted in `packages/backend/src/server.ts`, all behind `requireAuth`:
 
 | Mount | Router |
 |---|---|
-| `/api/presentations` | `presentations.ts`, `slides.ts`, `variables.ts` (three routers, same mount) |
+| `/api/templates` | `templates.ts`, `pages.ts`, `variables.ts` (three routers, same mount) |
 | `/api/export` | `export.ts` |
 | `/api/images` | `images.ts` — the uploader's own images (`Image.ownerId`), 500 MB each |
 | `/api/oauth-consent` | `oauthConsent.ts` — the pending OAuth authorization the consent page shows, to the user it was asked of |
@@ -57,19 +57,19 @@ Two mechanisms, both resolving to `req.user.id`:
 - **`x-api-key` header**, resolved by `authService.resolveApiKeyOwner`
   (SDK, Claude Code, scripts).
 
-Authentication is not authorization. Every presentation-scoped operation must
+Authentication is not authorization. Every template-scoped operation must
 also call the ownership check:
 
 ```ts
-requireOwnsPresentation        // Express middleware, after requireAuth
-assertOwnsPresentation(id, ownerId)   // the same check for non-HTTP callers (MCP)
+requireOwnsTemplate        // Express middleware, after requireAuth
+assertOwnsTemplate(id, ownerId)   // the same check for non-HTTP callers (MCP)
 ```
 
 It throws **`NotFoundError`, not a 403** — deliberately, so a third party cannot
-learn that someone else's presentation exists. Keep that when you add a check.
+learn that someone else's template exists. Keep that when you add a check.
 
-A route that takes a `:id` presentation param and does not go through
-`requireOwnsPresentation` is a vulnerability, not a style issue.
+A route that takes a `:id` template param and does not go through
+`requireOwnsTemplate` is a vulnerability, not a style issue.
 
 Some resources belong to the **instance**, not to a user: imported fonts and
 the instance settings (email, single sign-on). Every authenticated user reads the fonts; only
@@ -132,10 +132,10 @@ redirect URI; the consent page shows where the access goes from
 own URL.
 
 A tool has: a zod `inputSchema` and `outputSchema` with `.describe()` on every
-field (that text is what the agent reads), `assertOwnsPresentation` first,
+field (that text is what the agent reads), `assertOwnsTemplate` first,
 `toolError(...)` on failure rather than a thrown exception, and both
 `content` (human-readable) and `structuredContent` (machine-readable) on success.
-`exportPresentation.ts` is the reference implementation, including the
+`exportTemplate.ts` is the reference implementation, including the
 
 Binary results are not returned inline: the PDF goes into `pdfDownloadStore`
 and the tool returns a single-use URL with a 10-minute TTL.
@@ -149,8 +149,8 @@ Use `/new-endpoint`. The sites, in order:
    Never send a Mongoose document straight out; `_id` is an `ObjectId`.
 3. `packages/backend/src/services/` — the logic, on an existing singleton or a
    new one wired in `services/index.ts`.
-4. `packages/backend/src/routes/` — a thin handler; `requireOwnsPresentation`
-   if it is presentation-scoped.
+4. `packages/backend/src/routes/` — a thin handler; `requireOwnsTemplate`
+   if it is template-scoped.
 5. `packages/sdk/src/ImprimeClient.ts` — the typed method, in the matching
    `// ===` section.
 6. `packages/frontend/src/api/api.ts` — the wrapper, if the editor needs it.

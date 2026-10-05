@@ -1,5 +1,5 @@
 import { ImageModel } from '../models/Image.js'
-import { SlideModel } from '../models/Slide.js'
+import { PageModel } from '../models/Page.js'
 import { isObjectIdString } from '../models/mappers.js'
 import { IMAGE_MIME_TYPES, type ImageDTO, type ImageMimeType } from '@imprime/common'
 import { AppError, NotFoundError, ValidationError } from './errors.js'
@@ -71,14 +71,14 @@ function parseImage(upload: ImageDTO.Create | undefined): UploadedImage {
 /**
  * Images belong to the user who uploaded them: every read, delete and
  * reference count is scoped by `ownerId`, which the caller passes — the
- * authenticated user, or a presentation's owner.
+ * authenticated user, or a template's owner.
  */
 export class ImageService {
   public async upload(data: ImageDTO.Create, ownerId: string): Promise<ImageDTO.Response> {
     const { mimeType, size } = parseImage(data)
     if (await this.storedBytes(ownerId) + size > MAX_IMAGE_BYTES_PER_OWNER) {
       throw new AppError(
-        `Image storage is full (${MAX_IMAGE_BYTES_PER_OWNER / 1024 / 1024} MB): remove images from your slides, or delete presentations`,
+        `Image storage is full (${MAX_IMAGE_BYTES_PER_OWNER / 1024 / 1024} MB): remove images from your pages, or delete templates`,
         413,
         'IMAGE_QUOTA_EXCEEDED',
       )
@@ -133,19 +133,19 @@ export class ImageService {
     return total?.bytes ?? 0
   }
 
-  // Of `ids`, those no slide shows any more — on any presentation, since a
+  // Of `ids`, those no page shows any more — on any template, since a
   // duplicated or pasted image shape keeps its image. Read after the write
-  // that removed them, so that slide already counts as not showing them.
+  // that removed them, so that page already counts as not showing them.
   private async unused(ids: string[]): Promise<string[]> {
     if (ids.length === 0) return []
-    const used = new Set(await SlideModel.distinct('imageIds', { imageIds: { $in: ids } }))
+    const used = new Set(await PageModel.distinct('imageIds', { imageIds: { $in: ids } }))
     return [...new Set(ids)].filter(id => !used.has(id))
   }
 
-  // These left a slide of `ownerId`'s. Those no slide shows any more start
+  // These left a page of `ownerId`'s. Those no page shows any more start
   // their grace period (ORPHAN_GRACE_SECONDS) rather than being deleted: the
   // editor can undo the removal. An image already orphaned keeps its
-  // original date. Ids a slide holds are anyone's to write: only the owner's
+  // original date. Ids a page holds are anyone's to write: only the owner's
   // own images are touched.
   public async release(ids: string[], ownerId: string): Promise<void> {
     const unused = await this.unused(ids)
@@ -156,7 +156,7 @@ export class ImageService {
     )
   }
 
-  // A slide of `ownerId`'s shows these: keep them. Run for every image of
+  // A page of `ownerId`'s shows these: keep them. Run for every image of
   // every saved tree, not only the new ones, so a release that raced a later
   // save is undone.
   public async markReferenced(ids: string[], ownerId: string): Promise<void> {
@@ -167,8 +167,8 @@ export class ImageService {
     )
   }
 
-  // Deleted now, without a grace period: their presentation, `ownerId`'s, is
-  // gone. Those another presentation shows are kept.
+  // Deleted now, without a grace period: their template, `ownerId`'s, is
+  // gone. Those another template shows are kept.
   public async deleteUnused(ids: string[], ownerId: string): Promise<number> {
     const unused = await this.unused(ids)
     if (unused.length === 0) return 0

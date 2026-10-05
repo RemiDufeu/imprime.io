@@ -2,7 +2,7 @@ import { Schema, model, Types, HydratedDocument } from 'mongoose'
 import type { VariableItemField, VariableType, VariableValueType } from '@imprime/common'
 
 export interface IVariableData {
-  presentationId: Types.ObjectId
+  templateId: Types.ObjectId
   type: VariableType
   name: string
   default?: VariableValueType
@@ -32,7 +32,7 @@ VariableItemFieldSchema.add({
 })
 
 const VariableDataSchema = new Schema<IVariableData>({
-  presentationId: { type: Schema.Types.ObjectId, ref: 'Presentation', required: true, index: true },
+  templateId: { type: Schema.Types.ObjectId, ref: 'Template', required: true, index: true },
   type: { type: String, required: true, enum: VARIABLE_TYPES, default: 'string' },
   name: { type: String, required: true },
   default: { type: Schema.Types.Mixed },
@@ -40,7 +40,7 @@ const VariableDataSchema = new Schema<IVariableData>({
   itemFields: { type: [VariableItemFieldSchema], default: undefined },
 })
 
-VariableDataSchema.index({ presentationId: 1, name: 1 }, { unique: true })
+VariableDataSchema.index({ templateId: 1, name: 1 }, { unique: true })
 
 export type VariableDataDocument = HydratedDocument<IVariableData>
 

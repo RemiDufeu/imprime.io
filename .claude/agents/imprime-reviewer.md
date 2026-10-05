@@ -48,14 +48,14 @@ those areas, say which other agent should also run.
   does not happen and the wrong tree is persisted. Every helper in
   `packages/frontend/src/utils/shapeTree.ts` rebuilds instead.
 - **Bypassing the single write path.** A shape action calling
-  `presentationsAPI.updateSlide` directly instead of `updateSlideShapes`, which
+  `templatesAPI.updatePage` directly instead of `updatePageShapes`, which
   skips `reflowGroups` and the retry logic.
 - **A type hole in the only safety net.** `any`, `as` on a domain type,
   `@ts-ignore`, or a `default:` case that swallows a new union member. This repo
   has no tests — the compiler is the test suite. A suppression is acceptable
-  only with the form used in `mcp/tools/exportPresentation.ts`: an upstream
+  only with the form used in `mcp/tools/exportTemplate.ts`: an upstream
   issue link and a condition for rechecking it.
-- **Missing ownership check** on a presentation-scoped route or MCP tool
+- **Missing ownership check** on a template-scoped route or MCP tool
   (flag it, then defer detail to `api-surface-reviewer`).
 
 ### HIGH
@@ -104,13 +104,17 @@ those areas, say which other agent should also run.
 - **A mutation that does not load-and-guard first** — trusting `updateOne` to
   have matched instead of fetching the target and throwing `NotFoundError`, or
   fetching a child by its own id alone rather than `{ _id, parentId }` together.
-- **Re-deriving `selectCurrentSlide`** inline rather than using the selector.
+- **Re-deriving `selectCurrentPage`** inline rather than using the selector.
 - **A container test written as `type === 'group' || ...`** instead of
   `isContainerShape` — it will be incomplete the day a fourth container lands.
-- **A new optional field without a documented default.** Shapes persist as
-  `Schema.Types.Mixed`; documents saved before the change must still render.
-  `GroupShape.layout` is the model: optional, with the legacy behaviour as the
-  unset meaning, and a comment saying so.
+- **A new optional field whose unset meaning is undocumented.** Optional is
+  for a field whose absence means something in the domain — `GroupShape.layout`
+  unset is free positioning, said in a comment. A field every new document has
+  is required.
+- **A migration script, a startup backfill, or a fallback for documents saved
+  before the change.** Imprime is pre-production: stored data is reset, not
+  migrated (→ skill `backend-persistence`). Ask for it to be removed, and for
+  the collections to drop to be named instead.
 
 ### MEDIUM
 
@@ -146,8 +150,10 @@ those areas, say which other agent should also run.
   here by design. Flag a *new* service that departs from it, not the pattern.
 - **The absence of transactions** on an existing multi-collection operation.
   Flag it only if a new operation's partial-failure state is actively harmful.
+- **Documents saved before the change no longer loading or rendering.**
+  Pre-production: that is a development database to reset, not a defect.
 - The two pre-existing gaps still documented in the skills — unscoped images,
-  and the non-recursive `collectImageIds` in `PresentationService` — unless the
+  and the non-recursive `collectImageIds` in `TemplateService` — unless the
   diff touches them. Both are known and deliberately deferred.
 
 ## Output

@@ -198,7 +198,7 @@ export class FontService {
     return { data: file.data.toString('base64') }
   }
 
-  // Text using the family, in any presentation, is left as is: both renderers
+  // Text using the family, in any template, is left as is: both renderers
   // draw an unknown family in the default font, and re-importing the name
   // brings it back.
   public async delete(fontId: string): Promise<void> {

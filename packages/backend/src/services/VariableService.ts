@@ -1,5 +1,5 @@
-import { PresentationModel } from '../models/Presentation.js'
-import { SlideModel } from '../models/Slide.js'
+import { TemplateModel } from '../models/Template.js'
+import { PageModel } from '../models/Page.js'
 import { VariableDataModel } from '../models/VariableData.js'
 import {
   isObjectIdString,
@@ -10,11 +10,11 @@ import {
 } from '../models/mappers.js'
 import type { VariableDTO, VariableData } from '@imprime/common'
 import { collectVariableIds } from '@imprime/common'
-import { touchPresentation } from './PresentationService.js'
+import { touchTemplate } from './TemplateService.js'
 import { NotFoundError, ConflictError, ValidationError } from './errors.js'
 
 const nameConflict = () =>
-  new ConflictError('Variable name already exists in this presentation', 'VARIABLE_NAME_EXISTS')
+  new ConflictError('Variable name already exists in this template', 'VARIABLE_NAME_EXISTS')
 
 const variableIdTaken = () => new ConflictError('Variable id already in use', 'VARIABLE_ID_TAKEN')
 
@@ -23,10 +23,10 @@ function isDuplicateName(err: unknown): boolean {
 }
 
 export class VariableService {
-  public async create(presentationId: string, data: VariableDTO.Create): Promise<VariableData[]> {
-    const presentation = await PresentationModel.findById(presentationId).select('_id')
-    if (!presentation) {
-      throw new NotFoundError('Presentation not found', 'PRESENTATION_NOT_FOUND')
+  public async create(templateId: string, data: VariableDTO.Create): Promise<VariableData[]> {
+    const template = await TemplateModel.findById(templateId).select('_id')
+    if (!template) {
+      throw new NotFoundError('Template not found', 'TEMPLATE_NOT_FOUND')
     }
 
     if (data._id !== undefined) {
@@ -39,7 +39,7 @@ export class VariableService {
     }
 
     const exists = await VariableDataModel.exists({
-      presentationId: presentation._id,
+      templateId: template._id,
       name: data.name,
     })
     if (exists) {
@@ -48,25 +48,25 @@ export class VariableService {
 
     try {
       await VariableDataModel.create({
-        ...variableCreateToModel(presentation._id, data),
+        ...variableCreateToModel(template._id, data),
         ...(data._id !== undefined ? { _id: toObjectId(data._id) } : {}),
       })
     } catch (err) {
       if (isDuplicateName(err)) throw nameConflict()
       throw err
     }
-    await touchPresentation(presentation._id)
-    return await this.list(presentation._id.toString())
+    await touchTemplate(template._id)
+    return await this.list(template._id.toString())
   }
 
   public async update(
-    presentationId: string,
+    templateId: string,
     variableId: string,
     data: VariableDTO.Update
   ): Promise<VariableData[]> {
     const variable = await VariableDataModel.findOne({
       _id: toObjectId(variableId),
-      presentationId: toObjectId(presentationId),
+      templateId: toObjectId(templateId),
     })
     if (!variable) {
       throw new NotFoundError('Variable not found', 'VARIABLE_NOT_FOUND')
@@ -74,7 +74,7 @@ export class VariableService {
 
     if (data.name && data.name !== variable.name) {
       const conflict = await VariableDataModel.exists({
-        presentationId: variable.presentationId,
+        templateId: variable.templateId,
         name: data.name,
         _id: { $ne: variable._id },
       })
@@ -102,21 +102,21 @@ export class VariableService {
       if (isDuplicateName(err)) throw nameConflict()
       throw err
     }
-    await touchPresentation(variable.presentationId)
+    await touchTemplate(variable.templateId)
 
-    return await this.list(presentationId)
+    return await this.list(templateId)
   }
 
-  public async delete(presentationId: string, variableId: string): Promise<VariableData[]> {
+  public async delete(templateId: string, variableId: string): Promise<VariableData[]> {
     const variable = await VariableDataModel.findOne({
       _id: toObjectId(variableId),
-      presentationId: toObjectId(presentationId),
+      templateId: toObjectId(templateId),
     })
     if (!variable) {
       throw new NotFoundError('Variable not found', 'VARIABLE_NOT_FOUND')
     }
 
-    if (await this.isVariableInUse(variable.presentationId.toString(), variableId)) {
+    if (await this.isVariableInUse(variable.templateId.toString(), variableId)) {
       throw new ValidationError(
         `Cannot delete variable that is currently in use`,
         'VARIABLE_IN_USE',
@@ -125,24 +125,24 @@ export class VariableService {
     }
 
     await variable.deleteOne()
-    await touchPresentation(variable.presentationId)
-    return await this.list(presentationId)
+    await touchTemplate(variable.templateId)
+    return await this.list(templateId)
   }
 
-  private async list(presentationId: string): Promise<VariableData[]> {
+  private async list(templateId: string): Promise<VariableData[]> {
     const variables = await VariableDataModel.find({
-      presentationId: toObjectId(presentationId),
+      templateId: toObjectId(templateId),
     })
     return variables.map(variableToDTO)
   }
 
   // Anywhere in the trees: text runs inside containers, if-group conditions
   // and for-group lists all point at the variable by id.
-  private async isVariableInUse(presentationId: string, variableId: string): Promise<boolean> {
-    const slides = await SlideModel.find({
-      presentationId: toObjectId(presentationId),
+  private async isVariableInUse(templateId: string, variableId: string): Promise<boolean> {
+    const pages = await PageModel.find({
+      templateId: toObjectId(templateId),
     }).select('shapes')
 
-    return slides.some(slide => collectVariableIds(slide.shapes).has(variableId))
+    return pages.some(page => collectVariableIds(page.shapes).has(variableId))
   }
 }

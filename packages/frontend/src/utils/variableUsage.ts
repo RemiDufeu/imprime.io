@@ -1,4 +1,4 @@
-import type { Paragraph, Shape, Slide, VariableType } from '@imprime/sdk'
+import type { Paragraph, Shape, Page, VariableType } from '@imprime/sdk'
 import { isContainerShape } from './shapeTree'
 
 // How a shape consumes a variable. Each kind has its own tolerance for the type
@@ -41,17 +41,17 @@ function collectFromShapes(shapes: Shape[], variableId: string, out: VariableRef
 }
 
 /**
- * Every place in the presentation that points at a variable — text runs,
+ * Every place in the template that points at a variable — text runs,
  * if-group conditions and for-group sources — including the ones nested inside
  * containers.
  *
  * This is the editor's own view, used to tell the author what an edit is about
  * to break. It is not the backend's deletion guard, which is narrower.
  */
-export function findVariableReferences(slides: Slide[], variableId: string): VariableReference[] {
+export function findVariableReferences(pages: Page[], variableId: string): VariableReference[] {
   const references: VariableReference[] = []
-  for (const slide of slides) {
-    collectFromShapes(slide.shapes ?? [], variableId, references)
+  for (const page of pages) {
+    collectFromShapes(page.shapes ?? [], variableId, references)
   }
   return references
 }

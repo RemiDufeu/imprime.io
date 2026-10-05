@@ -1,18 +1,20 @@
 {
   "name": "@imprime/backend",
   "version": "1.0.0",
-  "description": "Backend API for Imprime presentation app",
+  "description": "Backend API for Imprime template app",
   "main": "src/server.ts",
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "esbuild src/server.ts src/scripts/resetAdminPassword.ts src/scripts/demoteOtherAdmins.ts --bundle --platform=node --target=node18 --format=esm --outdir=dist --packages=external",
+    "build": "esbuild src/server.ts src/scripts/resetAdminPassword.ts src/scripts/demoteOtherAdmins.ts src/scripts/migrateTemplates.ts --bundle --platform=node --target=node18 --format=esm --outdir=dist --packages=external",
     "typecheck": "tsc --noEmit",
     "start": "node dist/server.js",
     "admin:reset-password": "node dist/scripts/resetAdminPassword.js",
     "admin:reset-password:dev": "tsx src/scripts/resetAdminPassword.ts",
     "admin:demote-others": "node dist/scripts/demoteOtherAdmins.js",
     "admin:demote-others:dev": "tsx src/scripts/demoteOtherAdmins.ts",
+    "migrate:templates": "node dist/scripts/migrateTemplates.js",
+    "migrate:templates:dev": "tsx src/scripts/migrateTemplates.ts",
     "lint": "eslint src --ext .ts"
   },
   "dependencies": {

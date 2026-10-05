@@ -11,18 +11,18 @@ metadata:
 `@react-pdf/renderer`. Reached from two entry points:
 
 - `POST /api/export/:id/pdf` → buffer streamed back with download headers;
-- MCP `export_presentation` → buffer parked in `pdfDownloadStore`, single-use
+- MCP `export_template` → buffer parked in `pdfDownloadStore`, single-use
   URL returned.
 
 ## Pipeline
 
 ```
-exportToPDF(presentation, ownerId, { variableValues })
+exportToPDF(template, ownerId, { variableValues })
   validateVariables          required variables must be non-empty (no default fallback)
-  resolveShapes per slide    containers flattened → absolute leaves
-  filter                     drop shapes whose x or y is past the slide edge
+  resolveShapes per page    containers flattened → absolute leaves
+  filter                     drop shapes whose x or y is past the page edge
   fetchImageData             one batched pass, imageId → data URL, ownerId's images only
-  renderSlide per slide      Page (1920×1080) + one element per shape
+  renderPage per page      Page (template.pageSize) + one element per shape
   acquireRenderSlot          4 renders at once, 2 per owner → AppError(429 EXPORT_BUSY)
   renderToBuffer             raced against a 30s timeout → AppError(408)
 ```
@@ -54,7 +54,7 @@ instead — the library errors on a zero-sized `Svg`.
 
 **Text needs `fixed`.** `renderTextBox` sets `fixed: true` on the wrapper `View`
 and on every `Text`, which stops react-pdf from trying to reflow the absolutely
-positioned box across pages. Slides are fixed-size pages; there is no flow.
+positioned box across pages. Pages are fixed-size pages; there is no flow.
 
 **Positioning is absolute, from the top-left.** Every shape carries
 `position: 'absolute', left: shape.x, top: shape.y`. A text box sets `width` but
@@ -64,7 +64,7 @@ variable overflows rather than clipping.
 **Text metrics differ from the browser.** react-pdf breaks lines with its own
 algorithm, so wrapping can still differ from the editor by a word.
 `DEFAULT_LINE_HEIGHT` (1.5), `PARAGRAPH_SPACING` (8) and `DEFAULT_FONT_SIZE`
-(24) live in `common/rendering/slideContentStyles.ts` and both renderers read
+(24) live in `common/rendering/pageContentStyles.ts` and both renderers read
 them — change them there, never locally. Hyphenation is off on purpose (see
 Fonts): the browser never hyphenates.
 
@@ -88,7 +88,7 @@ Two kinds of family, one resolution.
   because react-pdf's registry is process-wide and cannot unregister a family.
 
 A run's face comes from `resolveFontFace(run, catalog)` (or `getRunTextStyle`)
-in `common/rendering/slideContentStyles.ts`, against
+in `common/rendering/pageContentStyles.ts`, against
 `createFontCatalog(importedFonts)`. An unset or unknown family is drawn in
 `DEFAULT_FONT` (Roboto); a face the family lacks falls back to the closest one
 (`resolveFontVariant`: bold italic → bold → italic → regular). **Never build
@@ -128,13 +128,13 @@ If the deployment ever scales horizontally, this is the thing that breaks.
 Typecheck proves nothing about the output. Generate a real one:
 
 ```bash
-curl -X POST http://localhost:3001/api/export/<presentationId>/pdf \
+curl -X POST http://localhost:3001/api/export/<templateId>/pdf \
   -H 'x-api-key: <key>' -H 'content-type: application/json' \
   -d '{"variableName":"value"}' -o /tmp/out.pdf
 ```
 
 The response carries `X-Generation-Time` in ms. Then compare against the editor
-for the same presentation. → command `/export-debug`
+for the same template. → command `/export-debug`
 
 ## Related
 

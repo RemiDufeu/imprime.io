@@ -26,7 +26,7 @@ type ConsentState = OAuthConsentRequest | 'failed' | null
 
 /**
  * Where an MCP client — the Claude connector, an editor — asks for access to
- * the signed-in user's presentations. Every request comes here (the server
+ * the signed-in user's templates. Every request comes here (the server
  * forces `prompt=consent`): any site can register a client, so it is the
  * user who must recognise where the access goes.
  */
@@ -90,7 +90,7 @@ export default function ConsentPage() {
         <Typography.Title level={3}>Authorize access</Typography.Title>
         <Typography.Paragraph>
           <strong>{request.clientName ?? 'An unnamed application'}</strong> asks to read your
-          presentations and export them to PDF{request.keepsAccess ? ', for up to 7 days' : ''}.
+          templates and export them to PDF{request.keepsAccess ? ', for up to 7 days' : ''}.
         </Typography.Paragraph>
         <Space direction="vertical" style={{ width: '100%' }} size="middle">
           <Alert

@@ -1,6 +1,6 @@
 ---
 description: Add or change an Imprime API capability across all four surfaces — REST route, service, SDK client, editor wrapper and MCP tool — with the auth and error contract applied.
-argument-hint: "<capability, e.g. 'duplicate a presentation'>"
+argument-hint: "<capability, e.g. 'duplicate a template'>"
 ---
 
 # New Endpoint
@@ -10,8 +10,8 @@ walked deliberately rather than discovered later.
 
 ## Decide first
 
-- **Is it presentation-scoped?** Then it needs `requireOwnsPresentation` (route)
-  or `assertOwnsPresentation` (MCP), and an ownership failure is a
+- **Is it template-scoped?** Then it needs `requireOwnsTemplate` (route)
+  or `assertOwnsTemplate` (MCP), and an ownership failure is a
   `NotFoundError`, never a 403.
 - **Should an agent be able to do it?** If yes, it needs an MCP tool, not just a
   route.
@@ -21,7 +21,7 @@ walked deliberately rather than discovered later.
 ## Sites, in order
 
 ### 1. `packages/common/src/types.ts`
-The DTO, in the matching namespace (`PresentationDTO`, `SlideDTO`,
+The DTO, in the matching namespace (`TemplateDTO`, `PageDTO`,
 `VariableDTO`, `ImageDTO`, `ExportDTO`). Never type a route body inline.
 
 ### 2. `packages/backend/src/models/mappers.ts`
@@ -36,7 +36,7 @@ machine-readable `code`; never build an error response by hand.
 
 ### 4. `packages/backend/src/routes/`
 A thin handler: parse params, call one service, respond. No try/catch — Express 5
-forwards rejections to `errorHandler`. Add `requireOwnsPresentation` if scoped.
+forwards rejections to `errorHandler`. Add `requireOwnsTemplate` if scoped.
 If it needs a new mount, add it in `server.ts` **inside** the `requireAuth`
 pipeline.
 
@@ -44,12 +44,12 @@ pipeline.
 The typed method, in the matching `// ===` section.
 
 ### 6. `packages/frontend/src/api/api.ts`
-The wrapper on `presentationsAPI` / `imagesAPI` / `variablesAPI`, if the editor
+The wrapper on `templatesAPI` / `imagesAPI` / `variablesAPI`, if the editor
 uses it. Store slices call these, never `fetch`.
 
 ### 7. `packages/backend/src/mcp/tools/`
 If useful to an agent: zod `inputSchema` and `outputSchema` with `.describe()`
-on every field, `assertOwnsPresentation` first, `toolError(...)` on failure
+on every field, `assertOwnsTemplate` first, `toolError(...)` on failure
 instead of throwing, both `content` and `structuredContent` on success, then
 register it in `tools/index.ts`. Never accept an owner id as an argument — the
 tool closes over the `ownerId` from the API key. Large binaries go through

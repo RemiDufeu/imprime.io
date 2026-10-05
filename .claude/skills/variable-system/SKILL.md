@@ -8,7 +8,7 @@ metadata:
 # Variable System
 
 A variable is what turns a document into a template. Definitions live on the
-presentation; values arrive at export time.
+template; values arrive at export time.
 
 ```ts
 VariableData  { _id, type, name, default?, required? }
@@ -26,9 +26,9 @@ VariableValueType  string | boolean | string[]
   `{ "customerName": "Acme" }`.
 
 `resolveVariable` (`packages/common/src/rendering/variables.ts`) is the bridge:
-it looks the definition up by `_id` in `presentation.variableData`, then reads
+it looks the definition up by `_id` in `template.variableData`, then reads
 `ctx.variableValues[variable.name]`. This is why renaming a variable does not
-break a template, and why `ResolveContext` carries the whole presentation and
+break a template, and why `ResolveContext` carries the whole template and
 not just the value map.
 
 Never resolve a variable any other way. One definition means the condition of an
@@ -89,20 +89,20 @@ empty child is required by Slate for inline void elements; do not remove it.
 
 Enforced in `packages/backend/src/services/VariableService.ts`:
 
-- **Names are unique per presentation**, enforced twice: `create` and `update`
+- **Names are unique per template**, enforced twice: `create` and `update`
   check first and throw `ConflictError('VARIABLE_NAME_EXISTS')`, and a unique
-  index on `{ presentationId, name }` catches the race between two concurrent
+  index on `{ templateId, name }` catches the race between two concurrent
   writers, mapped back to the same error. The uniqueness is what makes the
   name-keyed payload unambiguous.
 - **A variable has no stored value.** `default` is the only value on the
   definition; runtime values arrive per export and never persist.
 - **A variable in use cannot be deleted** — `ValidationError('VARIABLE_IN_USE')`.
-  "In use" is any reference, anywhere in any slide's tree (see References).
+  "In use" is any reference, anywhere in any page's tree (see References).
   The frontend special-cases this code in `VariableSlice.deleteVariable` to show
   "Variable used in the template".
-- Every mutation calls `touchPresentation()` so `updatedAt` reflects variable edits,
+- Every mutation calls `touchTemplate()` so `updatedAt` reflects variable edits,
   and returns the **full refreshed list**, which the store swaps into
-  `presentation.variableData` wholesale.
+  `template.variableData` wholesale.
 
 ### References
 
@@ -119,9 +119,9 @@ Check it still holds before relying on it:
 **A dangling reference degrades silently.** `resolveVariable` returns
 `undefined` for an unknown `_id`, so the `if-group` disappears, the `for-group`
 disappears and the text run renders empty — no error anywhere. The server
-validates text-run ids on every slide save, but not `conditionVariable` or
+validates text-run ids on every page save, but not `conditionVariable` or
 `itemsVariable`: a client can still store an unknown one. Validating them would
-make slides that already hold one unsavable, so it needs a cleanup first.
+make pages that already hold one unsavable, so it needs a cleanup first.
 
 ## Related
 

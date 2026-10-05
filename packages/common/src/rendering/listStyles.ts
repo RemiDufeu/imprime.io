@@ -13,7 +13,7 @@
  */
 
 import type { CustomText, ListType, Paragraph, TextFormatting, VariableElement } from '../types.js'
-import { getParagraphStyle, parseFontSize } from './slideContentStyles.js'
+import { getParagraphStyle, parseFontSize } from './pageContentStyles.js'
 
 // Deepest nesting level; levels run from 0 to this.
 export const MAX_LIST_LEVEL = 3

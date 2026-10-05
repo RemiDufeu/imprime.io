@@ -1,17 +1,17 @@
-import type { Presentation, VariableItem, VariableValueType } from '../types.js'
+import type { Template, VariableItem, VariableValueType } from '../types.js'
 
 // Values are keyed by variable *name* (that's the surface the export endpoint,
-// the MCP tool and the UI all expose). The presentation is carried alongside so
+// the MCP tool and the UI all expose). The template is carried alongside so
 // a missing runtime value can fall back to the variable's `default`.
 export interface ResolveContext {
   variableValues: Record<string, VariableValueType>
-  presentation?: Presentation
+  template?: Template
 }
 
 /**
  * One level of for-group iteration. Frames are pushed by `expandForGroup` and
  * live only for the duration of `resolveShapes` — they are not part of
- * `ResolveContext`, which is built once per export and is presentation-wide.
+ * `ResolveContext`, which is built once per export and is template-wide.
  */
 export interface VariableScopeFrame {
   variableId: string
@@ -124,7 +124,7 @@ export function resolveVariable(
   }
 
   if (!ctx) return undefined
-  const variable = ctx.presentation?.variableData?.find(v => v._id === variableId)
+  const variable = ctx.template?.variableData?.find(v => v._id === variableId)
   if (!variable) return undefined
 
   const runtime = ctx.variableValues[variable.name]

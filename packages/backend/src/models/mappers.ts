@@ -5,23 +5,24 @@ import type {
   AccessSettingsDTO,
   FontDTO,
   FontVariant,
-  Presentation,
-  PresentationDTO,
-  PresentationSummary,
+  Template,
+  TemplateDTO,
+  TemplateSummary,
   Shape,
-  Slide,
-  SlideDTO,
+  Page,
+  PageDTO,
   VariableData,
   VariableDTO,
 } from '@imprime/common'
+import { DEFAULT_PAGE_SIZE } from '@imprime/common'
 import type { FontDocument, IFont, IFontFace } from './Font.js'
 import type { IFontFile } from './FontFile.js'
 import type { IInstanceSettings, ISmtpSettings, ISsoProviderSettings } from './InstanceSettings.js'
-import type { IPresentation, PresentationDocument } from './Presentation.js'
-import type { ISlide, SlideDocument } from './Slide.js'
+import type { ITemplate, TemplateDocument } from './Template.js'
+import type { IPage, PageDocument } from './Page.js'
 import type { IVariableData, VariableDataDocument } from './VariableData.js'
 
-export function slideToDTO(doc: SlideDocument): Slide {
+export function pageToDTO(doc: PageDocument): Page {
   return {
     _id: doc._id.toString(),
     order: doc.order,
@@ -42,65 +43,69 @@ export function variableToDTO(doc: VariableDataDocument): VariableData {
   }
 }
 
-export function presentationToSummaryDTO(doc: PresentationDocument): PresentationSummary {
+export function templateToSummaryDTO(doc: TemplateDocument): TemplateSummary {
   return {
     _id: doc._id.toString(),
     title: doc.title,
+    pageSize: { width: doc.pageSize.width, height: doc.pageSize.height },
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt,
   }
 }
 
-export function presentationToDTO(doc: PresentationDocument): Omit<Presentation, 'slides' | 'variableData'> {
-  return presentationToSummaryDTO(doc)
+export function templateToDTO(doc: TemplateDocument): Omit<Template, 'pages' | 'variableData'> {
+  return templateToSummaryDTO(doc)
 }
 
-export function presentationCreateToModel(
-  dto: PresentationDTO.Create
-): Pick<IPresentation, 'title'> {
+// `pageSize` must have passed `isValidPageSize`: the service checks it.
+export function templateCreateToModel(
+  dto: TemplateDTO.Create
+): Pick<ITemplate, 'title' | 'pageSize'> {
+  const pageSize = dto.pageSize ?? DEFAULT_PAGE_SIZE
   return {
-    title: dto.title || 'Untitled Presentation',
+    title: dto.title || 'Untitled Template',
+    pageSize: { width: pageSize.width, height: pageSize.height },
   }
 }
 
-export function presentationUpdateToModel(
-  dto: PresentationDTO.Update
-): Partial<Pick<IPresentation, 'title'>> {
-  const update: Partial<Pick<IPresentation, 'title'>> = {}
+export function templateUpdateToModel(
+  dto: TemplateDTO.Update
+): Partial<Pick<ITemplate, 'title'>> {
+  const update: Partial<Pick<ITemplate, 'title'>> = {}
   if (dto.title !== undefined) update.title = dto.title
   return update
 }
 
-export function slideCreateToModel(
-  presentationId: Types.ObjectId,
+export function pageCreateToModel(
+  templateId: Types.ObjectId,
   order: number,
   shapes: Shape[] = []
-): Pick<ISlide, 'presentationId' | 'order' | 'shapes'> {
+): Pick<IPage, 'templateId' | 'order' | 'shapes'> {
   return {
-    presentationId,
+    templateId,
     order,
     shapes,
   }
 }
 
-export function slideUpdateToModel(
-  dto: SlideDTO.Update
-): Partial<Pick<ISlide, 'shapes'>> {
+export function pageUpdateToModel(
+  dto: PageDTO.Update
+): Partial<Pick<IPage, 'shapes'>> {
   return { shapes: dto.shapes }
 }
 
-export function slidesReorderToOrderUpdates(
-  slides: Slide[]
+export function pagesReorderToOrderUpdates(
+  pages: Page[]
 ): Array<{ _id: string; order: number }> {
-  return slides.map((slide, idx) => ({ _id: slide._id, order: idx }))
+  return pages.map((page, idx) => ({ _id: page._id, order: idx }))
 }
 
 export function variableCreateToModel(
-  presentationId: Types.ObjectId,
+  templateId: Types.ObjectId,
   dto: VariableDTO.Create
-): Pick<IVariableData, 'presentationId' | 'type' | 'name' | 'default' | 'required' | 'itemFields'> {
+): Pick<IVariableData, 'templateId' | 'type' | 'name' | 'default' | 'required' | 'itemFields'> {
   return {
-    presentationId,
+    templateId,
     type: dto.type,
     name: dto.name,
     default: dto.default,

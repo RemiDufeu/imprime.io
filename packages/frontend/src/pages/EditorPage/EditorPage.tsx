@@ -5,27 +5,27 @@ import FullScreen from '../../components/Layout/FullScreen/FullScreen'
 import SpinnerFullScreen from '../../components/Feedback/SpinnerFullScreen'
 import './EditorPage.css'
 import { useEditorStore } from '../../store/editor/EditorStore'
-import SlideEditor from './components/SlideEditor/SlideEditor'
+import PageEditor from './components/PageEditor/PageEditor'
 
 export default function EditorPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const presentation = useEditorStore(state => state.presentation)
+  const template = useEditorStore(state => state.template)
   const isLoading = useEditorStore(state => state.isLoading)
   const error = useEditorStore(state => state.error)
-  const loadPresentation = useEditorStore(state => state.loadPresentation)
+  const loadTemplate = useEditorStore(state => state.loadTemplate)
   const loadFonts = useEditorStore(state => state.loadFonts)
-  // The id loaded last: the route can change presentation without remounting
+  // The id loaded last: the route can change template without remounting
   // the page (history navigation between two editors).
   const loadedId = useRef<string | null>(null)
 
   useEffect(() => {
     if (id && loadedId.current !== id) {
       loadedId.current = id
-      // Fonts after the presentation: only the ones its text uses are loaded.
-      void loadPresentation(id).then(loadFonts)
+      // Fonts after the template: only the ones its text uses are loaded.
+      void loadTemplate(id).then(loadFonts)
     }
-  }, [id, loadPresentation, loadFonts])
+  }, [id, loadTemplate, loadFonts])
 
   if (isLoading) {
     return (<SpinnerFullScreen />)
@@ -46,12 +46,12 @@ export default function EditorPage() {
     )
   }
 
-  if (!presentation) {
+  if (!template) {
     return (
       <FullScreen>
         <div style={{ textAlign: 'center' }}>
           <p style={{ color: '#6b7280', marginBottom: '16px' }}>
-            Presentation not found
+            Template not found
           </p>
           <Button
             type="primary"
@@ -66,7 +66,7 @@ export default function EditorPage() {
 
   return (
     <div className='page-container'>
-      <SlideEditor />
+      <PageEditor />
     </div>
   )
 }

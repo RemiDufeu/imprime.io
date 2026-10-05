@@ -3,7 +3,7 @@ import { ReactEditor } from 'slate-react'
 import type { StateCreator } from 'zustand'
 import type { CustomText, ListType, Paragraph, TextAlign, VariableElement } from '@imprime/sdk'
 import { DEFAULT_FONT, DEFAULT_FONT_SIZE, DEFAULT_LINE_HEIGHT, getListStyle, getParagraphStyle } from '@imprime/sdk'
-import type { PresentationSlice } from './PresentationSlice'
+import type { TemplateSlice } from './TemplateSlice'
 import type { ShapeSlice } from './ShapeSlice'
 import {
     firstSelectedParagraph,
@@ -58,9 +58,9 @@ const isVariable = (n: unknown) => Element.isElement(n) && n.type === 'variable'
 /**
  * The text box being edited. Editing is a session: it begins when a box's
  * editor becomes the active one and ends — committing the typing as one undo
- * step, if there was any — when the selection, the slide or the presentation
+ * step, if there was any — when the selection, the page or the template
  * changes. Ending is synchronous and in the store, so a commit always lands
- * before whatever ended it, on the slide the box is on.
+ * before whatever ended it, on the page the box is on.
  *
  * The text bar reads `textFormat` (refreshed from the selection on every
  * editor change) and writes through `applyTextFormat`: a command applied to
@@ -92,7 +92,7 @@ export interface TextEditorSlice {
 }
 
 export const createTextEditorSlice: StateCreator<
-    TextEditorSlice & PresentationSlice & ShapeSlice,
+    TextEditorSlice & TemplateSlice & ShapeSlice,
     [],
     [],
     TextEditorSlice
@@ -143,8 +143,8 @@ export const createTextEditorSlice: StateCreator<
 
             // Start from what the document holds: an undo or redo may have
             // replaced this text while the editor sat idle.
-            const shape = get().presentation?.slides
-                .map(slide => findShapeById(slide.shapes, shapeId)?.shape)
+            const shape = get().template?.pages
+                .map(page => findShapeById(page.shapes, shapeId)?.shape)
                 .find(found => found !== undefined)
             if (shape?.type === 'text' && shape.paragraphes !== editor.children) {
                 replaceEditorContent(editor, shape.paragraphes)
@@ -242,7 +242,7 @@ export const createTextEditorSlice: StateCreator<
                 ...markStyles,
                 type: 'variable',
                 variableId,
-                // Left unset for a presentation-wide reference, which is what
+                // Left unset for a template-wide reference, which is what
                 // resolves against the variable's own value at export.
                 ...(itemPath !== undefined ? { itemPath } : {}),
                 children: [{ text: '' }],

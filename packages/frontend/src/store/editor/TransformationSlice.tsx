@@ -1,19 +1,19 @@
 import type { StateCreator } from 'zustand'
 import type { Shape } from '@imprime/sdk'
 import type { ShapeSlice } from './ShapeSlice'
-import type { PresentationSlice } from './PresentationSlice'
-import type { SlideSlice } from './SlideSlice'
+import type { TemplateSlice } from './TemplateSlice'
+import type { PageSlice } from './PageSlice'
 import type { DocumentWriteSlice } from './DocumentWriteSlice'
 import type { SelectionSlice } from './SelectionSlice'
 import { findShapeById, findInnermostGroupAt, extractShapeById, insertShape } from '../../utils/shapeTree'
 import { resizeRect, type Rect, type ResizeHandle } from '../../utils/transform'
-import { selectCurrentSlide, selectSelectedShape } from './selectors'
+import { selectCurrentPage, selectSelectedShape } from './selectors'
 
 export type { ResizeHandle }
 
 export type TransformationData = Rect
 
-// Absolute bbox (slide coords) of the group that would receive the shape if the
+// Absolute bbox (page coords) of the group that would receive the shape if the
 // user dropped right now. Purely for the overlay to render — the re-parent
 // decision itself reads `hoveredGroupId`.
 export interface GroupHighlight extends Rect {
@@ -87,7 +87,7 @@ const baseDragState = (
 })
 
 export const createTransformationSlice: StateCreator<
-    TransformationSlice & ShapeSlice & PresentationSlice & SlideSlice & DocumentWriteSlice & SelectionSlice,
+    TransformationSlice & ShapeSlice & TemplateSlice & PageSlice & DocumentWriteSlice & SelectionSlice,
     [],
     [],
     TransformationSlice
@@ -96,7 +96,7 @@ export const createTransformationSlice: StateCreator<
         const newAbsX = drag.originalAbsX + (rect.x - drag.originalX)
         const newAbsY = drag.originalAbsY + (rect.y - drag.originalY)
 
-        get()._editSlide(shapes => {
+        get()._editPage(shapes => {
             const parentLoc = drag.hoveredGroupId !== null ? findShapeById(shapes, drag.hoveredGroupId) : null
             const { removed, remaining } = extractShapeById(shapes, shapeId)
             if (!removed) return null
@@ -113,8 +113,8 @@ export const createTransformationSlice: StateCreator<
             const selectedShape = selectSelectedShape(get())
             if (!selectedShape) return
 
-            const slide = selectCurrentSlide(get())
-            const loc = slide ? findShapeById(slide.shapes, selectedShape.id) : null
+            const page = selectCurrentPage(get())
+            const loc = page ? findShapeById(page.shapes, selectedShape.id) : null
 
             set({
                 dragData: {
@@ -169,10 +169,10 @@ export const createTransformationSlice: StateCreator<
 
             // Live drop-target highlight (Canva-style): show the group under the
             // cursor as a drop zone, unless it's already the shape's parent.
-            const slide = selectCurrentSlide(get())
-            if (!slide) return
+            const page = selectCurrentPage(get())
+            if (!page) return
 
-            const hit = findInnermostGroupAt(slide.shapes, currentSVG.x, currentSVG.y, selectedShapeId)
+            const hit = findInnermostGroupAt(page.shapes, currentSVG.x, currentSVG.y, selectedShapeId)
             const hoveredGroupId = hit?.id ?? null
             const highlightedGroup: GroupHighlight | null =
                 hit && hit.id !== dragData.originalParentGroupId

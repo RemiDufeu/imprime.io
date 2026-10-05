@@ -1,13 +1,13 @@
 import { Router, type Response } from 'express'
 import type { ExportDTO } from '@imprime/common'
-import { presentationService, exportService } from '../services/index.js'
+import { templateService, exportService } from '../services/index.js'
 import { takePdf } from '../services/pdfDownloadStore.js'
-import { requireOwnsPresentation } from '../middleware/requireOwnsPresentation.js'
+import { requireOwnsTemplate } from '../middleware/requireOwnsTemplate.js'
 
 const router = Router()
 
 function setPdfDownloadHeaders(res: Response, buffer: Buffer, filename: string): void {
-  const ascii = filename.replace(/[^\w.\- ]/g, '_') || 'presentation.pdf'
+  const ascii = filename.replace(/[^\w.\- ]/g, '_') || 'template.pdf'
   const utf8 = encodeURIComponent(filename)
   res.setHeader('Content-Type', 'application/pdf')
   res.setHeader(
@@ -17,15 +17,15 @@ function setPdfDownloadHeaders(res: Response, buffer: Buffer, filename: string):
   res.setHeader('Content-Length', buffer.length)
 }
 
-router.post('/:id/pdf', requireOwnsPresentation, async (req, res) => {
-  const presentation = await presentationService.getById(req.params.id)
+router.post('/:id/pdf', requireOwnsTemplate, async (req, res) => {
+  const template = await templateService.getById(req.params.id)
   const payload: ExportDTO.PdfRequest = { variableValues: req.body || {} }
 
   const startTime = Date.now()
-  const pdfBuffer = await exportService.exportToPDF(presentation, req.user!.id, payload)
+  const pdfBuffer = await exportService.exportToPDF(template, req.user!.id, payload)
   const duration = Date.now() - startTime
 
-  setPdfDownloadHeaders(res, pdfBuffer, `${presentation.title || 'presentation'}.pdf`)
+  setPdfDownloadHeaders(res, pdfBuffer, `${template.title || 'template'}.pdf`)
   res.setHeader('X-Generation-Time', duration.toString())
 
   res.send(pdfBuffer)

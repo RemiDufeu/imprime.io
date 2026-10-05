@@ -8,7 +8,7 @@ interface ItemListInputProps {
   value?: VariableItem[]
   onChange?: (value: VariableItem[] | undefined) => void
   // Declared item schema, shown as a hint. Not enforced — the fields a
-  // presentation declares and the data an integration sends drift on their own
+  // template declares and the data an integration sends drift on their own
   // schedules, and the renderer already degrades gracefully on a missing field.
   itemFields?: VariableItemField[]
   disabled?: boolean

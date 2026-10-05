@@ -15,7 +15,7 @@ only works if nothing suppresses it with `as` or a `default:` case.
   branch in `resolveShapes` and must join `ContainerShape` and
   `isContainerShape`. A leaf needs a `renderShape` case instead.
 - **Is it drawn by dragging?** If so it needs a tool, a drawing preview and an
-  entry in `SlideCanvas.handleMouseDown`.
+  entry in `PageCanvas.handleMouseDown`.
 - **What does it need in the PDF?** If the answer is "nothing", stop and
   reconsider — an editor-only shape is a surprise at export time.
 
@@ -43,12 +43,12 @@ only works if nothing suppresses it with `as` or a `default:` case.
 
 ### 4. `packages/frontend`
 
-- `components/slide/svg/SVGX.tsx` + the `SVGShape` switch
+- `components/page/svg/SVGX.tsx` + the `SVGShape` switch
 - `store/editor/ToolSlice.tsx` — `ToolType`, and the `drawnShape` switch that
   turns a drag into the shape (exhaustive: the compiler flags a missing tool)
 - `store/editor/selectors.ts` — `ContextBarType` and `contextBarFor`, which
   `selectContextBar` derives the bar from
-- `components/slide/SlideCanvas.tsx` — the drawing-tool list, if drag-drawn
+- `components/page/PageCanvas.tsx` — the drawing-tool list, if drag-drawn
 - `pages/.../TopBar/Context-toolbar/` — a context bar + the `index.tsx` switch
 - `pages/.../TopBar/Toolbar/Toolbar.tsx` — the tool button
 - `utils/shapeTree.ts` — `TYPE_LABEL` (typed `Record<Shape['type'], string>`,
@@ -57,7 +57,7 @@ only works if nothing suppresses it with `as` or a `default:` case.
 
 ### 5. Persistence
 
-None. `packages/backend/src/models/Slide.ts` stores `shapes` as
+None. `packages/backend/src/models/Page.ts` stores `shapes` as
 `Schema.Types.Mixed`. The flip side: nothing validates the payload at the
 database boundary, so a malformed shape persists silently and fails at render.
 
@@ -72,7 +72,7 @@ database boundary, so a malformed shape persists silently and fails at render.
 5. Check by hand the editor sites the compiler does **not** find, because they
    test tool or shape type as a string rather than exhausting the union:
    the toolbar button list (`Toolbar.tsx`), the drawing-tool list in
-   `SlideCanvas.handleMouseDown`, the `shapeIcon.tsx` switch, and
+   `PageCanvas.handleMouseDown`, the `shapeIcon.tsx` switch, and
    `contextBarFor` in `selectors.ts` (it has a `default`).
 6. `/parity` — including the manual editor-vs-PDF comparison.
 7. `/review`.

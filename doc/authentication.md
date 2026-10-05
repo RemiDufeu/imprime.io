@@ -311,7 +311,7 @@ themselves. A client's name is therefore whatever its author chose.
   its redirect URI, such as `https://claude.ai`. That address is the one to
   check, since the name can be anything. A link that would hand over access
   without that page does not exist.
-- **What a client can do.** Read the user's presentations and export them to
+- **What a client can do.** Read the user's templates and export them to
   PDF. With `offline_access`, for up to 7 days.
 - **Every request is checked.** A client's session lasts as long as its token
   or API key: revoking the key, or the token expiring, ends it. A user can

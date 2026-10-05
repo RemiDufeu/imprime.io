@@ -1,9 +1,9 @@
 import { createFontCatalog, importedFontFamilyName, isContainerShape } from '@imprime/sdk'
-import type { FontCatalog, FontDTO, Presentation, Shape } from '@imprime/sdk'
+import type { FontCatalog, FontDTO, Template, Shape } from '@imprime/sdk'
 import type { StateCreator } from 'zustand'
 import { fontsAPI } from '../../api/api'
 import { registerImportedFont } from '../../fonts'
-import type { PresentationSlice } from './PresentationSlice'
+import type { TemplateSlice } from './TemplateSlice'
 
 export interface FontSlice {
     // The instance's imported fonts that are ready to draw with.
@@ -11,16 +11,16 @@ export interface FontSlice {
     // What every run in the editor resolves its face against.
     fontCatalog: FontCatalog
 
-    // Lists the instance's fonts and loads the ones the open presentation
+    // Lists the instance's fonts and loads the ones the open template
     // uses: each face is a download of up to a few megabytes, and most fonts
-    // of an instance appear in no given presentation.
+    // of an instance appear in no given template.
     loadFonts: () => Promise<void>
     // Loads every imported font: the font picker previews each in itself.
     loadAllFonts: () => Promise<void>
 }
 
-// Families the text of `presentation` is set in, containers included.
-function usedFamilies(presentation: Presentation | null): Set<string> {
+// Families the text of `template` is set in, containers included.
+function usedFamilies(template: Template | null): Set<string> {
     const families = new Set<string>()
     const visit = (shapes: Shape[]) => {
         for (const shape of shapes) {
@@ -35,12 +35,12 @@ function usedFamilies(presentation: Presentation | null): Set<string> {
             }
         }
     }
-    for (const slide of presentation?.slides ?? []) visit(slide.shapes)
+    for (const page of template?.pages ?? []) visit(page.shapes)
     return families
 }
 
 export const createFontSlice: StateCreator<
-    FontSlice & PresentationSlice,
+    FontSlice & TemplateSlice,
     [],
     [],
     FontSlice
@@ -87,7 +87,7 @@ export const createFontSlice: StateCreator<
         loadFonts: async () => {
             try {
                 await list()
-                const used = usedFamilies(get().presentation)
+                const used = usedFamilies(get().template)
                 await load(listed.filter(font => used.has(font.family)))
             } catch (error) {
                 console.error('Failed to load fonts:', error)

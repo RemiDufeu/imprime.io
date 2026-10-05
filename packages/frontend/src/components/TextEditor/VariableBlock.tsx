@@ -11,10 +11,10 @@ type VariableBlockProps = CustomRenderElementProps & {
 
 export const VariableBlock = ({ attributes, children, element } : VariableBlockProps) => {
   const { token } = theme.useToken();
-  const presentation = useEditorStore(state => state.presentation);
+  const template = useEditorStore(state => state.template);
   const fontCatalog = useEditorStore(state => state.fontCatalog);
 
-  const variable = presentation?.variableData?.find(v => v._id === element.variableId);
+  const variable = template?.variableData?.find(v => v._id === element.variableId);
   const variableName = variable?.name || 'Unknown Variable';
   // The chip names what is plugged in, never what it will evaluate to — the
   // editor shows the authored tree. An item-scoped run names its field too, so

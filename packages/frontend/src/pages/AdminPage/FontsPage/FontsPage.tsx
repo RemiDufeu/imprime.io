@@ -108,7 +108,7 @@ export default function FontsPage() {
                 <Popconfirm
                   key="delete"
                   title={`Delete ${font.family}?`}
-                  description={`Text using it, in every presentation, will be drawn in ${DEFAULT_FONT}.`}
+                  description={`Text using it, in every template, will be drawn in ${DEFAULT_FONT}.`}
                   onConfirm={() => handleDelete(font)}
                   okText="Delete"
                   okButtonProps={{ danger: true }}

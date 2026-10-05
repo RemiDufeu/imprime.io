@@ -104,7 +104,7 @@ function expandForGroup(group: ForGroupShape, ctx: ResolveContext | undefined, s
 
   // Children are shifted by the tight bbox origin so each iteration lands at
   // (group.x + xOff, group.y + yOff) — otherwise the authored minX/minY get
-  // added on top of the layout offset and push iterations off-slide.
+  // added on top of the layout offset and push iterations off-page.
   const bbox = childrenBBox(group.children)
   const offsets = forGroupIterationOffsets(group, items.length)
 

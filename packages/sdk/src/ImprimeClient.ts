@@ -1,7 +1,8 @@
 import type {
-  Presentation,
-  PresentationSummary,
-  Slide,
+  Template,
+  TemplateSummary,
+  Page,
+  PageSize,
   Shape,
   RectangleShape,
   EllipseShape,
@@ -14,8 +15,8 @@ import type {
   ImageDTO,
   FontDTO,
   FontVariant,
-  PresentationDTO,
-  SlideDTO,
+  TemplateDTO,
+  PageDTO,
   VariableDTO,
   VariableValueType,
   EnabledAuthProviders,
@@ -39,20 +40,20 @@ export interface ImprimeClientOptions {
 /**
  * TypeScript SDK for Imprime API
  *
- * Provides a type-safe client for creating and managing presentations programmatically.
+ * Provides a type-safe client for creating and managing templates programmatically.
  *
  * @example
  * ```typescript
  * const client = new ImprimeClient({ baseUrl: 'http://localhost:3023/api' })
  *
- * // Create a presentation
- * const presentation = await client.createPresentation('My Presentation')
+ * // Create a template
+ * const template = await client.createTemplate('My Template')
  *
- * // Add a slide
- * const slide = await client.addSlide(presentation._id)
+ * // Add a page
+ * const page = await client.addPage(template._id)
  *
  * // Add shapes
- * await client.addRectangle(presentation._id, slide._id, {
+ * await client.addRectangle(template._id, page._id, {
  *   x: 100, y: 100, width: 200, height: 100, fill: '#3b82f6'
  * })
  * ```
@@ -135,84 +136,86 @@ export class ImprimeClient {
   }
 
   // ============================================
-  // Presentation Operations
+  // Template Operations
   // ============================================
 
   /**
-   * List all presentations (light summary — no slides/variables)
+   * List all templates (light summary — no pages/variables)
    */
-  async listPresentations(): Promise<PresentationSummary[]> {
-    return this.request<PresentationSummary[]>('/presentations')
+  async listTemplates(): Promise<TemplateSummary[]> {
+    return this.request<TemplateSummary[]>('/templates')
   }
 
   /**
-   * Get a specific presentation by ID
+   * Get a specific template by ID
    */
-  async getPresentation(id: string): Promise<Presentation> {
-    return this.request<Presentation>(`/presentations/${id}`)
+  async getTemplate(id: string): Promise<Template> {
+    return this.request<Template>(`/templates/${id}`)
   }
 
   /**
-   * Create a new presentation
+   * Create a new template, with one blank page
+   * @param pageSize - one of `PAGE_FORMATS`' sizes, or a custom one; 1920×1080 when omitted
    */
-  async createPresentation(title?: string): Promise<Presentation> {
-    return this.request<Presentation>('/presentations', {
+  async createTemplate(title?: string, pageSize?: PageSize): Promise<Template> {
+    const data: TemplateDTO.Create = { title, pageSize }
+    return this.request<Template>('/templates', {
       method: 'POST',
-      body: JSON.stringify({ title }),
+      body: JSON.stringify(data),
     })
   }
 
   /**
-   * Update a presentation (title and/or slides)
+   * Update a template (title and/or pages)
    */
-  async updatePresentation(id: string, data: PresentationDTO.Update): Promise<Presentation> {
-    return this.request<Presentation>(`/presentations/${id}`, {
+  async updateTemplate(id: string, data: TemplateDTO.Update): Promise<Template> {
+    return this.request<Template>(`/templates/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     })
   }
 
   /**
-   * Delete a presentation
+   * Delete a template
    */
-  async deletePresentation(id: string): Promise<void> {
-    return this.request<void>(`/presentations/${id}`, {
+  async deleteTemplate(id: string): Promise<void> {
+    return this.request<void>(`/templates/${id}`, {
       method: 'DELETE',
     })
   }
 
   // ============================================
-  // Slide Operations
+  // Page Operations
   // ============================================
 
   /**
-   * Add a slide to a presentation and return it: blank and last by default,
-   * or at `slide.order` with `slide.shapes`. `slide._id` restores a deleted
-   * slide under its former id.
+   * Add a page to a template and return it: blank and last by default,
+   * or at `page.order` with `page.shapes`. `page._id` restores a deleted
+   * page under its former id.
    */
-  async addSlide(presentationId: string, slide: SlideDTO.Create = {}): Promise<Slide> {
-    return this.request<Slide>(`/presentations/${presentationId}/slides`, {
+  async addPage(templateId: string, page: PageDTO.Create = {}): Promise<Page> {
+    return this.request<Page>(`/templates/${templateId}/pages`, {
       method: 'POST',
-      body: JSON.stringify(slide),
+      body: JSON.stringify(page),
     })
   }
 
   /**
-   * Update a slide's shapes. Fire-and-forget: the server returns 204 No Content,
+   * Update a page's shapes. Fire-and-forget: the server returns 204 No Content,
    * callers are expected to apply the change optimistically client-side.
    */
-  async updateSlide(presentationId: string, slideId: string, shapes: Shape[]): Promise<void> {
-    return this.request<void>(`/presentations/${presentationId}/slides/${slideId}`, {
+  async updatePage(templateId: string, pageId: string, shapes: Shape[]): Promise<void> {
+    return this.request<void>(`/templates/${templateId}/pages/${pageId}`, {
       method: 'PATCH',
       body: JSON.stringify({ shapes }),
     })
   }
 
   /**
-   * Delete a slide from a presentation. Returns 204 — refetch the presentation to sync.
+   * Delete a page from a template. Returns 204 — refetch the template to sync.
    */
-  async deleteSlide(presentationId: string, slideId: string): Promise<void> {
-    return this.request<void>(`/presentations/${presentationId}/slides/${slideId}`, {
+  async deletePage(templateId: string, pageId: string): Promise<void> {
+    return this.request<void>(`/templates/${templateId}/pages/${pageId}`, {
       method: 'DELETE',
     })
   }
@@ -222,26 +225,26 @@ export class ImprimeClient {
   // ============================================
 
   /**
-   * Add a shape to a slide
+   * Add a shape to a page
    */
-  async addShape(presentationId: string, slideId: string, shape: Shape): Promise<void> {
-    const presentation = await this.getPresentation(presentationId)
-    const slide = presentation.slides.find(s => s._id === slideId)
+  async addShape(templateId: string, pageId: string, shape: Shape): Promise<void> {
+    const template = await this.getTemplate(templateId)
+    const page = template.pages.find(s => s._id === pageId)
 
-    if (!slide) {
-      throw new Error(`Slide ${slideId} not found in presentation ${presentationId}`)
+    if (!page) {
+      throw new Error(`Page ${pageId} not found in template ${templateId}`)
     }
 
-    const updatedShapes = [...slide.shapes, shape]
-    await this.updateSlide(presentationId, slideId, updatedShapes)
+    const updatedShapes = [...page.shapes, shape]
+    await this.updatePage(templateId, pageId, updatedShapes)
   }
 
   /**
-   * Add a rectangle to a slide
+   * Add a rectangle to a page
    */
   async addRectangle(
-    presentationId: string,
-    slideId: string,
+    templateId: string,
+    pageId: string,
     options: {
       x: number
       y: number
@@ -259,15 +262,15 @@ export class ImprimeClient {
       height: options.height,
       fill: options.fill || '#3b82f6',
     }
-    return this.addShape(presentationId, slideId, shape)
+    return this.addShape(templateId, pageId, shape)
   }
 
   /**
-   * Add an ellipse/circle to a slide
+   * Add an ellipse/circle to a page
    */
   async addEllipse(
-    presentationId: string,
-    slideId: string,
+    templateId: string,
+    pageId: string,
     options: {
       x: number
       y: number
@@ -285,16 +288,16 @@ export class ImprimeClient {
       height: options.height,
       fill: options.fill || '#f59e0b',
     }
-    return this.addShape(presentationId, slideId, shape)
+    return this.addShape(templateId, pageId, shape)
   }
 
   /**
-   * Add a text box to a slide. Each line of `text` becomes a paragraph (a list
+   * Add a text box to a page. Each line of `text` becomes a paragraph (a list
    * item when `list` is set); the formatting options apply to all of them.
    */
   async addText(
-    presentationId: string,
-    slideId: string,
+    templateId: string,
+    pageId: string,
     options: {
       x: number
       y: number
@@ -333,44 +336,44 @@ export class ImprimeClient {
       verticalAlign: options.verticalAlign,
       paragraphes,
     }
-    return this.addShape(presentationId, slideId, shape)
+    return this.addShape(templateId, pageId, shape)
   }
 
   /**
    * Update a shape's properties
    */
   async updateShape(
-    presentationId: string,
-    slideId: string,
+    templateId: string,
+    pageId: string,
     shapeId: string,
     updates: Partial<Shape>
   ): Promise<void> {
-    const presentation = await this.getPresentation(presentationId)
-    const slide = presentation.slides.find(s => s._id === slideId)
+    const template = await this.getTemplate(templateId)
+    const page = template.pages.find(s => s._id === pageId)
 
-    if (!slide) {
-      throw new Error(`Slide ${slideId} not found in presentation ${presentationId}`)
+    if (!page) {
+      throw new Error(`Page ${pageId} not found in template ${templateId}`)
     }
 
-    const updatedShapes = slide.shapes.map(shape =>
+    const updatedShapes = page.shapes.map(shape =>
       shape.id === shapeId ? { ...shape, ...updates } as Shape : shape
     )
-    await this.updateSlide(presentationId, slideId, updatedShapes)
+    await this.updatePage(templateId, pageId, updatedShapes)
   }
 
   /**
-   * Delete a shape from a slide
+   * Delete a shape from a page
    */
-  async deleteShape(presentationId: string, slideId: string, shapeId: string): Promise<void> {
-    const presentation = await this.getPresentation(presentationId)
-    const slide = presentation.slides.find(s => s._id === slideId)
+  async deleteShape(templateId: string, pageId: string, shapeId: string): Promise<void> {
+    const template = await this.getTemplate(templateId)
+    const page = template.pages.find(s => s._id === pageId)
 
-    if (!slide) {
-      throw new Error(`Slide ${slideId} not found in presentation ${presentationId}`)
+    if (!page) {
+      throw new Error(`Page ${pageId} not found in template ${templateId}`)
     }
 
-    const updatedShapes = slide.shapes.filter(s => s.id !== shapeId)
-    await this.updateSlide(presentationId, slideId, updatedShapes)
+    const updatedShapes = page.shapes.filter(s => s.id !== shapeId)
+    await this.updatePage(templateId, pageId, updatedShapes)
   }
 
   // ============================================
@@ -402,15 +405,15 @@ export class ImprimeClient {
   }
 
   /**
-   * Add an image to a slide
-   * @param presentationId - Presentation ID
-   * @param slideId - Slide ID
+   * Add an image to a page
+   * @param templateId - Template ID
+   * @param pageId - Page ID
    * @param options - Image options
-   * @returns Updated presentation
+   * @returns Updated template
    */
   async addImage(
-    presentationId: string,
-    slideId: string,
+    templateId: string,
+    pageId: string,
     options: {
       imageId: string
       x: number
@@ -430,7 +433,7 @@ export class ImprimeClient {
       imageId: options.imageId,
       alt: options.alt,
     }
-    return this.addShape(presentationId, slideId, shape)
+    return this.addShape(templateId, pageId, shape)
   }
 
   // ============================================
@@ -487,7 +490,7 @@ export class ImprimeClient {
   }
 
   /**
-   * Delete an imported family. Text using it, in every presentation, is drawn
+   * Delete an imported family. Text using it, in every template, is drawn
    * in the default font. Admin only.
    */
   async deleteFont(fontId: string): Promise<void> {
@@ -586,20 +589,20 @@ export class ImprimeClient {
   // ============================================
 
   /**
-   * Get all variables for a presentation
+   * Get all variables for a template
    */
-  async listVariables(presentationId: string): Promise<VariableDTO.List> {
-    return this.request<VariableDTO.List>(`/presentations/${presentationId}/variables`)
+  async listVariables(templateId: string): Promise<VariableDTO.List> {
+    return this.request<VariableDTO.List>(`/templates/${templateId}/variables`)
   }
 
   /**
-   * Create a new variable in a presentation
+   * Create a new variable in a template
    */
   async createVariable(
-    presentationId: string,
+    templateId: string,
     variable: VariableDTO.Create
   ): Promise<VariableDTO.List> {
-    return this.request<VariableDTO.List>(`/presentations/${presentationId}/variables`, {
+    return this.request<VariableDTO.List>(`/templates/${templateId}/variables`, {
       method: 'POST',
       body: JSON.stringify(variable),
     })
@@ -609,22 +612,22 @@ export class ImprimeClient {
    * Update an existing variable
    */
   async updateVariable(
-    presentationId: string,
+    templateId: string,
     variableId: string,
     updates: VariableDTO.Update
   ): Promise<VariableDTO.List> {
-    return this.request<VariableDTO.List>(`/presentations/${presentationId}/variables/${variableId}`, {
+    return this.request<VariableDTO.List>(`/templates/${templateId}/variables/${variableId}`, {
       method: 'PATCH',
       body: JSON.stringify(updates),
     })
   }
 
   /**
-   * Delete a variable from a presentation
+   * Delete a variable from a template
    * Will fail if the variable is currently in use in any text shape
    */
-  async deleteVariable(presentationId: string, variableId: string): Promise<VariableDTO.List> {
-    return this.request<VariableDTO.List>(`/presentations/${presentationId}/variables/${variableId}`, {
+  async deleteVariable(templateId: string, variableId: string): Promise<VariableDTO.List> {
+    return this.request<VariableDTO.List>(`/templates/${templateId}/variables/${variableId}`, {
       method: 'DELETE',
     })
   }
@@ -634,12 +637,12 @@ export class ImprimeClient {
   // ============================================
 
   /**
-   * Export presentation to PDF
+   * Export template to PDF
    * @param variableValues - Optional record of variable ID to value mappings
    * @returns PDF blob URL that can be used for download
    */
-  async exportToPDF(presentationId: string, variableValues?: Record<string, VariableValueType>): Promise<Blob> {
-    const url = `${this.baseUrl}/export/${presentationId}/pdf`
+  async exportToPDF(templateId: string, variableValues?: Record<string, VariableValueType>): Promise<Blob> {
+    const url = `${this.baseUrl}/export/${templateId}/pdf`
 
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), this.timeout)
@@ -668,21 +671,21 @@ export class ImprimeClient {
   }
 
   /**
-   * Download presentation as PDF file
+   * Download template as PDF file
    * Helper method that triggers a browser download
    * Note: This method is only available in browser environments
    * @param variableValues - Optional record of variable ID to value mappings
    */
-  async downloadPDF(presentationId: string, filename?: string, variableValues?: Record<string, VariableValueType>): Promise<void> {
+  async downloadPDF(templateId: string, filename?: string, variableValues?: Record<string, VariableValueType>): Promise<void> {
     if (typeof window === 'undefined' || typeof document === 'undefined') {
       throw new Error('downloadPDF is only available in browser environments')
     }
 
-    const blob = await this.exportToPDF(presentationId, variableValues)
+    const blob = await this.exportToPDF(templateId, variableValues)
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = filename || `presentation-${presentationId}.pdf`
+    a.download = filename || `template-${templateId}.pdf`
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)

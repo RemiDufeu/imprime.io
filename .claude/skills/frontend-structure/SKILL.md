@@ -36,7 +36,7 @@ plausibly generic. Current contents:
 
 | Folder | Why it is shared |
 |---|---|
-| `slide/` | `SlideCanvas` and the SVG renderers — used by the editor *and* by slide thumbnails in the slide list |
+| `page/` | `PageCanvas` and the SVG renderers — used by the editor *and* by page thumbnails in the page list |
 | `TextEditor/` | Slate editor, used from inside `SVGText` |
 | `Layout/` | `FullScreen`, `RegularPageContainer` — page shells |
 | `common/` | genuinely generic widgets (`DebouncedColorPicker`) |
@@ -57,12 +57,12 @@ pages/EditorPage/
   EditorPage.css
   components/                      used only by EditorPage
     LayeringToolbar/
-    SlideEditor/
-      SlideEditor.tsx  SlideEditor.css  Toolbars.css
+    PageEditor/
+      PageEditor.tsx  PageEditor.css  Toolbars.css
       useEditorShortcuts.ts
       CanvasArea/
       FloatingPanels/
-        Panel/  ShapeTreePanel/  SlideList/  ZoomBar.tsx
+        Panel/  ShapeTreePanel/  PageList/  ZoomBar.tsx
       TopBar/
         TopBar.tsx  TopBar.css
         Toolbar/  DropdownTrigger/  Context-toolbar/
@@ -95,7 +95,7 @@ Used sparingly, and only two shapes of them:
 - `index.ts` re-exporting a directory's public surface: `components/common/`,
   `providers/`, `config/`.
 - `index.tsx` **as** the component, when the folder name already says what it is:
-  `pages/Layout/index.tsx`, `FloatingPanels/SlideList/index.tsx`,
+  `pages/Layout/index.tsx`, `FloatingPanels/PageList/index.tsx`,
   `TopBar/Context-toolbar/index.tsx` (which is the dispatcher over
   `selectContextBar`).
 
@@ -104,7 +104,7 @@ Do not add a barrel per folder. Most components are imported by their real path.
 ## Hooks
 
 There is no `hooks/` directory. A hook lives next to what uses it:
-`useEditorShortcuts.ts` sits in `SlideEditor/` because that is its only consumer.
+`useEditorShortcuts.ts` sits in `PageEditor/` because that is its only consumer.
 Create `hooks/` only when a hook is genuinely shared across pages.
 
 Hooks that need store state **outside a React subscription** use
@@ -145,7 +145,7 @@ belongs in `packages/common/src/rendering/`. → skill `render-parity`
 | a new route | `pages/<Name>Page/`, plus a `<Route>` in `App.tsx` under `RequireAuth` if protected |
 | UI used by one page | that page's `components/` |
 | UI used by two pages | `src/components/` |
-| a shape renderer | `components/slide/svg/SVG<Type>.tsx` |
+| a shape renderer | `components/page/svg/SVG<Type>.tsx` |
 | editor state | a slice in `store/editor/` (→ `editor-store`) |
 | a pure helper | `utils/`, or `packages/common/src/rendering/` if the PDF needs it too |
 | a hook | next to its consumer |

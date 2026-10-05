@@ -28,7 +28,7 @@ anything visual.
 | `backend-structure` | route → service → model layering, why there is no repository layer, singleton wiring |
 | `backend-routes` | how to write a handler: mounting, guards, status codes, and the state of request validation |
 | `backend-services` | class shape, constructor injection, thrown error classes, the recurring service patterns |
-| `backend-persistence` | schema anatomy, the mapper direction rules, why update mappers whitelist, cascades |
+| `backend-persistence` | schema anatomy, the mapper direction rules, why update mappers whitelist, cascades, no migrations before production |
 | `pdf-export` | `@react-pdf/renderer` traps, fonts, the 30s timeout, the download store |
 
 ## Agents

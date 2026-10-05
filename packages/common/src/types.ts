@@ -59,7 +59,7 @@ export type VariableElement = TextFormatting & {
   // Dotted path, from the referenced variable's root, to a field of the item
   // being iterated by an enclosing for-group: 'name', or 'moves.name' when the
   // run sits inside a for-group nested on the `moves` field. Unset means the
-  // variable resolves at presentation scope, which is the only behaviour a run
+  // variable resolves at template scope, which is the only behaviour a run
   // outside any for-group can have.
   itemPath?: string;
   children: [{ text: '' }]; // Required by Slate for inline elements
@@ -166,10 +166,10 @@ export type Shape =
   | ForGroupShape
 
 // ============================================
-// Slide & Presentation Types
+// Page & Template Types
 // ============================================
 
-export interface Slide {
+export interface Page {
   _id: string
   shapes: Shape[]
   order: number
@@ -177,18 +177,28 @@ export interface Slide {
   updatedAt?: Date
 }
 
-export interface Presentation {
+// Size of every page of a template, in the units its shapes are drawn in; the
+// PDF page is the same numbers in points. Chosen when the template is created:
+// one of `PAGE_FORMATS`, or a custom size.
+export interface PageSize {
+  width: number
+  height: number
+}
+
+export interface Template {
   _id: string
   title: string
-  slides: Slide[]
+  pageSize: PageSize
+  pages: Page[]
   variableData: VariableData[]
   createdAt?: Date
   updatedAt?: Date
 }
 
-export interface PresentationSummary {
+export interface TemplateSummary {
   _id: string
   title: string
+  pageSize: PageSize
   createdAt?: Date
   updatedAt?: Date
 }
@@ -230,35 +240,38 @@ export type VariableValueType = string | boolean | VariableItem[]
 // API DTOs (Data Transfer Objects)
 // ============================================
 
-export namespace PresentationDTO {
+export namespace TemplateDTO {
   export interface Create {
     title?: string
+    // DEFAULT_PAGE_SIZE when absent. Whole numbers from MIN_PAGE_DIMENSION to
+    // MAX_PAGE_DIMENSION, or the request is refused (`INVALID_PAGE_SIZE`).
+    pageSize?: PageSize
   }
 
   export interface Update {
     title?: string
-    slides?: Slide[]
+    pages?: Page[]
   }
 
-  export interface Response extends Presentation {}
+  export interface Response extends Template {}
 
   export interface List {
-    presentations: Presentation[]
+    templates: Template[]
     total: number
   }
 }
 
-export namespace SlideDTO {
+export namespace PageDTO {
   export interface Update {
     shapes: Shape[]
   }
 
   export interface Create {
-    // Position among the presentation's slides, 0-based; the end when absent.
-    // The slides from there on move down one.
+    // Position among the template's pages, 0-based; the end when absent.
+    // The pages from there on move down one.
     order?: number
     shapes?: Shape[]
-    // Restores a deleted slide under its former id, so references to it stay
+    // Restores a deleted page under its former id, so references to it stay
     // valid (the editor's undo). Rejected with 409 when the id is in use.
     _id?: string
   }

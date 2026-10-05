@@ -1,16 +1,17 @@
 import { message } from 'antd'
 import type { Paragraph, Shape } from '@imprime/sdk'
-import { DEFAULT_FONT_SIZE, DEFAULT_LINE_HEIGHT, PARAGRAPH_SPACING, SLIDE_HEIGHT, SLIDE_WIDTH, isImageMimeType } from '@imprime/sdk'
+import { DEFAULT_FONT_SIZE, DEFAULT_LINE_HEIGHT, PARAGRAPH_SPACING, isImageMimeType } from '@imprime/sdk'
 import type { StateCreator } from 'zustand'
-import type { PresentationSlice } from './PresentationSlice'
-import type { SlideSlice } from './SlideSlice'
+import type { TemplateSlice } from './TemplateSlice'
+import type { PageSlice } from './PageSlice'
 import type { DocumentWriteSlice } from './DocumentWriteSlice'
 import type { SelectionSlice } from './SelectionSlice'
 import { imagesAPI } from '../../api/api'
 import { nextShapeName } from '../../utils/shapeTree'
-import { selectCurrentSlide } from './selectors'
+import { selectCurrentPage, selectPageSize } from './selectors'
 
-// An inserted image is scaled down to fit this square, then centred.
+// An inserted image is scaled down to fit this square and the page, then
+// centred.
 const IMAGE_MAX_SIZE = 800
 
 // A pasted text box is sized before any layout, from rough metrics: as wide
@@ -35,17 +36,14 @@ const loadImage = (src: string) => new Promise<HTMLImageElement>((resolve, rejec
     img.src = src
 })
 
-// A vector image has no pixels of its own: it is redrawn at least this wide or
-// tall, so that it stays sharp across a slide.
-const VECTOR_RASTER_SIZE = SLIDE_WIDTH
-
 // The export draws only IMAGE_MIME_TYPES, and the API takes nothing else: any
 // other format the browser can show is redrawn as a PNG — an animated GIF as
-// its first frame, the one the PDF could show.
-function toPngDataUrl(img: HTMLImageElement, isVector: boolean): string {
+// its first frame, the one the PDF could show. A vector image has no pixels of
+// its own: it is redrawn at least `vectorSize` wide or tall.
+function toPngDataUrl(img: HTMLImageElement, isVector: boolean, vectorSize: number): string {
     const { naturalWidth: width, naturalHeight: height } = img
     if (!width || !height) throw new Error('This image has no size of its own: save it as PNG or JPEG')
-    const scale = isVector ? Math.max(1, VECTOR_RASTER_SIZE / Math.max(width, height)) : 1
+    const scale = isVector ? Math.max(1, vectorSize / Math.max(width, height)) : 1
     const canvas = document.createElement('canvas')
     canvas.width = Math.round(width * scale)
     canvas.height = Math.round(height * scale)
@@ -69,19 +67,19 @@ function uploadErrorMessage(error: unknown): string {
 export interface ImportSlice {
     // Ask for an image file, then insert it.
     handleImageUpload: () => void
-    // Upload an image and place it, fitted and centred, on the current slide.
+    // Upload an image and place it, fitted and centred, on the current page.
     insertImageFile: (file: File) => Promise<void>
-    // A text box holding `text`, one paragraph per line, centred on the slide.
+    // A text box holding `text`, one paragraph per line, centred on the page.
     insertTextBox: (text: string) => void
 }
 
 export const createImportSlice: StateCreator<
-    ImportSlice & PresentationSlice & SlideSlice & DocumentWriteSlice & SelectionSlice,
+    ImportSlice & TemplateSlice & PageSlice & DocumentWriteSlice & SelectionSlice,
     [],
     [],
     ImportSlice
 > = (_, get) => {
-    const getCurrentSlide = () => selectCurrentSlide(get())
+    const getCurrentPage = () => selectCurrentPage(get())
 
     return {
         handleImageUpload: () => {
@@ -97,6 +95,7 @@ export const createImportSlice: StateCreator<
 
         insertImageFile: async (file: File) => {
             const hideLoading = message.loading('Uploading image...', 0)
+            const pageSize = selectPageSize(get())
             try {
                 let dataUrl: string
                 let mimeType: string
@@ -109,7 +108,9 @@ export const createImportSlice: StateCreator<
                         dataUrl = original
                         mimeType = file.type
                     } else {
-                        dataUrl = toPngDataUrl(img, file.type === 'image/svg+xml')
+                        // As large as the page, so that it stays sharp across it.
+                        const vectorSize = Math.max(pageSize.width, pageSize.height)
+                        dataUrl = toPngDataUrl(img, file.type === 'image/svg+xml', vectorSize)
                         mimeType = 'image/png'
                     }
                 } catch (error) {
@@ -126,26 +127,30 @@ export const createImportSlice: StateCreator<
                     return
                 }
 
-                const ratio = Math.min(1, IMAGE_MAX_SIZE / natural.width, IMAGE_MAX_SIZE / natural.height)
+                const ratio = Math.min(
+                    1,
+                    Math.min(IMAGE_MAX_SIZE, pageSize.width) / natural.width,
+                    Math.min(IMAGE_MAX_SIZE, pageSize.height) / natural.height,
+                )
                 const width = Math.floor(natural.width * ratio)
                 const height = Math.floor(natural.height * ratio)
 
-                // Read now: the slide may have changed during the upload.
-                const slide = getCurrentSlide()
-                if (!slide) return
+                // Read now: the page may have changed during the upload.
+                const page = getCurrentPage()
+                if (!page) return
                 const shapeId = crypto.randomUUID()
                 const newShape: Shape = {
                     id: shapeId,
                     type: 'image',
-                    name: nextShapeName(slide.shapes, 'image'),
-                    x: Math.floor((SLIDE_WIDTH - width) / 2),
-                    y: Math.floor((SLIDE_HEIGHT - height) / 2),
+                    name: nextShapeName(page.shapes, 'image'),
+                    x: Math.floor((pageSize.width - width) / 2),
+                    y: Math.floor((pageSize.height - height) / 2),
                     width,
                     height,
                     imageId,
                     alt: file.name,
                 }
-                get()._editSlide(shapes => [...shapes, newShape], { slideId: slide._id })
+                get()._editPage(shapes => [...shapes, newShape], { pageId: page._id })
                 get().selectShape(shapeId)
                 message.success('Image uploaded successfully')
             } finally {
@@ -154,16 +159,18 @@ export const createImportSlice: StateCreator<
         },
 
         insertTextBox: (text: string) => {
-            const slide = getCurrentSlide()
-            if (!slide) return
+            const page = getCurrentPage()
+            if (!page) return
+            const pageSize = selectPageSize(get())
 
             const lines = text.replace(/\r\n?/g, '\n').split('\n')
             const charWidth = DEFAULT_FONT_SIZE * AVERAGE_CHAR_WIDTH
             const longest = lines.reduce((max, line) => Math.max(max, line.length), 0)
-            const width = Math.round(Math.min(PASTED_TEXT_MAX_WIDTH, Math.max(PASTED_TEXT_MIN_WIDTH, longest * charWidth)))
+            const maxWidth = Math.min(PASTED_TEXT_MAX_WIDTH, pageSize.width)
+            const width = Math.round(Math.min(maxWidth, Math.max(PASTED_TEXT_MIN_WIDTH, longest * charWidth)))
             const rows = lines.reduce((sum, line) => sum + Math.max(1, Math.ceil((line.length * charWidth) / width)), 0)
             const height = Math.round(Math.min(
-                SLIDE_HEIGHT,
+                pageSize.height,
                 rows * DEFAULT_FONT_SIZE * DEFAULT_LINE_HEIGHT + (lines.length - 1) * PARAGRAPH_SPACING,
             ))
 
@@ -171,14 +178,14 @@ export const createImportSlice: StateCreator<
             const newShape: Shape = {
                 id: shapeId,
                 type: 'text',
-                name: nextShapeName(slide.shapes, 'text'),
-                x: Math.round((SLIDE_WIDTH - width) / 2),
-                y: Math.round((SLIDE_HEIGHT - height) / 2),
+                name: nextShapeName(page.shapes, 'text'),
+                x: Math.round((pageSize.width - width) / 2),
+                y: Math.round((pageSize.height - height) / 2),
                 width,
                 height,
                 paragraphes: lines.map((line): Paragraph => ({ type: 'paragraph', children: [{ text: line }] })),
             }
-            get()._editSlide(shapes => [...shapes, newShape], { slideId: slide._id })
+            get()._editPage(shapes => [...shapes, newShape], { pageId: page._id })
             get().selectShape(shapeId)
         },
     }
