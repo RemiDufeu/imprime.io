@@ -61,8 +61,8 @@ incomplete the day a fourth container lands.
 | `for-group` | once per item of a list variable | `itemsVariable`, `layout`, `justify`, `align`, `gap` |
 
 `layout` defaults to `'none'` for `group` (free-form, children keep their own
-`x`/`y`) — chosen so groups saved before auto-layout existed keep rendering as
-before. `for-group` defaults to `'vertical'` instead, because a repeat with no
+`x`/`y`): a group is a plain grouping until it is given a direction.
+`for-group` defaults to `'vertical'` instead, because a repeat with no
 direction has no meaningful free-form interpretation.
 
 ## `resolveShapes`

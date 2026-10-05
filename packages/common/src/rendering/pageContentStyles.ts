@@ -31,8 +31,8 @@ export interface ParagraphStyle {
 }
 
 /**
- * Block formatting of a paragraph, with unset fields resolved to their legacy
- * meaning. Shapes are stored as Mixed and writable through the API, so an
+ * Block formatting of a paragraph, with unset fields resolved to their
+ * defaults. Shapes are stored as Mixed and writable through the API, so an
  * unknown alignment or a non-positive line height falls back to the default
  * rather than reaching a renderer.
  */

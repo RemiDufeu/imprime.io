@@ -56,9 +56,7 @@ export class PageService {
       throw isDuplicateKey(err) ? pageIdTaken() : err
     })
 
-    // Dense orders, with a gap at `position` for the new page. Rewriting them
-    // all also repairs the duplicates a count-based order used to leave behind
-    // after a deletion.
+    // Dense orders, with a gap at `position` for the new page.
     const renumbered = siblings
       .map((sibling, index) => ({ sibling, order: index < position ? index : index + 1 }))
       .filter(({ sibling, order }) => sibling.order !== order)
@@ -129,23 +127,6 @@ export class PageService {
     } catch (error) {
       console.error('Failed to release the images of a deleted page:', error)
     }
-  }
-
-  /**
-   * Fills `imageIds` on pages saved before the field existed, which image
-   * reference checks would otherwise miss. Run at startup; a no-op once every
-   * page has it.
-   */
-  async indexImageReferences(): Promise<number> {
-    const pages = await PageModel.find({ imageIds: { $exists: false } }).select('shapes')
-    if (pages.length === 0) return 0
-    await PageModel.bulkWrite(pages.map(page => ({
-      updateOne: {
-        filter: { _id: page._id },
-        update: { $set: { imageIds: [...new Set(collectImageIds(page.shapes))] } },
-      },
-    })))
-    return pages.length
   }
 
   private async assertVariableReferences(templateId: Types.ObjectId, shapes: Shape[]): Promise<void> {

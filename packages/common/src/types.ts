@@ -67,20 +67,16 @@ export type VariableElement = TextFormatting & {
 
 export interface Paragraph {
   type: 'paragraph';
-  // Stored documents may still carry a free-form `style` object from an
-  // earlier API; no renderer reads it any more. The typed fields below replace
-  // it, so both renderers agree on every paragraph property.
-  //
-  // Block-level formatting. Unset means 'left' and DEFAULT_LINE_HEIGHT, which
-  // is how every paragraph rendered before these fields existed. Read them
-  // through `getParagraphStyle`, which also sanitises values written via the API.
+  // Block-level formatting. Unset means 'left' and DEFAULT_LINE_HEIGHT. Read
+  // them through `getParagraphStyle`, which also sanitises values written via
+  // the API.
   align?: TextAlign;
   lineHeight?: number; // unitless multiplier of each run's font size
   // List membership. Lists are flat: an item is a paragraph carrying `list`,
   // and nesting is its `indent` level (0 to MAX_LIST_LEVEL), ignored outside a
-  // list. Unset `list` is a plain paragraph, which every paragraph was before
-  // lists existed. Numbering is derived from the surrounding paragraphs by
-  // `getListMarkers`, never stored. Read through `getListStyle`.
+  // list. Unset `list` is a plain paragraph. Numbering is derived from the
+  // surrounding paragraphs by `getListMarkers`, never stored. Read through
+  // `getListStyle`.
   list?: ListType;
   indent?: number;
   children: (CustomText | VariableElement)[];
@@ -89,8 +85,7 @@ export interface Paragraph {
 export interface TextBoxShape extends BaseShape {
   type: 'text'
   paragraphes: Paragraph[]
-  // Position of the paragraph stack inside the box. Unset means 'top', the
-  // only behaviour text boxes had before this field existed.
+  // Position of the paragraph stack inside the box. Unset means 'top'.
   verticalAlign?: TextVerticalAlign
 }
 
@@ -108,8 +103,7 @@ export interface GroupShape extends BaseShape {
   type: 'group'
   children: Shape[]
   // Flexbox-like auto-layout for children. Defaults to 'none' (free-form
-  // positioning, children keep their own x/y) when unset, so groups saved
-  // before auto-layout existed keep rendering exactly as they did.
+  // positioning, children keep their own x/y) when unset.
   layout?: GroupLayoutDirection
   justify?: GroupJustify
   align?: GroupAlign

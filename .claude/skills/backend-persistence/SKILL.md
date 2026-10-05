@@ -212,12 +212,6 @@ for a document created today? `GroupShape.layout` unset is free positioning,
 `Paragraph.align` unset is left: those stay optional, with the meaning
 documented. A field every new document always has is required.
 
-This governs new work. Code that predates the rule —
-`PageService.indexImageReferences` (a startup backfill),
-`scripts/migrateTemplates.ts` (the presentation → template rename), the
-`pageSize` defaults on the `Template` schema — is not a pattern to copy, and is
-not removed unless the user asks.
-
 ## Cascades and transactions
 
 **There are no transactions.** Multi-collection operations run as a sequence of
@@ -242,9 +236,8 @@ cleanup work; do not match it for anything the caller needs to know about.
 An image is **shared**: duplicating or pasting an image shape keeps its
 `imageId`, on any page of any template. So "is it still used?" is asked of
 every page, through `Page.imageIds` — derived from `shapes` by a pre-save hook
-on the model, indexed, and backfilled at startup for pages saved before it
-existed (`PageService.indexImageReferences`). `updateOne` and `bulkWrite` skip
-that hook: never use them to write `shapes`.
+on the model, and indexed. `updateOne` and `bulkWrite` skip that hook: never
+use them to write `shapes`.
 
 An image that leaves its page — a shape write without it, or the page's
 deletion — is **released** (`ImageService.release`): if no page shows it any
@@ -274,10 +267,8 @@ Verify these still hold before relying on them:
    is set at upload and every `ImageService` method takes the `ownerId` to
    scope by — reads, deletes, and the reference bookkeeping, since the image
    ids a page holds are anyone's to write. The export draws only the
-   template owner's images. Images stored before the field existed have
-   no owner and answer 404 to everyone: no backfill was written (not in
-   production then). ObjectIds follow each other, so an unscoped lookup by id
-   is an enumerable one. → skill `backend-routes`
+   template owner's images. ObjectIds follow each other, so an unscoped
+   lookup by id is an enumerable one. → skill `backend-routes`
 
 ## Related
 

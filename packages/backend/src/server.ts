@@ -9,7 +9,7 @@ import { oAuthDiscoveryMetadata, oAuthProtectedResourceMetadata } from 'better-a
 import type { Server as HttpServer } from 'http'
 import { connectDatabase } from './config/database.js'
 import { connectAuthDb, closeAuthDb } from './config/authDb.js'
-import { authService, settingsService, pageService } from './services/index.js'
+import { authService, settingsService } from './services/index.js'
 import { CLIENT_IP_HEADER } from './services/AuthService.js'
 import { requireAuth } from './middleware/requireAuth.js'
 import templatesRouter from './routes/templates.js'
@@ -225,8 +225,6 @@ async function startServer() {
     await connectAuthDb()
     await settingsService.load()
     await authService.promoteConfiguredAdmin()
-    const indexed = await pageService.indexImageReferences()
-    if (indexed > 0) console.log(`Indexed the image references of ${indexed} pages`)
     const httpServer = app.listen(PORT, () => {
       console.log(`Server running on http://localhost:${PORT}`)
     })

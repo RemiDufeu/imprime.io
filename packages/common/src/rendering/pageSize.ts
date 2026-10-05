@@ -1,7 +1,6 @@
 import type { PageSize } from '../types.js'
 
-// The size of every template made before formats existed — still the size of
-// one created without asking for any.
+// The size of a template created without asking for one.
 export const DEFAULT_PAGE_SIZE: PageSize = { width: 1920, height: 1080 }
 
 export type PageFormatId = 'a4-portrait' | 'a4-landscape' | '16:9'

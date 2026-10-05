@@ -72,22 +72,13 @@ Both paths land on the same server and expose the same tools — plug Imprime in
 ## Sign-in and access control
 Sign in with an email and a password, or with Google, GitHub or Microsoft. The administrator sets everything up from the app — SMTP server, single sign-on providers, who may sign in and from which domains — and a single `ADMIN_EMAIL` in the environment is all it takes to get started. See [Authentication and access](./doc/authentication.md).
 
-# Upgrading
-
-Presentations are now **templates**, and slides **pages** — in the app, the REST API (`/api/templates`, `/api/templates/:id/pages`), the SDK and the MCP tools (`list_templates`, `export_template`). An instance installed before this change must move its data once, with the server stopped, before starting the new version:
-
-```bash
-npm run migrate:templates --workspace=@imprime/backend
-```
-
-Until then the new version shows no template. Running it again changes nothing.
-
 # Roadmap
 
 Imprime is currently under active development. Here are the main planned updates:
 
 ## Block enhancements
-- *image variable
+- image rework : fill mode change it etc...
+- image variable
 - condition on page (if and for)
 
 ## Layout
