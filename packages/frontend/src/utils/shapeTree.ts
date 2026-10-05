@@ -7,7 +7,7 @@ export { isContainerShape }
 export interface ShapeLocation {
   shape: Shape
   parentGroupId: string | null
-  // Absolute top-left of the shape in slide coordinates
+  // Absolute top-left of the shape in page coordinates
   absX: number
   absY: number
 }
@@ -128,7 +128,7 @@ export function insertShapeAt(shapes: Shape[], groupId: string | null, index: nu
 
 // The sibling list a shape lives in: root `shapes`, or the children array of
 // its parent container. Used to scope z-order reordering to the shape's own
-// container instead of always operating on the slide root.
+// container instead of always operating on the page root.
 export function getSiblingList(shapes: Shape[], groupId: string | null): Shape[] {
   if (groupId === null) return shapes
   const loc = findShapeById(shapes, groupId)
@@ -157,7 +157,7 @@ export function cloneShapeWithNewIds(shape: Shape): Shape {
 }
 
 // `shapes` with `shape` placed at absolute (x, y), right after `anchorId` in
-// the anchor's container — the slide root when there is no anchor or it is
+// the anchor's container — the page root when there is no anchor or it is
 // not in the tree. Duplicate and paste both put the copy next to its source.
 export function insertNear(shapes: Shape[], shape: Shape, x: number, y: number, anchorId: string | null): Shape[] {
   const anchor = anchorId !== null ? findShapeById(shapes, anchorId) : null

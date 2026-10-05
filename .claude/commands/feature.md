@@ -14,7 +14,7 @@ packages, and discovering that halfway through is how drift gets introduced.
 
 ### 1. Understand
 
-Restate the request in domain terms (shapes, variables, slides, surfaces).
+Restate the request in domain terms (shapes, variables, pages, surfaces).
 Identify acceptance criteria. Ask now if the request is ambiguous about
 behaviour, not later.
 
@@ -31,14 +31,15 @@ Invoke `imprime-explorer` on the area involved. You need, before designing:
 
 Present what exploration found, then ask the design questions it raised —
 typically: does this need to appear in the PDF, does it need to be reachable
-from the SDK or MCP, what should happen to presentations saved before the
-change. Wait for answers.
+from the SDK or MCP. Not what happens to templates saved before the change:
+Imprime is pre-production, and stored data is reset, never migrated
+(→ skill `backend-persistence`). Wait for answers.
 
 ### 4. Design
 
 Invoke `imprime-architect`. Expect a blueprint with package placement, an
 ordered site list (common → sdk → backend → frontend, so the build stays green),
-a surface table, backward compatibility, and what is verifiable by the compiler
+a surface table, the development data to reset, and what is verifiable by the compiler
 versus what needs a generated PDF.
 
 **Present the blueprint and wait for approval before implementing.**
@@ -49,8 +50,9 @@ Follow the approved site order. While implementing:
 
 - put anything both renderers need in `packages/common/src/rendering/`
 - extend the union and let the compiler enumerate the sites; do not suppress it
-- new optional fields carry the legacy behaviour as their unset meaning, with a
-  comment saying so (shapes persist as `Mixed`; old documents must still render)
+- no migration script, startup backfill or fallback for documents saved
+  before; a new field is optional only when its absence means something, with
+  that meaning in a comment (→ skill `backend-persistence`)
 - match the surrounding file's formatting; do not reformat untouched lines
 
 Run `/verify` as you go, not only at the end.

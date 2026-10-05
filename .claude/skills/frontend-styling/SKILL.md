@@ -27,7 +27,7 @@ them directly:
 ```
 
 **There are no hardcoded colours in the stylesheets** — the only three
-exceptions are deliberate translucent overlays in `SlideList.css`
+exceptions are deliberate translucent overlays in `PageList.css`
 (`rgba(0,0,0,0.6)` for a hover scrim and two `rgba(...)` action-button
 backgrounds), where a token would be opaque.
 
@@ -109,7 +109,7 @@ the element**, not as an inline rule — `.shape-tree-row` reads
 Legitimate, and used, for three things only:
 
 1. **Computed geometry** — SVG coordinates, a canvas sized from `zoom`, a
-   container whose height is measured. `SlideCanvas` styles its wrapper inline
+   container whose height is measured. `PageCanvas` styles its wrapper inline
    because `width`/`height` are props.
 2. **One-off layout on an antd component** where a class would exist solely to
    hold two declarations — `<Content style={{ flex: 1, overflow: 'auto' }}>`.

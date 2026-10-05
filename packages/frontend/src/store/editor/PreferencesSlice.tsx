@@ -7,10 +7,10 @@ export const ZOOM_LEVELS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2]
 
 export interface PreferencesSlice {
   zoom: number
-  slidesPanelOpen: boolean
+  pagesPanelOpen: boolean
   layersPanelOpen: boolean
   setZoom: (zoom: number | ((prevZoom: number) => number)) => void
-  setSlidesPanelOpen: (open: boolean | ((prev: boolean) => boolean)) => void
+  setPagesPanelOpen: (open: boolean | ((prev: boolean) => boolean)) => void
   setLayersPanelOpen: (open: boolean | ((prev: boolean) => boolean)) => void
 }
 
@@ -21,16 +21,16 @@ export const createPreferencesSlice: StateCreator<
   PreferencesSlice
 > = (set, get) => ({
     zoom: DEFAULT_ZOOM,
-    slidesPanelOpen: true,
+    pagesPanelOpen: true,
     layersPanelOpen: true,
     setZoom: (newZoom) => {
         const prevZoom = get().zoom
         const nextZoom = typeof newZoom === 'function' ? newZoom(prevZoom) : newZoom
         set({ zoom: Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, nextZoom)) })
     },
-    setSlidesPanelOpen: (open) => {
-        const prev = get().slidesPanelOpen
-        set({ slidesPanelOpen: typeof open === 'function' ? open(prev) : open })
+    setPagesPanelOpen: (open) => {
+        const prev = get().pagesPanelOpen
+        set({ pagesPanelOpen: typeof open === 'function' ? open(prev) : open })
     },
     setLayersPanelOpen: (open) => {
         const prev = get().layersPanelOpen

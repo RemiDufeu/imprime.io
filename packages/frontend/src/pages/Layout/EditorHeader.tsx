@@ -1,7 +1,7 @@
 import { DownloadOutlined, LeftOutlined, RedoOutlined, ThunderboltFilled, UndoOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom"
 import { useState, useEffect } from "react";
-import { presentationsAPI } from "../../api/api";
+import { templatesAPI } from "../../api/api";
 import { Button, Input, message, Modal, Form, Switch, Dropdown, Space, Tooltip } from "antd";
 import type { VariableValueType } from "@imprime/sdk";
 import "./EditorHeader.css";
@@ -9,18 +9,18 @@ import { useEditorStore } from "../../store/editor/EditorStore";
 import { MOD_LABEL } from "../../utils/hotkeys";
 import { selectCanRedo, selectCanUndo } from "../../store/editor/selectors";
 import { ItemListInput } from "../../components/common";
-import { DropdownVariablesContent } from "../EditorPage/components/SlideEditor/TopBar/Context-toolbar/DropdownVariablesContent/DropdownVariablesContent";
-import { VariableFormModal } from "../EditorPage/components/SlideEditor/TopBar/Context-toolbar/DropdownVariablesContent/VariableFormModal";
+import { DropdownVariablesContent } from "../EditorPage/components/PageEditor/TopBar/Context-toolbar/DropdownVariablesContent/DropdownVariablesContent";
+import { VariableFormModal } from "../EditorPage/components/PageEditor/TopBar/Context-toolbar/DropdownVariablesContent/VariableFormModal";
 
 export default function EditorHeader() {
     const navigate = useNavigate();
-    const presentation = useEditorStore(state => state.presentation);
-    const updatePresentationTitle = useEditorStore(state => state.updatePresentationTitle);
+    const template = useEditorStore(state => state.template);
+    const updateTemplateTitle = useEditorStore(state => state.updateTemplateTitle);
     const undo = useEditorStore(state => state.undo);
     const redo = useEditorStore(state => state.redo);
     const canUndo = useEditorStore(selectCanUndo);
     const canRedo = useEditorStore(selectCanRedo);
-    const [localTitle, setLocalTitle] = useState(presentation?.title ?? '');
+    const [localTitle, setLocalTitle] = useState(template?.title ?? '');
     const [isExporting, setIsExporting] = useState(false);
     const [isVariableModalOpen, setIsVariableModalOpen] = useState(false);
     const [form] = Form.useForm();
@@ -31,37 +31,37 @@ export default function EditorHeader() {
     const setVariablesPanelOpen = useEditorStore(state => state.setVariablesPanelOpen);
 
     useEffect(() => {
-        if (presentation?.title !== undefined) {
-            setLocalTitle(presentation.title);
+        if (template?.title !== undefined) {
+            setLocalTitle(template.title);
         }
-    }, [presentation?.title]);
+    }, [template?.title]);
 
     useEffect(() => {
-        if (!presentation) return;
+        if (!template) return;
 
-        if (localTitle === presentation.title) return;
+        if (localTitle === template.title) return;
 
         const timeoutId = setTimeout(() => {
             if (localTitle.trim()) {
-                updatePresentationTitle(localTitle);
+                updateTemplateTitle(localTitle);
             }
         }, 500);
 
         return () => clearTimeout(timeoutId);
-    }, [localTitle, presentation, updatePresentationTitle]);
+    }, [localTitle, template, updateTemplateTitle]);
 
     const handleDownloadClick = () => {
-        if (!presentation) {
-            message.warning('No presentation loaded');
+        if (!template) {
+            message.warning('No template loaded');
             return;
         }
 
-        const hasVariables = presentation.variableData && presentation.variableData.length > 0;
+        const hasVariables = template.variableData && template.variableData.length > 0;
 
         if (hasVariables) {
             setIsVariableModalOpen(true);
             const initialValues: Record<string, VariableValueType> = {};
-            presentation.variableData?.forEach(variable => {
+            template.variableData?.forEach(variable => {
                 if (variable.default !== undefined && variable.default !== null) {
                     initialValues[variable.name] = variable.default;
                 }
@@ -74,13 +74,13 @@ export default function EditorHeader() {
     };
 
     const handleDownloadPDF = async (variableValues: Record<string, VariableValueType>) => {
-        if (!presentation) return;
+        if (!template) return;
 
         setIsExporting(true);
         try {
-            await presentationsAPI.downloadPDF(
-                presentation._id,
-                `${presentation.title || 'presentation'}.pdf`,
+            await templatesAPI.downloadPDF(
+                template._id,
+                `${template.title || 'template'}.pdf`,
                 variableValues
             );
             message.success('PDF exported successfully!');
@@ -120,7 +120,7 @@ export default function EditorHeader() {
                 type="text"
                 value={localTitle}
                 onChange={(e) => setLocalTitle(e.target.value)}
-                placeholder="Presentation title"
+                placeholder="Template title"
                 size="large"
                 className="inputBtn"/>
             <Space>
@@ -174,7 +174,7 @@ export default function EditorHeader() {
             form={form}
             layout="vertical"
         >
-            {presentation?.variableData?.map(variable => {
+            {template?.variableData?.map(variable => {
                 const defaultHint = variable.default !== undefined && variable.default !== null
                     ? `Default: ${Array.isArray(variable.default) ? `${variable.default.length} items` : String(variable.default)}`
                     : 'None';

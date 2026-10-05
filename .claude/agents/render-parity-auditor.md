@@ -1,6 +1,6 @@
 ---
 name: render-parity-auditor
-description: Audits a change for divergence between the SVG editor renderer and the react-pdf export renderer. Use whenever a diff touches shapes, geometry, layout, text formatting, fonts, colours, packages/common/src/rendering, packages/frontend/src/components/slide, or ExportService. Reports findings only.
+description: Audits a change for divergence between the SVG editor renderer and the react-pdf export renderer. Use whenever a diff touches shapes, geometry, layout, text formatting, fonts, colours, packages/common/src/rendering, packages/frontend/src/components/page, or ExportService. Reports findings only.
 tools: Read, Grep, Glob, Bash
 model: sonnet
 ---
@@ -32,11 +32,11 @@ to `api-surface-reviewer`.
 
 | Editor | Export |
 |---|---|
-| `frontend/src/components/slide/svg/SVGRectangle.tsx` | `ExportService.renderRectangle` |
-| `frontend/src/components/slide/svg/SVGEllipse.tsx` | `ExportService.renderEllipse` |
-| `frontend/src/components/slide/svg/SVGText.tsx` + `TextEditor/` | `ExportService.renderTextBox` + `inlineTextStyle` |
-| `frontend/src/components/slide/svg/SVGImage.tsx` | `ExportService.renderImage` |
-| `frontend/src/components/slide/svg/SVGGroup.tsx` | `resolveShapes` / `expandGroup` |
+| `frontend/src/components/page/svg/SVGRectangle.tsx` | `ExportService.renderRectangle` |
+| `frontend/src/components/page/svg/SVGEllipse.tsx` | `ExportService.renderEllipse` |
+| `frontend/src/components/page/svg/SVGText.tsx` + `TextEditor/` | `ExportService.renderTextBox` + `inlineTextStyle` |
+| `frontend/src/components/page/svg/SVGImage.tsx` | `ExportService.renderImage` |
+| `frontend/src/components/page/svg/SVGGroup.tsx` | `resolveShapes` / `expandGroup` |
 | `frontend/src/utils/groupLayout.ts` (`reflowGroups`) | `common/rendering/groupLayout.ts` (`layoutGroupChildren`) |
 
 ## Findings to look for
@@ -45,7 +45,7 @@ to `api-surface-reviewer`.
 
 - A visual rule added to one renderer with no counterpart in the other.
 - A constant duplicated instead of imported from `packages/common/src/rendering/`
-  (slide size, dash array, corner radius, ellipse geometry, line height).
+  (page size, dash array, corner radius, ellipse geometry, line height).
 - A new shape type or container with a case in only one dispatcher
   (`SVGShape` switch / `renderShape` switch / `resolveShapes`).
 - A colour-carrying property in the export that bypasses `parseColor` — alpha
@@ -61,8 +61,8 @@ to `api-surface-reviewer`.
   belongs in `common/rendering` by the test "would the other side need the same
   formula to match?".
 - A geometry change that ignores the export's page clipping
-  (`renderInSvgLayer` clamps to `SLIDE_WIDTH`/`SLIDE_HEIGHT`; the editor does not)
-  or the slide-edge filter in `exportToPDF`.
+  (`renderInSvgLayer` clamps to the template's `pageSize`; the editor does not)
+  or the page-edge filter in `exportToPDF`.
 - A layout rule changed in `layoutGroupChildren` without checking `reflowGroups`
   still produces the editor-side equivalent.
 - A container change that does not keep `expandForGroup`'s bbox-origin
@@ -94,7 +94,7 @@ End with:
 
 ```
 Parity verdict: PASS | DRIFT | BLOCK
-Manual check required: <presentation and steps to compare editor vs PDF>
+Manual check required: <template and steps to compare editor vs PDF>
 ```
 
 `BLOCK` for any CRITICAL, `DRIFT` for HIGH only, `PASS` otherwise. Always name a

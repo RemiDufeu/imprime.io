@@ -1,7 +1,7 @@
 {
   "name": "@imprime/sdk",
   "version": "1.0.0",
-  "description": "TypeScript SDK for Imprime API - Create and manage presentations programmatically",
+  "description": "TypeScript SDK for Imprime API - Create and manage templates programmatically",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -11,7 +11,7 @@
   },
   "keywords": [
     "imprime",
-    "presentation",
+    "template",
     "sdk",
     "api-client"
   ],

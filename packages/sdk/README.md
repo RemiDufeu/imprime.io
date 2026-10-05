@@ -1,6 +1,6 @@
 # @imprime/sdk
 
-TypeScript SDK for Imprime API - Create and manage presentations programmatically.
+TypeScript SDK for Imprime API - Create and manage templates programmatically.
 
 ## Installation
 
@@ -18,15 +18,15 @@ const client = new ImprimeClient({
   baseUrl: 'http://localhost:3023/api'
 })
 
-// Create a presentation
-const presentation = await client.createPresentation('My Presentation')
+// Create a template
+const template = await client.createTemplate('My Template')
 
-// Add a slide
-const slide = await client.addSlide(presentation._id)
-const slideId = slide._id
+// Add a page
+const page = await client.addPage(template._id)
+const pageId = page._id
 
 // Add shapes
-await client.addRectangle(presentation._id, slideId, {
+await client.addRectangle(template._id, pageId, {
   x: 100,
   y: 100,
   width: 200,
@@ -34,7 +34,7 @@ await client.addRectangle(presentation._id, slideId, {
   fill: '#3b82f6'
 })
 
-await client.addText(presentation._id, slideId, {
+await client.addText(template._id, pageId, {
   x: 120,
   y: 120,
   text: 'Hello World!',
@@ -55,80 +55,82 @@ new ImprimeClient(options?: ImprimeClientOptions)
 - `baseUrl?: string` - Base URL of the Imprime API
 - `timeout?: number` - Request timeout in milliseconds (default: `30000`)
 
-### Presentation Methods
+### Template Methods
 
-#### `listPresentations()`
-List all presentations.
+#### `listTemplates()`
+List all templates.
 
 ```typescript
-const presentations = await client.listPresentations()
+const templates = await client.listTemplates()
 ```
 
-#### `getPresentation(id: string)`
-Get a specific presentation by ID.
+#### `getTemplate(id: string)`
+Get a specific template by ID.
 
 ```typescript
-const presentation = await client.getPresentation('674abc123def456')
+const template = await client.getTemplate('674abc123def456')
 ```
 
-#### `createPresentation(title?: string)`
-Create a new presentation.
+#### `createTemplate(title?: string, pageSize?: PageSize)`
+Create a new template with one blank page. `pageSize` is in points, and 1920×1080
+when omitted; `PAGE_FORMATS` lists the presets (A4 portrait, A4 landscape, 16:9).
 
 ```typescript
-const presentation = await client.createPresentation('Q4 Results')
+const template = await client.createTemplate('Q4 Results')
+const invoice = await client.createTemplate('Invoice', PAGE_FORMATS[0].size) // A4 portrait
 ```
 
-#### `updatePresentation(id: string, data: { title?: string; slides?: Slide[] })`
-Update a presentation's title or slides.
+#### `updateTemplate(id: string, data: { title?: string; pages?: Page[] })`
+Update a template's title or pages.
 
 ```typescript
-await client.updatePresentation('674abc123def456', {
+await client.updateTemplate('674abc123def456', {
   title: 'Updated Title'
 })
 ```
 
-#### `deletePresentation(id: string)`
-Delete a presentation.
+#### `deleteTemplate(id: string)`
+Delete a template.
 
 ```typescript
-await client.deletePresentation('674abc123def456')
+await client.deleteTemplate('674abc123def456')
 ```
 
-### Slide Methods
+### Page Methods
 
-#### `addSlide(presentationId: string, slide?: SlideDTO.Create)`
-Add a slide to a presentation and return it. Blank and last by default; `order`
+#### `addPage(templateId: string, page?: PageDTO.Create)`
+Add a page to a template and return it. Blank and last by default; `order`
 inserts it at that 0-based position, `shapes` gives it content, and `_id`
-restores a deleted slide under its former id (409 if that id is in use).
+restores a deleted page under its former id (409 if that id is in use).
 
 ```typescript
-const slide = await client.addSlide('674abc123def456')
-const second = await client.addSlide('674abc123def456', { order: 1, shapes: [] })
+const page = await client.addPage('674abc123def456')
+const second = await client.addPage('674abc123def456', { order: 1, shapes: [] })
 ```
 
-#### `updateSlide(presentationId: string, slideId: string, shapes: Shape[])`
-Update all shapes on a slide.
+#### `updatePage(templateId: string, pageId: string, shapes: Shape[])`
+Update all shapes on a page.
 
 ```typescript
-await client.updateSlide('674abc123def456', 'slide-123', [
+await client.updatePage('674abc123def456', 'page-123', [
   { id: 'rect-1', type: 'rectangle', x: 0, y: 0, width: 100, height: 100, fill: '#000' }
 ])
 ```
 
-#### `deleteSlide(presentationId: string, slideId: string)`
-Delete a slide from a presentation.
+#### `deletePage(templateId: string, pageId: string)`
+Delete a page from a template.
 
 ```typescript
-await client.deleteSlide('674abc123def456', 'slide-123')
+await client.deletePage('674abc123def456', 'page-123')
 ```
 
 ### Shape Methods
 
-#### `addRectangle(presentationId, slideId, options)`
-Add a rectangle to a slide.
+#### `addRectangle(templateId, pageId, options)`
+Add a rectangle to a page.
 
 ```typescript
-await client.addRectangle('674abc123def456', 'slide-123', {
+await client.addRectangle('674abc123def456', 'page-123', {
   x: 100,
   y: 100,
   width: 200,
@@ -137,11 +139,11 @@ await client.addRectangle('674abc123def456', 'slide-123', {
 })
 ```
 
-#### `addEllipse(presentationId, slideId, options)`
-Add an ellipse/circle to a slide.
+#### `addEllipse(templateId, pageId, options)`
+Add an ellipse/circle to a page.
 
 ```typescript
-await client.addEllipse('674abc123def456', 'slide-123', {
+await client.addEllipse('674abc123def456', 'page-123', {
   x: 100,
   y: 100,
   width: 150,
@@ -150,13 +152,13 @@ await client.addEllipse('674abc123def456', 'slide-123', {
 })
 ```
 
-#### `addText(presentationId, slideId, options)`
-Add a text box to a slide. Each line of `text` (split on `
+#### `addText(templateId, pageId, options)`
+Add a text box to a page. Each line of `text` (split on `
 `) becomes a
 paragraph; the formatting options apply to all of them.
 
 ```typescript
-await client.addText('674abc123def456', 'slide-123', {
+await client.addText('674abc123def456', 'page-123', {
   x: 50,
   y: 50,
   text: 'Hello World
@@ -173,22 +175,22 @@ Second paragraph',
 })
 ```
 
-#### `updateShape(presentationId, slideId, shapeId, updates)`
+#### `updateShape(templateId, pageId, shapeId, updates)`
 Update a shape's properties.
 
 ```typescript
-await client.updateShape('674abc123def456', 'slide-123', 'rect-1', {
+await client.updateShape('674abc123def456', 'page-123', 'rect-1', {
   x: 150,
   y: 150,
   fill: '#ff0000'
 })
 ```
 
-#### `deleteShape(presentationId, slideId, shapeId)`
-Delete a shape from a slide.
+#### `deleteShape(templateId, pageId, shapeId)`
+Delete a shape from a page.
 
 ```typescript
-await client.deleteShape('674abc123def456', 'slide-123', 'rect-1')
+await client.deleteShape('674abc123def456', 'page-123', 'rect-1')
 ```
 
 ### Font Methods
@@ -247,7 +249,7 @@ Get one face's file, base64-encoded.
 Remove an optional face (not `'regular'`).
 
 #### `deleteFont(fontId)` — admin
-Delete a family. Text that uses it, in every presentation, is drawn in Roboto.
+Delete a family. Text that uses it, in every template, is drawn in Roboto.
 
 ### Settings Methods
 
@@ -360,16 +362,16 @@ The SDK throws errors for failed requests:
 
 ```typescript
 try {
-  await client.getPresentation('invalid-id')
+  await client.getTemplate('invalid-id')
 } catch (error) {
-  console.error('Failed to get presentation:', error.message)
+  console.error('Failed to get template:', error.message)
 }
 ```
 
 Limits worth handling:
 
 - **Images are their uploader's.** `getImage` answers 404 for another user's
-  image, as for a missing one, and an export draws only the presentation
+  image, as for a missing one, and an export draws only the template
   owner's images. A user stores up to 500 MB of images: beyond,
   `uploadImage` fails with `413 IMAGE_QUOTA_EXCEEDED`.
 - **Images are PNG or JPEG**, the formats the PDF export draws. The format
@@ -385,19 +387,19 @@ Limits worth handling:
 The SDK is written in TypeScript and includes full type definitions:
 
 ```typescript
-import type { Presentation, Slide, Shape } from '@imprime/sdk'
+import type { Template, Page, Shape } from '@imprime/sdk'
 
-const presentation: Presentation = await client.getPresentation(id)
-const slide: Slide = presentation.slides[0]
-const shape: Shape = slide.shapes[0]
+const template: Template = await client.getTemplate(id)
+const page: Page = template.pages[0]
+const shape: Shape = page.shapes[0]
 ```
 
 ## Use Cases
 
-- **Automation**: Generate presentations from data
-- **CLI tools**: Build command-line tools for slide management
-- **Testing**: Automated testing of presentation features
-- **MCP Servers**: Build AI-accessible presentation tools
+- **Automation**: Generate templates from data
+- **CLI tools**: Build command-line tools for page management
+- **Testing**: Automated testing of template features
+- **MCP Servers**: Build AI-accessible template tools
 - **Integrations**: Connect Imprime to other services
 
 ## Requirements

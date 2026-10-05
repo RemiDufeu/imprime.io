@@ -34,8 +34,7 @@ export interface IInstanceSettings {
   }
   // A provider is offered on the sign-in page while it is present.
   sso: Partial<Record<SsoProvider, ISsoProviderSettings>>
-  // Absent in older documents, where anyone could use a password and every
-  // domain was allowed: the defaults say so.
+  // Until an admin sets them, anyone may use a password, from any domain.
   access: {
     passwordPolicy: PasswordPolicy
     // Lower-cased, deduplicated.

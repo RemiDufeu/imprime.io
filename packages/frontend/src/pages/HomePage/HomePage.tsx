@@ -2,27 +2,28 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Empty, App, Typography } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
-import { presentationsAPI } from '../../api/api'
-import type { PresentationSummary } from '@imprime/sdk'
+import { templatesAPI } from '../../api/api'
+import type { TemplateSummary } from '@imprime/sdk'
 import SpinnerFullScreen from '../../components/Feedback/SpinnerFullScreen'
 import RegularPageContainer from '../../components/Layout/RegularPageContainer/RegularPageContainer'
-import PresentationCard from './PresentationCard'
+import TemplateCard from './TemplateCard'
+import CreateTemplateModal from './CreateTemplateModal/CreateTemplateModal'
 import './HomePage.css'
 
 export default function HomePage() {
   const navigate = useNavigate()
   const { message, modal } = App.useApp()
-  const [presentations, setPresentations] = useState<PresentationSummary[]>([])
+  const [templates, setTemplates] = useState<TemplateSummary[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [isCreating, setIsCreating] = useState(false)
+  const [isCreateOpen, setIsCreateOpen] = useState(false)
 
-  const loadPresentations = async () => {
+  const loadTemplates = async () => {
     setIsLoading(true)
     try {
-      const data = await presentationsAPI.getAll()
-      setPresentations(data)
+      const data = await templatesAPI.getAll()
+      setTemplates(data)
     } catch (error) {
-      message.error('Failed to load presentations')
+      message.error('Failed to load templates')
       console.error(error)
     } finally {
       setIsLoading(false)
@@ -30,35 +31,21 @@ export default function HomePage() {
   }
 
   useEffect(() => {
-    loadPresentations()
+    loadTemplates()
   }, [])
 
-  const handleCreatePresentation = async () => {
-    setIsCreating(true)
-    try {
-      const newPresentation = await presentationsAPI.create('New Presentation')
-      message.success('Presentation created successfully')
-      navigate(`/editor/${newPresentation._id}`)
-    } catch (error) {
-      message.error('Failed to create presentation')
-      console.error(error)
-    } finally {
-      setIsCreating(false)
-    }
-  }
-
-  const handleDeletePresentation = async (id: string, title: string) => {
+  const handleDeleteTemplate = async (id: string, title: string) => {
     modal.confirm({
-      title: 'Delete presentation',
+      title: 'Delete template',
       content: `Are you sure you want to delete "${title}"?`,
       okText: 'Delete',
       okType: 'danger',
       cancelText: 'Cancel',
       async onOk() {
         try {
-          await presentationsAPI.delete(id)
-          message.success('Presentation deleted')
-          loadPresentations()
+          await templatesAPI.delete(id)
+          message.success('Template deleted')
+          loadTemplates()
         } catch (error) {
           message.error('Failed to delete')
           console.error(error)
@@ -80,48 +67,52 @@ export default function HomePage() {
       }}>
         <div>
           <Typography.Title level={1}>
-            My Presentations
+            My Templates
           </Typography.Title>
           <Typography.Text type="secondary">
-            Manage your presentations and create new ones
+            Manage your templates and create new ones
           </Typography.Text>
         </div>
         <Button
           type="primary"
           size="large"
           icon={<PlusOutlined />}
-          onClick={handleCreatePresentation}
-          loading={isCreating}
+          onClick={() => setIsCreateOpen(true)}
         >
-          New Presentation
+          New Template
         </Button>
       </div>
 
-      {presentations.length === 0 ? (
+      {templates.length === 0 ? (
         <Empty
-          className='empty-presentation'
-          description="No presentations yet"
+          className='empty-template'
+          description="No templates yet"
         >
           <Button
             type="primary"
             icon={<PlusOutlined />}
-            onClick={handleCreatePresentation}
-            loading={isCreating}
+            onClick={() => setIsCreateOpen(true)}
           >
-            Create my first presentation
+            Create my first template
           </Button>
         </Empty>
       ) : (
-        <div className='presentation-grid'>
-          {presentations.map((presentation) => (
-            <PresentationCard
-              key={presentation._id}
-              presentation={presentation}
-              onDeleteClicked={() => {handleDeletePresentation(presentation._id, presentation.title)}}
-              onDetailClick={() => {navigate(`/editor/${presentation._id}`)}}/>
+        <div className='template-grid'>
+          {templates.map((template) => (
+            <TemplateCard
+              key={template._id}
+              template={template}
+              onDeleteClicked={() => {handleDeleteTemplate(template._id, template.title)}}
+              onDetailClick={() => {navigate(`/editor/${template._id}`)}}/>
           ))}
         </div>
       )}
+
+      <CreateTemplateModal
+        open={isCreateOpen}
+        onClose={() => setIsCreateOpen(false)}
+        onCreated={(template) => navigate(`/editor/${template._id}`)}
+      />
     </RegularPageContainer>
   )
 }

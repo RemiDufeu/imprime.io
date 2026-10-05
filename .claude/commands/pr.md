@@ -39,7 +39,7 @@ findings, or state in the PR why each is deliberate.
 ```markdown
 ## What
 
-<the change in domain terms — shapes, variables, slides, surfaces — not a file list>
+<the change in domain terms — shapes, variables, pages, surfaces — not a file list>
 
 ## Why
 
@@ -61,12 +61,12 @@ findings, or state in the PR why each is deliberate.
 
 ## Needs manual review
 
-- <the editor-vs-PDF comparison, with the presentation and variable values to use>
+- <the editor-vs-PDF comparison, with the template and variable values to use>
 - <anything a reviewer must look at rather than read>
 
-## Backward compatibility
+## Development data to reset
 
-<what happens to presentations saved before this change; "none needed" is an answer>
+<collections to drop before running this branch, or "none" — pre-production, nothing is migrated>
 ```
 
 The **Needs manual review** section is the point of this command. In a repository

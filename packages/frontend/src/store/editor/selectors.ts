@@ -1,23 +1,29 @@
-import type { Presentation, Shape, Slide } from '@imprime/sdk'
+import type { Template, Shape, Page, PageSize } from '@imprime/sdk'
+import { DEFAULT_PAGE_SIZE } from '@imprime/sdk'
 import { findShapeById } from '../../utils/shapeTree'
 import type { HistorySlice } from './HistorySlice'
 import type { TextEditorSlice } from './TextEditorSlice'
 import type { ToolType } from './ToolSlice'
 
 // Minimal shape of the state these selectors read, so they can be applied both
-// to a React subscription (`useEditorStore(selectCurrentSlide)`) and to a plain
-// snapshot inside a slice action (`selectCurrentSlide(get())`).
-export interface CurrentSlideState {
-    presentation: Presentation | null
-    currentSlideIndex: number
+// to a React subscription (`useEditorStore(selectCurrentPage)`) and to a plain
+// snapshot inside a slice action (`selectCurrentPage(get())`).
+export interface CurrentPageState {
+    template: Template | null
+    currentPageIndex: number
 }
 
-// The slide currently being edited. Single definition of that lookup — slice
-// actions can't call `useCurrentSlide`, so without this they each re-derive it.
-export const selectCurrentSlide = (s: CurrentSlideState): Slide | null =>
-    s.presentation?.slides[s.currentSlideIndex] ?? null
+// The page currently being edited. Single definition of that lookup — slice
+// actions can't call `useCurrentPage`, so without this they each re-derive it.
+export const selectCurrentPage = (s: CurrentPageState): Page | null =>
+    s.template?.pages[s.currentPageIndex] ?? null
 
-interface SelectionState extends CurrentSlideState {
+// The size of every page of the template being edited — the coordinate space
+// its shapes are drawn in.
+export const selectPageSize = (s: Pick<CurrentPageState, 'template'>): PageSize =>
+    s.template?.pageSize ?? DEFAULT_PAGE_SIZE
+
+interface SelectionState extends CurrentPageState {
     selectedShapeId: string | null
 }
 
@@ -25,9 +31,9 @@ interface SelectionState extends CurrentSlideState {
 // so it can never describe the shape as it was before an edit; and it is the
 // tree's own object, so a subscriber re-renders only when that shape changes.
 export const selectSelectedShape = (s: SelectionState): Shape | null => {
-    const slide = selectCurrentSlide(s)
-    return slide && s.selectedShapeId !== null
-        ? findShapeById(slide.shapes, s.selectedShapeId)?.shape ?? null
+    const page = selectCurrentPage(s)
+    return page && s.selectedShapeId !== null
+        ? findShapeById(page.shapes, s.selectedShapeId)?.shape ?? null
         : null
 }
 

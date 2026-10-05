@@ -1,8 +1,9 @@
 import React from 'react'
-import { Document, Page, View, Text as PDFText, Image, Svg, Rect, Ellipse, renderToBuffer } from '@react-pdf/renderer'
+import { Document, Page as PDFPage, View, Text as PDFText, Image, Svg, Rect, Ellipse, renderToBuffer } from '@react-pdf/renderer'
 import type {
-  Presentation,
-  Slide,
+  Template,
+  Page,
+  PageSize,
   Shape,
   BaseShape,
   RectangleShape,
@@ -19,8 +20,6 @@ import type {
   FontCatalog
 } from '@imprime/common'
 import {
-  SLIDE_WIDTH,
-  SLIDE_HEIGHT,
   getDashArray,
   resolveShapes,
   resolveVariable,
@@ -90,8 +89,8 @@ export class ExportService {
     }
   }
 
-  private validateVariables(presentation: Presentation, variableValues: Record<string, VariableValueType>): void {
-    const requiredVariables = presentation.variableData?.filter(v => v.required) || []
+  private validateVariables(template: Template, variableValues: Record<string, VariableValueType>): void {
+    const requiredVariables = template.variableData?.filter(v => v.required) || []
 
     for (const variable of requiredVariables) {
       if (isEmptyVariableValue(variableValues[variable.name])) {
@@ -102,11 +101,11 @@ export class ExportService {
 
   // Only `ownerId`'s images: a shape's image id is anyone's to write, and an
   // export must not draw someone else's. One not found is left out.
-  private async fetchImageData(resolvedSlides: Slide[], ownerId: string): Promise<Map<string, string>> {
+  private async fetchImageData(resolvedPages: Page[], ownerId: string): Promise<Map<string, string>> {
     const imageIds = new Set<string>()
 
-    for (const slide of resolvedSlides) {
-      for (const shape of slide.shapes) {
+    for (const page of resolvedPages) {
+      for (const shape of page.shapes) {
         if (shape.type === 'image') {
           imageIds.add(shape.imageId)
         }
@@ -152,10 +151,10 @@ export class ExportService {
    * catalog they resolve against. A family that is not imported (or no longer
    * is) is left out and drawn in the default font, as the editor draws it.
    */
-  private async loadFonts(resolvedSlides: Slide[]): Promise<FontCatalog> {
+  private async loadFonts(resolvedPages: Page[]): Promise<FontCatalog> {
     const families = new Set<string>()
-    for (const slide of resolvedSlides) {
-      for (const shape of slide.shapes) {
+    for (const page of resolvedPages) {
+      for (const shape of page.shapes) {
         if (shape.type !== 'text') continue
         for (const paragraph of shape.paragraphes) {
           for (const run of paragraph.children) {
@@ -176,13 +175,14 @@ export class ExportService {
    */
   private renderInSvgLayer(
     shape: BaseShape,
+    pageSize: PageSize,
     draw: (origin: { left: number; top: number }) => React.ReactElement
   ): React.ReactElement {
     const sw = shape.strokeWidth || 0
     const left = Math.max(0, shape.x - sw / 2)
     const top = Math.max(0, shape.y - sw / 2)
-    const width = Math.max(0, Math.min(SLIDE_WIDTH, shape.x + shape.width + sw / 2) - left)
-    const height = Math.max(0, Math.min(SLIDE_HEIGHT, shape.y + shape.height + sw / 2) - top)
+    const width = Math.max(0, Math.min(pageSize.width, shape.x + shape.width + sw / 2) - left)
+    const height = Math.max(0, Math.min(pageSize.height, shape.y + shape.height + sw / 2) - top)
 
     if (width <= 0 || height <= 0) {
       return React.createElement(View, { key: shape.id })
@@ -194,12 +194,12 @@ export class ExportService {
     }, draw({ left, top }))
   }
 
-  private renderRectangle(shape: RectangleShape): React.ReactElement {
+  private renderRectangle(shape: RectangleShape, pageSize: PageSize): React.ReactElement {
     const fill = this.parseColor(shape.fill, 'none')
     const stroke = this.parseColor(shape.stroke, 'none')
     const cornerRadius = getRectangleCornerRadius(shape)
 
-    return this.renderInSvgLayer(shape, ({ left, top }) =>
+    return this.renderInSvgLayer(shape, pageSize, ({ left, top }) =>
       React.createElement(Rect, {
         x: shape.x - left,
         y: shape.y - top,
@@ -217,12 +217,12 @@ export class ExportService {
     )
   }
 
-  private renderEllipse(shape: EllipseShape): React.ReactElement {
+  private renderEllipse(shape: EllipseShape, pageSize: PageSize): React.ReactElement {
     const fill = this.parseColor(shape.fill, 'none')
     const stroke = this.parseColor(shape.stroke, 'none')
     const geometry = getEllipseGeometry(shape)
 
-    return this.renderInSvgLayer(shape, ({ left, top }) =>
+    return this.renderInSvgLayer(shape, pageSize, ({ left, top }) =>
       React.createElement(Ellipse, {
         cx: geometry.cx - left,
         cy: geometry.cy - top,
@@ -430,14 +430,15 @@ export class ExportService {
   // tree into leaves before rendering starts.
   private renderShape(
     shape: Shape,
+    pageSize: PageSize,
     assets: RenderAssets,
     ctx: ResolveContext
   ): React.ReactElement {
     switch (shape.type) {
       case 'rectangle':
-        return this.renderRectangle(shape)
+        return this.renderRectangle(shape, pageSize)
       case 'ellipse':
-        return this.renderEllipse(shape)
+        return this.renderEllipse(shape, pageSize)
       case 'text':
         return this.renderTextBox(shape, ctx, assets.fonts)
       case 'image':
@@ -447,18 +448,19 @@ export class ExportService {
     }
   }
 
-  private renderSlide(
-    slide: Slide,
+  private renderPage(
+    page: Page,
+    pageSize: PageSize,
     assets: RenderAssets,
     ctx: ResolveContext
   ): React.ReactElement {
-    const shapes = slide.shapes.map(shape => this.renderShape(shape, assets, ctx))
+    const shapes = page.shapes.map(shape => this.renderShape(shape, pageSize, assets, ctx))
 
-    return React.createElement(Page, {
-      key: slide._id,
+    return React.createElement(PDFPage, {
+      key: page._id,
       size: {
-        width: SLIDE_WIDTH,
-        height: SLIDE_HEIGHT
+        width: pageSize.width,
+        height: pageSize.height
       },
       style: {
         position: 'relative',
@@ -467,25 +469,26 @@ export class ExportService {
     }, shapes)
   }
 
-  /** `ownerId` owns the presentation: only their images are drawn. */
-  public async exportToPDF(presentation: Presentation, ownerId: string, options: RenderOptions = {}): Promise<Buffer> {
+  /** `ownerId` owns the template: only their images are drawn. */
+  public async exportToPDF(template: Template, ownerId: string, options: RenderOptions = {}): Promise<Buffer> {
     const variableValues = options.variableValues || {}
 
-    this.validateVariables(presentation, variableValues)
+    this.validateVariables(template, variableValues)
 
-    const ctx: ResolveContext = { variableValues, presentation }
-    const resolvedSlides: Slide[] = presentation.slides.map(slide => ({
-      ...slide,
-      shapes: resolveShapes(slide.shapes, ctx)
-        .filter(s => s.y < SLIDE_HEIGHT && s.x < SLIDE_WIDTH),
+    const ctx: ResolveContext = { variableValues, template }
+    const { pageSize } = template
+    const resolvedPages: Page[] = template.pages.map(page => ({
+      ...page,
+      shapes: resolveShapes(page.shapes, ctx)
+        .filter(s => s.y < pageSize.height && s.x < pageSize.width),
     }))
 
     const [images, fonts] = await Promise.all([
-      this.fetchImageData(resolvedSlides, ownerId),
-      this.loadFonts(resolvedSlides),
+      this.fetchImageData(resolvedPages, ownerId),
+      this.loadFonts(resolvedPages),
     ])
     const assets: RenderAssets = { images, fonts }
-    const pages = resolvedSlides.map(slide => this.renderSlide(slide, assets, ctx))
+    const pages = resolvedPages.map(page => this.renderPage(page, pageSize, assets, ctx))
 
     const doc = React.createElement(Document, {}, pages)
 

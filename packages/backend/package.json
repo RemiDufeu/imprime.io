@@ -1,7 +1,7 @@
 {
   "name": "@imprime/backend",
   "version": "1.0.0",
-  "description": "Backend API for Imprime presentation app",
+  "description": "Backend API for Imprime template app",
   "main": "src/server.ts",
   "type": "module",
   "scripts": {

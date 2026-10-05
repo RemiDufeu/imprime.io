@@ -1,11 +1,11 @@
 import type { Shape } from '@imprime/sdk'
 import type { StateCreator } from 'zustand'
-import type { PresentationSlice } from './PresentationSlice'
-import type { SlideSlice } from './SlideSlice'
+import type { TemplateSlice } from './TemplateSlice'
+import type { PageSlice } from './PageSlice'
 import type { DocumentWriteSlice } from './DocumentWriteSlice'
 import type { SelectionSlice } from './SelectionSlice'
 import { findInnermostGroupAt, insertShape, nextShapeName } from '../../utils/shapeTree'
-import { selectCurrentSlide } from './selectors'
+import { selectCurrentPage } from './selectors'
 
 export type ToolType = 'move' | 'rectangle' | 'ellipse' | 'text' | 'group' | 'if-group' | 'for-group'
 
@@ -48,7 +48,7 @@ export interface ToolSlice {
 }
 
 export const createToolSlice: StateCreator<
-    ToolSlice & PresentationSlice & SlideSlice & DocumentWriteSlice & SelectionSlice,
+    ToolSlice & TemplateSlice & PageSlice & DocumentWriteSlice & SelectionSlice,
     [],
     [],
     ToolSlice
@@ -57,7 +57,7 @@ export const createToolSlice: StateCreator<
     // not the store's.
     let rafId: number | null = null
 
-    // The shape the current tool draws in `rect` (slide coordinates).
+    // The shape the current tool draws in `rect` (page coordinates).
     const drawnShape = (tool: Exclude<ToolType, 'move'>, shapes: Shape[], x: number, y: number, width: number, height: number): Shape => {
         const base = { id: crypto.randomUUID(), name: nextShapeName(shapes, tool), x, y, width, height }
         const { fill, stroke, strokeWidth, strokeStyle, cornerRadius } = get().drawStyle
@@ -125,8 +125,8 @@ export const createToolSlice: StateCreator<
 
         finishDrawing: () => {
             const { isDrawing, drawingData, selectedTool, cancelDrawing } = get()
-            const slide = selectCurrentSlide(get())
-            if (!isDrawing || !drawingData || !slide || selectedTool === 'move') {
+            const page = selectCurrentPage(get())
+            if (!isDrawing || !drawingData || !page || selectedTool === 'move') {
                 cancelDrawing()
                 return
             }
@@ -141,11 +141,11 @@ export const createToolSlice: StateCreator<
                 return
             }
 
-            const shape = drawnShape(selectedTool, slide.shapes, x, y, width, height)
+            const shape = drawnShape(selectedTool, page.shapes, x, y, width, height)
 
             // Drawing over a container drops the shape inside it, with the
             // rect converted into that container's local coordinate space.
-            get()._editSlide(shapes => {
+            get()._editPage(shapes => {
                 const parent = findInnermostGroupAt(shapes, x, y)
                 return parent
                     ? insertShape(shapes, parent.id, { ...shape, x: x - parent.absX, y: y - parent.absY })

@@ -22,9 +22,9 @@ All extend `BaseShape`: `id`, `x`, `y`, `width`, `height`, optional `stroke`,
 
 `BaseShape.id` is a **client-generated UUID, not a Mongo `_id`**. The editor
 assigns it at creation so it can apply optimistic updates and track selection
-without a round-trip. Slides and presentations use Mongo `_id`; shapes do not.
+without a round-trip. Pages and templates use Mongo `_id`; shapes do not.
 Do not "fix" this by moving shape ids server-side — the whole shape tree is
-persisted as one embedded document on the slide.
+persisted as one embedded document on the page.
 
 Ids are unique **within their source tree**, which is why `resolveShapes`
 re-forges them when a `for-group` duplicates children: `reidShape` appends
@@ -34,17 +34,17 @@ re-forges them when a `for-group` duplicates children: `reidShape` appends
 
 This is the most common source of off-by-a-parent bugs.
 
-- A shape's `x`/`y` are **relative to its parent container**, or to the slide
+- A shape's `x`/`y` are **relative to its parent container**, or to the page
   when it sits at the root.
 - `SVGGroup` renders `<g transform="translate(x y)">`, so the browser applies
   the parent offset. Nothing in the editor stores absolute positions.
 - `findShapeById` (`packages/frontend/src/utils/shapeTree.ts`) returns
   `{ shape, parentGroupId, absX, absY }` — the accumulated absolute position,
-  computed on the way down. Use it whenever you need slide-space coordinates.
+  computed on the way down. Use it whenever you need page-space coordinates.
 - Moving a shape between parents means re-expressing its position:
   `newX = sourceLoc.absX - targetParentAbs.absX`. `ShapeSlice.moveShape` and
   `ungroupShape` both do this; copy that pattern rather than inventing another.
-- `resolveShapes` translates everything to slide space, once, at export time.
+- `resolveShapes` translates everything to page space, once, at export time.
 
 ## Containers
 
@@ -61,8 +61,8 @@ incomplete the day a fourth container lands.
 | `for-group` | once per item of a list variable | `itemsVariable`, `layout`, `justify`, `align`, `gap` |
 
 `layout` defaults to `'none'` for `group` (free-form, children keep their own
-`x`/`y`) — chosen so groups saved before auto-layout existed keep rendering as
-before. `for-group` defaults to `'vertical'` instead, because a repeat with no
+`x`/`y`): a group is a plain grouping until it is given a direction.
+`for-group` defaults to `'vertical'` instead, because a repeat with no
 direction has no meaningful free-form interpretation.
 
 ## `resolveShapes`
@@ -89,7 +89,7 @@ Two subtleties worth preserving:
   children come from dynamic data.
 - **`for-group` iterations are offset by the children's tight bbox origin**
   (`childrenBBox().minX/minY`). Without that subtraction the authored `minX`
-  gets added on top of the layout offset and pushes iterations off-slide.
+  gets added on top of the layout offset and pushes iterations off-page.
 
 `childrenBBox` returns the tight extent (`max - min`), deliberately excluding
 empty space between the parent's origin and its topmost/leftmost child.
@@ -105,18 +105,18 @@ compile errors after you extend the union — which is the point of the union.
    `expand*` branch in `resolveShapes` for a container.
 3. `packages/backend/src/services/ExportService.ts` — a `render*` method and a
    `renderShape` case. Containers need no case (they never arrive).
-4. `packages/frontend/src/components/slide/svg/` — the component, plus the
+4. `packages/frontend/src/components/page/svg/` — the component, plus the
    `SVGShape` switch.
 5. `packages/frontend/src/store/editor/` — `ToolSlice` (the tool, and
    `drawnShape`: drawing → shape), `selectors.ts` (`contextBarFor`).
-6. `packages/frontend/src/components/slide/SlideCanvas.tsx` — the drawing-tool
+6. `packages/frontend/src/components/page/PageCanvas.tsx` — the drawing-tool
    list in `handleMouseDown`, if it is drawn by dragging.
 7. Context toolbar under `.../TopBar/Context-toolbar/` + its `index.tsx` switch.
 8. `packages/frontend/src/utils/shapeTree.ts` — `shapeDisplayName`,
    `nextShapeName`; the shape-tree panel icon in `ShapeRow/shapeIcon.tsx`.
 9. `packages/sdk/src/ImprimeClient.ts` — an `addX` helper if it makes sense for
    API users.
-10. No schema migration: `packages/backend/src/models/Slide.ts` stores `shapes`
+10. No schema migration: `packages/backend/src/models/Page.ts` stores `shapes`
     as `Schema.Types.Mixed`, because Mongoose cannot validate the discriminated
     union. The flip side is that **nothing validates shape payloads at the
     database boundary** — a malformed shape is persisted happily and only blows

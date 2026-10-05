@@ -28,7 +28,7 @@ that does not compile.
 | The diff touches | Run |
 |---|---|
 | anything under `packages/frontend` or `packages/backend` | `imprime-reviewer` |
-| `components/slide/`, `common/src/rendering/`, `ExportService.ts`, fonts, geometry, layout | `render-parity-auditor` |
+| `components/page/`, `common/src/rendering/`, `ExportService.ts`, fonts, geometry, layout | `render-parity-auditor` |
 | `routes/`, `services/`, `models/`, `mcp/`, `packages/sdk/` | `api-surface-reviewer` |
 
 Run every agent that matches — most real changes match two. Run them in

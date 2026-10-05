@@ -40,7 +40,7 @@ stale or missing build, not a real error — run `npm run build:common`.
 | Auth / ownership middleware | `packages/backend/src/middleware/` |
 | MCP server and tools | `packages/backend/src/mcp/` |
 | Editor state (Zustand slices) | `packages/frontend/src/store/editor/` |
-| SVG renderer | `packages/frontend/src/components/slide/svg/` |
+| SVG renderer | `packages/frontend/src/components/page/svg/` |
 | Shape tree manipulation | `packages/frontend/src/utils/shapeTree.ts` |
 | Editor UI (toolbars, panels) | `packages/frontend/src/pages/EditorPage/` |
 

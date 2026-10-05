@@ -20,6 +20,8 @@ If Imprime is useful to you, the best way to support the project is to use it, s
 
 ## A full-featured document editor
 At its core, Imprime is a powerful document editor. It ships with everything you'd expect from a modern editing experience: rich text formatting, shapes, images, groups with auto-layout, copy / paste / duplicate shortcuts, and more — all in an intuitive visual interface.
+
+Each template picks its page format when it is created: A4 portrait, A4 landscape, 16:9, or any custom size.
 ![editor](./doc/editor.png)
 
 ## Dynamic variables
@@ -32,13 +34,13 @@ Go further with **conditional** blocks (`if`) that only show a section when a bo
 Imprime is designed from the ground up for developers. Build your template once, then programmatically generate polished, data-driven documents at scale — through a clean REST API or directly from your AI agents via MCP.
 
 ### API
-To print a presentation, you only need its ID. The easiest way to grab it is straight from the presentation's URL.
+To print a template, you only need its ID. The easiest way to grab it is straight from the template's URL.
 
-![alt text](./doc/presentationId.png)
+![alt text](./doc/templateId.png)
 
-Then fire a POST request to the endpoint below, with a JSON body matching your presentation's variables — and get back a ready-to-ship PDF.
+Then fire a POST request to the endpoint below, with a JSON body matching your template's variables — and get back a ready-to-ship PDF.
 ```
-https://imprime.io/api/export/{{presentationId}}/pdf
+https://imprime.io/api/export/{{templateId}}/pdf
 ```
 
 Authenticate the call by passing an API key generated from **Settings → API Keys** in the `x-api-key` header.
@@ -75,8 +77,9 @@ Sign in with an email and a password, or with Google, GitHub or Microsoft. The a
 Imprime is currently under active development. Here are the main planned updates:
 
 ## Block enhancements
-- *image variable
-- condition on slide (if and for)
+- image rework : fill mode change it etc...
+- image variable
+- condition on page (if and for)
 
 ## Layout
 - Margin
@@ -88,8 +91,7 @@ Imprime is currently under active development. Here are the main planned updates
 - Multiple block selection and grouped operations
 
 ## Document format
-- Change the resolution
-- Add text document format in addition to current presentation format
+- Add a flowing text document format, in addition to the current fixed-size pages
 - Add default style (font and bg color)
 - Add pagination
 

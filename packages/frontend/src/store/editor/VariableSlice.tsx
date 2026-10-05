@@ -1,7 +1,7 @@
 import { variablesAPI } from '../../api/api'
 import type { VariableData, VariableDTO } from '@imprime/sdk'
 import type { StateCreator } from 'zustand'
-import type { PresentationSlice } from './PresentationSlice'
+import type { TemplateSlice } from './TemplateSlice'
 import type { HistorySlice } from './HistorySlice'
 import { parseApiError } from '../../utils/apiError'
 import { message } from 'antd'
@@ -34,10 +34,10 @@ export interface VariableSlice {
   _setVariables: (variables: VariableData[]) => void
 }
 
-type StoreWithPresentation = VariableSlice & PresentationSlice & HistorySlice
+type StoreWithTemplate = VariableSlice & TemplateSlice & HistorySlice
 
 export const createVariableSlice: StateCreator<
-  StoreWithPresentation,
+  StoreWithTemplate,
   [],
   [],
   VariableSlice
@@ -56,13 +56,13 @@ export const createVariableSlice: StateCreator<
   closeVariableForm: () => set({ variableForm: null }),
 
   createVariable: async (variable) => {
-    const { presentation } = get()
-    if (!presentation) return []
+    const { template } = get()
+    if (!template) return []
 
     set({ isLoadingVariables: true })
 
     try {
-      const result = await variablesAPI.create(presentation._id, variable)
+      const result = await variablesAPI.create(template._id, variable)
 
       get()._setVariables(result.variables)
       const created = result.variables.find(v => v.name === variable.name)
@@ -71,19 +71,19 @@ export const createVariableSlice: StateCreator<
       set({ isLoadingVariables: false })
     }
 
-    const { presentation : presentationAfter } = get()
-    return presentationAfter?.variableData ?? []
+    const { template : templateAfter } = get()
+    return templateAfter?.variableData ?? []
   },
 
   updateVariable: async (variableId: string, updates: VariableDTO.Update) => {
-    const { presentation } = get()
-    if (!presentation) return []
+    const { template } = get()
+    if (!template) return []
 
     set({ isLoadingVariables: true })
-    const previous = presentation.variableData?.find(v => v._id === variableId) ?? null
+    const previous = template.variableData?.find(v => v._id === variableId) ?? null
 
     try {
-      const result = await variablesAPI.update(presentation._id, variableId, updates)
+      const result = await variablesAPI.update(template._id, variableId, updates)
 
       get()._setVariables(result.variables)
       get()._recordHistory({ kind: 'variable', variableId, snapshot: previous })
@@ -94,14 +94,14 @@ export const createVariableSlice: StateCreator<
   },
 
   deleteVariable: async (variableId: string) => {
-    const { presentation } = get()
-    if (!presentation) return
+    const { template } = get()
+    if (!template) return
 
     set({ isLoadingVariables: true })
-    const previous = presentation.variableData?.find(v => v._id === variableId) ?? null
+    const previous = template.variableData?.find(v => v._id === variableId) ?? null
 
     try {
-      const result = await variablesAPI.delete(presentation._id, variableId)
+      const result = await variablesAPI.delete(template._id, variableId)
 
       get()._setVariables(result.variables)
       get()._recordHistory({ kind: 'variable', variableId, snapshot: previous })
@@ -119,29 +119,29 @@ export const createVariableSlice: StateCreator<
   },
 
   _restoreVariable: async (variableId, snapshot) => {
-    const { presentation } = get()
-    if (!presentation) return
-    const current = presentation.variableData?.find(v => v._id === variableId)
+    const { template } = get()
+    if (!template) return
+    const current = template.variableData?.find(v => v._id === variableId)
 
     let result: VariableDTO.List
     if (!snapshot) {
       if (!current) return
-      result = await variablesAPI.delete(presentation._id, variableId)
+      result = await variablesAPI.delete(template._id, variableId)
     } else {
       const { _id, ...definition } = snapshot
       result = current
         // Every field, so the update leaves nothing of the newer definition.
-        ? await variablesAPI.update(presentation._id, variableId, { ...definition, default: definition.default ?? null })
-        : await variablesAPI.create(presentation._id, { ...definition, _id })
+        ? await variablesAPI.update(template._id, variableId, { ...definition, default: definition.default ?? null })
+        : await variablesAPI.create(template._id, { ...definition, _id })
     }
 
     get()._setVariables(result.variables)
   },
 
   _setVariables: (variables) => {
-    // Read again rather than reuse the presentation from before the request:
+    // Read again rather than reuse the template from before the request:
     // shape edits made meanwhile would be lost.
-    const current = get().presentation
-    if (current) set({ presentation: { ...current, variableData: variables } })
+    const current = get().template
+    if (current) set({ template: { ...current, variableData: variables } })
   },
 })

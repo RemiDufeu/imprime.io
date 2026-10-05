@@ -11,7 +11,7 @@ Imprime draws every document twice:
 
 | | Editor | Export |
 |---|---|---|
-| Entry point | `packages/frontend/src/components/slide/SlideCanvas.tsx` | `packages/backend/src/services/ExportService.ts` |
+| Entry point | `packages/frontend/src/components/page/PageCanvas.tsx` | `packages/backend/src/services/ExportService.ts` |
 | Dispatch | `svg/SVGShape.tsx` → one component per shape type | `renderShape()` → one method per shape type |
 | Technology | Browser SVG + Slate for text | `@react-pdf/renderer` (`Svg`/`Rect`/`Ellipse`, `View`, `Text`, `Image`) |
 | Input | the **authored** shape tree | the **resolved** shape tree |
@@ -27,13 +27,13 @@ Anything where "the editor and the PDF must agree" is the requirement:
 
 | Module | Owns |
 |---|---|
-| `constants.ts` | `SLIDE_WIDTH` / `SLIDE_HEIGHT` (1920×1080) |
+| `pageSize.ts` | `PAGE_FORMATS` (A4 portrait, A4 landscape, 16:9), `DEFAULT_PAGE_SIZE`, `isValidPageSize` — the size is per template (`Template.pageSize`), read in the editor through `selectPageSize` |
 | `strokeUtils.ts` | `getDashArray` — dashed/dotted stroke patterns |
 | `svgRenderers.ts` | `getEllipseGeometry`, `getRectangleCornerRadius` — shape geometry from a bounding box |
 | `groupLayout.ts` | `distributeMainAxis`, `crossAxisOffset`, `layoutGroupChildren` — the flexbox subset |
 | `shapeResolver.ts` | `resolveShapes`, `childrenBBox` — container expansion |
 | `variables.ts` | `resolveVariable`, `isEmptyVariableValue`, `stringifyVariableValue` |
-| `slideContentStyles.ts` | text formatting: `getSlideContentWrapperStyles` (box, vertical alignment), `getParagraphStyle` (alignment, line height, sanitised), `getTextDecoration`, `getTextTransform`, `parseFontSize`, `DEFAULT_FONT_SIZE`, `DEFAULT_LINE_HEIGHT`, `PARAGRAPH_SPACING` |
+| `pageContentStyles.ts` | text formatting: `getPageContentWrapperStyles` (box, vertical alignment), `getParagraphStyle` (alignment, line height, sanitised), `getTextDecoration`, `getTextTransform`, `parseFontSize`, `DEFAULT_FONT_SIZE`, `DEFAULT_LINE_HEIGHT`, `PARAGRAPH_SPACING` |
 | `listStyles.ts` | lists: `getListStyle` (sanitised), `getListMarkers` (numbering), `getListMarkerFormatting`, `getListLayout` / `getBulletBox` (item and marker geometry) |
 
 Everything exported here is re-exported from `packages/common/src/rendering/index.ts`
@@ -76,13 +76,13 @@ So in the editor:
 
 And in the export, `resolveShapes` flattens all of that to absolute-positioned
 leaves: `hidden` dropped, conditions evaluated, iterations materialised with
-re-forged ids (`reidShape`), coordinates translated into slide space. By the
+re-forged ids (`reidShape`), coordinates translated into page space. By the
 time `renderShape` runs, **no container can reach it**.
 
 The one place the editor deliberately mirrors resolution is auto-layout:
 `reflowGroups` (`packages/frontend/src/utils/groupLayout.ts`) re-applies
 `layoutGroupChildren` to the authored tree on every shape update
-(`SlideSlice.updateSlideShapes`), so a laid-out group looks the same in the
+(`PageSlice.updatePageShapes`), so a laid-out group looks the same in the
 editor as `expandGroup` will make it at export time. If you add a layout rule,
 check both call sites still agree.
 
@@ -90,17 +90,18 @@ check both call sites still agree.
 
 1. Does the rule need to match between editor and PDF? → put it in
    `packages/common/src/rendering/`, export it from `index.ts`.
-2. Editor side: the component under `packages/frontend/src/components/slide/svg/`,
+2. Editor side: the component under `packages/frontend/src/components/page/svg/`,
    plus the `SVGShape` switch if it is a new type.
 3. Export side: the `render*` method in `ExportService`, plus the `renderShape`
    switch.
 4. If it is a new container type: `resolveShapes` needs an `expand*` case, and
    the editor needs it in `isContainerShape` (defined in `common/src/types.ts`,
    re-exported through `utils/shapeTree.ts`).
-5. If it affects geometry, re-derive against `SLIDE_WIDTH`/`SLIDE_HEIGHT` —
-   the export clips shapes to the slide (`.filter(s => s.y < SLIDE_HEIGHT && s.x < SLIDE_WIDTH)`)
+5. If it affects geometry, re-derive against the template's `pageSize` —
+   never a fixed size: pages are A4, 16:9 or custom. The export clips shapes to
+   the page (`.filter(s => s.y < pageSize.height && s.x < pageSize.width)`)
    and the editor does not.
-6. Verify by generating a real PDF against a presentation that exercises the
+6. Verify by generating a real PDF against a template that exercises the
    change, and compare with the editor. Typecheck proves nothing here.
    → command `/export-debug`
 

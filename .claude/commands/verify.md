@@ -37,7 +37,7 @@ cause. CI sets the same value as a job-level env var.
 
 **Lint is advisory.** It is not in CI, and the frontend currently reports 11
 errors and 1 warning that predate any given change — mostly unused `err`
-bindings in `catch` blocks (`PresentationSlice`, `SlideSlice`, `VariableSlice`),
+bindings in `catch` blocks (`TemplateSlice`, `PageSlice`, `VariableSlice`),
 two `no-explicit-any`, and one `exhaustive-deps` warning in `HomePage`. So the
 bar is **no new findings**, not zero findings: compare against
 `git stash`-ed baseline output if in doubt, and never "fix" the pre-existing

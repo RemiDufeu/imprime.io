@@ -9,11 +9,11 @@ import { oAuthDiscoveryMetadata, oAuthProtectedResourceMetadata } from 'better-a
 import type { Server as HttpServer } from 'http'
 import { connectDatabase } from './config/database.js'
 import { connectAuthDb, closeAuthDb } from './config/authDb.js'
-import { authService, settingsService, slideService } from './services/index.js'
+import { authService, settingsService } from './services/index.js'
 import { CLIENT_IP_HEADER } from './services/AuthService.js'
 import { requireAuth } from './middleware/requireAuth.js'
-import presentationsRouter from './routes/presentations.js'
-import slideRouter from './routes/slides.js'
+import templatesRouter from './routes/templates.js'
+import pageRouter from './routes/pages.js'
 import variablesRouter from './routes/variables.js'
 import exportRouter from './routes/export.js'
 import imagesRouter from './routes/images.js'
@@ -174,9 +174,9 @@ app.get('/api/auth-providers', (_req, res) => {
 })
 
 // Protected API routes (session cookie or API key)
-app.use('/api/presentations', requireAuth, presentationsRouter)
-app.use('/api/presentations', requireAuth, slideRouter)
-app.use('/api/presentations', requireAuth, variablesRouter)
+app.use('/api/templates', requireAuth, templatesRouter)
+app.use('/api/templates', requireAuth, pageRouter)
+app.use('/api/templates', requireAuth, variablesRouter)
 app.use('/api/export', requireAuth, exportRouter)
 app.use('/api/images', requireAuth, imagesRouter)
 app.use('/api/fonts', requireAuth, fontsRouter)
@@ -225,8 +225,6 @@ async function startServer() {
     await connectAuthDb()
     await settingsService.load()
     await authService.promoteConfiguredAdmin()
-    const indexed = await slideService.indexImageReferences()
-    if (indexed > 0) console.log(`Indexed the image references of ${indexed} slides`)
     const httpServer = app.listen(PORT, () => {
       console.log(`Server running on http://localhost:${PORT}`)
     })

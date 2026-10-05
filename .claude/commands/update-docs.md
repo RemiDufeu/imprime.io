@@ -26,9 +26,9 @@ silently because nothing checks it.
 ### `api`
 
 1. List every route, with its mount, method, auth requirement and whether it is
-   presentation-scoped.
+   template-scoped.
 2. Compare against what the README documents. The README currently describes
-   `POST https://imprime.io/api/export/{{presentationId}}/pdf` and the
+   `POST https://imprime.io/api/export/{{templateId}}/pdf` and the
    `x-api-key` header — confirm both still hold.
 3. Report undocumented public endpoints and documented endpoints that no longer
    exist. Do not document internal routes that were never meant to be public;

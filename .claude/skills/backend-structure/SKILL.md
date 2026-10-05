@@ -18,19 +18,19 @@ src/
     fonts.ts             react-pdf font registration
   middleware/
     requireAuth.ts       session cookie or x-api-key → req.user
-    requireOwnsPresentation.ts  ownership guard + assertOwnsPresentation()
+    requireOwnsTemplate.ts  ownership guard + assertOwnsTemplate()
     requireAdmin.ts      admin-role guard for instance-wide resources
     errorHandler.ts      AppError subclasses → HTTP responses
   models/
-    Presentation.ts  Slide.ts  VariableData.ts  Image.ts  Font.ts  FontFile.ts
+    Template.ts  Page.ts  VariableData.ts  Image.ts  Font.ts  FontFile.ts
     InstanceSettings.ts
     mappers.ts           document ↔ DTO
   routes/
-    presentations.ts  slides.ts  variables.ts  export.ts  images.ts  fonts.ts
+    templates.ts  pages.ts  variables.ts  export.ts  images.ts  fonts.ts
     settings.ts
   services/
     index.ts             the singletons, wired here
-    PresentationService.ts  SlideService.ts  VariableService.ts
+    TemplateService.ts  PageService.ts  VariableService.ts
     ImageService.ts  FontService.ts  ExportService.ts  AuthService.ts  MailerService.ts
     SettingsService.ts
     errors.ts            AppError, NotFoundError, ValidationError, ConflictError
@@ -63,13 +63,13 @@ and nothing skips a level. Concretely:
 | **model** | declare the schema, indexes, timestamps | contain logic — no statics, no virtuals, no hooks anywhere today |
 
 A service never sees Express. That is what lets the MCP tools reuse
-`presentationService` and `exportService` unchanged.
+`templateService` and `exportService` unchanged.
 
 ## There is no repository layer
 
-Services import Mongoose models directly — `PresentationModel.findById(...)`,
-`SlideModel.find(...)`. **The service is the persistence boundary.** There is no
-`repositories/` directory, no `IPresentationRepository`, no generic base class,
+Services import Mongoose models directly — `TemplateModel.findById(...)`,
+`PageModel.find(...)`. **The service is the persistence boundary.** There is no
+`repositories/` directory, no `ITemplateRepository`, no generic base class,
 and no dependency-inversion seam between service and driver.
 
 That is a deliberate shape for this codebase, not an omission waiting to be
@@ -87,8 +87,8 @@ dependency order, and exported as singletons:
 
 ```ts
 const imageService = new ImageService()
-const slideService = new SlideService(imageService)
-const presentationService = new PresentationService(imageService)
+const pageService = new PageService(imageService)
+const templateService = new TemplateService(imageService)
 const exportService = new ExportService(imageService)
 const authService = new AuthService(mailerService)
 const settingsService = new SettingsService(mailerService, authService)
@@ -102,7 +102,7 @@ Rules:
 - A new service is added to `index.ts`. Never `new SomeService()` at a call site;
   services hold connections, transporters and registered fonts.
 - `index.ts` also re-exports the error classes, so most modules need one import:
-  `import { presentationService, NotFoundError } from '../services/index.js'`.
+  `import { templateService, NotFoundError } from '../services/index.js'`.
 
 ## Where a new file goes
 
@@ -127,7 +127,7 @@ the editor cannot disagree. → skill `render-parity`
   instantiated as `camelCaseService` in `index.ts`.
 - Models: `PascalCase.ts`, exporting `IPascalCase` (the plain interface),
   `PascalCaseDocument` (the hydrated type) and `PascalCaseModel`.
-- Routes: lowercase plural resource — `presentations.ts`, `variables.ts` —
+- Routes: lowercase plural resource — `templates.ts`, `variables.ts` —
   `export default router`.
 - Middleware: `camelCase.ts` named after the thing it asserts.
 - Mappers: `<entity>ToDTO`, `<entity>CreateToModel`, `<entity>UpdateToModel`.

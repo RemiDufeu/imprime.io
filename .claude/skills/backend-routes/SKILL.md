@@ -12,7 +12,7 @@ calls **one** service, and shapes the response. Everything else belongs
 somewhere else.
 
 ```ts
-router.post('/:id/variables', requireOwnsPresentation, async (req, res) => {
+router.post('/:id/variables', requireOwnsTemplate, async (req, res) => {
   const data: VariableDTO.Create = req.body
   const variables = await variableService.create(req.params.id, data)
   res.status(201).json({ variables })
@@ -27,18 +27,18 @@ belongs in the service.
 One `Router` per resource file, `export default router`, mounted in `server.ts`:
 
 ```ts
-app.use('/api/presentations', requireAuth, presentationsRouter)
-app.use('/api/presentations', requireAuth, slideRouter)
-app.use('/api/presentations', requireAuth, variablesRouter)
+app.use('/api/templates', requireAuth, templatesRouter)
+app.use('/api/templates', requireAuth, pageRouter)
+app.use('/api/templates', requireAuth, variablesRouter)
 app.use('/api/export',        requireAuth, exportRouter)
 app.use('/api/images',        requireAuth, imagesRouter)
 app.use('/api/fonts',         requireAuth, fontsRouter)
 app.use('/api/settings',      requireAuth, settingsRouter)
 ```
 
-**Three routers share the `/api/presentations` mount.** That is why
-`slides.ts` and `variables.ts` declare paths like `/:id/slides/:slideId` rather
-than `/:slideId` — the parent segment is part of their own path, not the mount.
+**Three routers share the `/api/templates` mount.** That is why
+`pages.ts` and `variables.ts` declare paths like `/:id/pages/:pageId` rather
+than `/:pageId` — the parent segment is part of their own path, not the mount.
 Split by resource, not by URL prefix, and keep the full sub-path in the router.
 
 `requireAuth` is applied **at the mount**, never inside a handler. A new router
@@ -49,7 +49,7 @@ goes inside that pipeline; putting one outside it needs a stated reason
 
 ```
 mount:    requireAuth               → sets req.user, or 401
-handler:  requireOwnsPresentation   → 404 if req.user does not own :id
+handler:  requireOwnsTemplate   → 404 if req.user does not own :id
 handler:  requireAdmin              → 403 unless req.user has the admin role
 ```
 
@@ -58,12 +58,12 @@ reads open, `POST`/`PUT`/`DELETE` guarded). Type a new guard as
 `RequestHandler<Record<string, string>>` like the existing two, or Express
 widens the handler's `req.params` to `string | string[]`.
 
-Every route with a presentation `:id` carries `requireOwnsPresentation`, before
+Every route with a template `:id` carries `requireOwnsTemplate`, before
 the handler function. Authentication is not authorization — `requireAuth` only
 proves *someone* is signed in.
 
 The guard throws `NotFoundError`, not 403, so a third party cannot learn that
-someone else's presentation exists. Preserve that.
+someone else's template exists. Preserve that.
 
 After `requireAuth`, `req.user` is non-null; handlers write `req.user!.id`.
 The `!` is the convention here, not an oversight — the type is optional because
@@ -94,7 +94,7 @@ What actually stands between a request body and the database:
 
 1. **The update mappers' field-by-field whitelist**, which is why they must not
    be "simplified" into a spread. → skill `backend-persistence`
-2. **Service-level checks** where they exist — `SlideService.validateVariableReferences`,
+2. **Service-level checks** where they exist — `PageService.validateVariableReferences`,
    `ImageService.upload`'s required-field check, `VariableService`'s uniqueness
    and in-use guards.
 3. `express.json({ limit: '10mb' })`, the only global size bound.
@@ -116,7 +116,7 @@ Observed, and worth matching:
 | Read or update returning data | `res.json(obj)` |
 | Delete with a confirmation | `res.json({ message: '... deleted successfully' })` |
 
-Response shapes are **not** uniform across resources: presentations return the
+Response shapes are **not** uniform across resources: templates return the
 bare object or a bare array, variables return `{ variables }`, images return the
 bare object, deletes return `{ message }`. Match the neighbours in the same
 router rather than inventing a third convention — and if you change one, change
@@ -141,7 +141,7 @@ file does.
 
 1. Which resource? → the matching `routes/*.ts`, or a new router + a mount
    inside the `requireAuth` pipeline.
-2. Presentation-scoped? → `requireOwnsPresentation`.
+2. Template-scoped? → `requireOwnsTemplate`.
 3. Type the body against a DTO namespace in `packages/common/src/types.ts` —
    never an inline object type.
 4. Call one service method. No Mongoose, no business rules, no try/catch.
@@ -149,12 +149,12 @@ file does.
 6. Mirror it in the SDK, the editor's `api.ts`, and an MCP tool if an agent
    should reach it. → command `/new-endpoint`
 
-## Resources owned outside a presentation
+## Resources owned outside a template
 
-**`routes/images.ts`** has no `:id` presentation to check: images belong to
+**`routes/images.ts`** has no `:id` template to check: images belong to
 their uploader (`Image.ownerId`), and each handler passes `req.user!.id` to the
 service, which scopes the query by it — someone else's image is a 404, like a
-missing one. Any new resource owned by a user rather than a presentation needs
+missing one. Any new resource owned by a user rather than a template needs
 the same: ownership in the model and in every query, not only a middleware.
 ObjectIds follow each other, so an id is no secret.
 

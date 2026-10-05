@@ -1,5 +1,5 @@
 import { ImprimeClient } from '@imprime/sdk'
-import type { Presentation, PresentationSummary, Shape, Slide, SlideDTO, ImageDTO, FontDTO, FontVariant, VariableDTO, VariableValueType, EmailSettingsDTO, SsoSettingsDTO, SsoProvider, AccessSettingsDTO } from '@imprime/sdk'
+import type { Template, TemplateSummary, PageSize, Shape, Page, PageDTO, ImageDTO, FontDTO, FontVariant, VariableDTO, VariableValueType, EmailSettingsDTO, SsoSettingsDTO, SsoProvider, AccessSettingsDTO } from '@imprime/sdk'
 import { API_BASE } from '../config'
 
 // Create a single SDK client instance
@@ -8,50 +8,50 @@ const client = new ImprimeClient({
 })
 
 /**
- * Presentations API using Imprime SDK
+ * Templates API using Imprime SDK
  *
  * This module provides a thin wrapper around the Imprime SDK
  * to maintain compatibility with existing frontend code.
  */
-export const presentationsAPI = {
-  async getAll(): Promise<PresentationSummary[]> {
-    return client.listPresentations()
+export const templatesAPI = {
+  async getAll(): Promise<TemplateSummary[]> {
+    return client.listTemplates()
   },
 
-  async getById(id: string): Promise<Presentation> {
-    return client.getPresentation(id)
+  async getById(id: string): Promise<Template> {
+    return client.getTemplate(id)
   },
 
-  async create(title?: string): Promise<Presentation> {
-    return client.createPresentation(title)
+  async create(title?: string, pageSize?: PageSize): Promise<Template> {
+    return client.createTemplate(title, pageSize)
   },
 
-  async update(id: string, data: Partial<Presentation>): Promise<Presentation> {
-    return client.updatePresentation(id, data)
+  async update(id: string, data: Partial<Template>): Promise<Template> {
+    return client.updateTemplate(id, data)
   },
 
   async delete(id: string): Promise<void> {
-    return client.deletePresentation(id)
+    return client.deleteTemplate(id)
   },
 
-  async updateSlide(presentationId: string, slideId: string, shapes: Shape[]): Promise<void> {
-    return client.updateSlide(presentationId, slideId, shapes)
+  async updatePage(templateId: string, pageId: string, shapes: Shape[]): Promise<void> {
+    return client.updatePage(templateId, pageId, shapes)
   },
 
-  async addSlide(presentationId: string, slide?: SlideDTO.Create): Promise<Slide> {
-    return client.addSlide(presentationId, slide)
+  async addPage(templateId: string, page?: PageDTO.Create): Promise<Page> {
+    return client.addPage(templateId, page)
   },
 
-  async deleteSlide(presentationId: string, slideId: string): Promise<void> {
-    return client.deleteSlide(presentationId, slideId)
+  async deletePage(templateId: string, pageId: string): Promise<void> {
+    return client.deletePage(templateId, pageId)
   },
 
-  async exportToPDF(presentationId: string, variableValues?: Record<string, VariableValueType>): Promise<Blob> {
-    return client.exportToPDF(presentationId, variableValues)
+  async exportToPDF(templateId: string, variableValues?: Record<string, VariableValueType>): Promise<Blob> {
+    return client.exportToPDF(templateId, variableValues)
   },
 
-  async downloadPDF(presentationId: string, filename?: string, variableValues?: Record<string, VariableValueType>): Promise<void> {
-    return client.downloadPDF(presentationId, filename, variableValues)
+  async downloadPDF(templateId: string, filename?: string, variableValues?: Record<string, VariableValueType>): Promise<void> {
+    return client.downloadPDF(templateId, filename, variableValues)
   },
 }
 
@@ -138,20 +138,20 @@ export const settingsAPI = {
  * Variables API using Imprime SDK
  */
 export const variablesAPI = {
-  async getAll(presentationId: string): Promise<VariableDTO.List> {
-    return client.listVariables(presentationId)
+  async getAll(templateId: string): Promise<VariableDTO.List> {
+    return client.listVariables(templateId)
   },
 
-  async create(presentationId: string, variable: VariableDTO.Create): Promise<VariableDTO.List> {
-    return client.createVariable(presentationId, variable)
+  async create(templateId: string, variable: VariableDTO.Create): Promise<VariableDTO.List> {
+    return client.createVariable(templateId, variable)
   },
 
-  async update(presentationId: string, variableId: string, updates: VariableDTO.Update): Promise<VariableDTO.List> {
-    return client.updateVariable(presentationId, variableId, updates)
+  async update(templateId: string, variableId: string, updates: VariableDTO.Update): Promise<VariableDTO.List> {
+    return client.updateVariable(templateId, variableId, updates)
   },
 
-  async delete(presentationId: string, variableId: string): Promise<VariableDTO.List> {
-    return client.deleteVariable(presentationId, variableId)
+  async delete(templateId: string, variableId: string): Promise<VariableDTO.List> {
+    return client.deleteVariable(templateId, variableId)
   },
 }
 

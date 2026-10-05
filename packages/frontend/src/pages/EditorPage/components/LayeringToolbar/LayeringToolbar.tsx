@@ -9,7 +9,7 @@ import {
   UngroupOutlined,
 } from '@ant-design/icons'
 import './LayeringToolbar.css'
-import { useCurrentSlide, useEditorStore } from '../../../../store/editor/EditorStore'
+import { useCurrentPage, useEditorStore } from '../../../../store/editor/EditorStore'
 import { findShapeById, getSiblingList } from '../../../../utils/shapeTree'
 import { MOD_LABEL } from '../../../../utils/hotkeys'
 
@@ -21,7 +21,7 @@ export default function LayeringToolbar() {
   const isTransforming = useEditorStore(state => !!state.transformationData)
 
   const zoom = useEditorStore(state => state.zoom)
-  const currentSlide = useCurrentSlide()
+  const currentPage = useCurrentPage()
   const deleteShape = useEditorStore(state => state.deleteShape)
 
   const bringToFront = useEditorStore(state => state.bringToFront)
@@ -32,7 +32,7 @@ export default function LayeringToolbar() {
 
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null)
 
-  const loc = currentSlide && selectedShapeId ? findShapeById(currentSlide.shapes, selectedShapeId) : null
+  const loc = currentPage && selectedShapeId ? findShapeById(currentPage.shapes, selectedShapeId) : null
   // The selection's box moves without the selection changing — an undo, a
   // nudge, a group reflowing — and the toolbar has to follow it.
   const boxX = loc?.absX
@@ -77,7 +77,7 @@ export default function LayeringToolbar() {
   if (!position) return null
   if (!loc) return null
 
-  const siblings = getSiblingList(currentSlide!.shapes, loc.parentGroupId)
+  const siblings = getSiblingList(currentPage!.shapes, loc.parentGroupId)
   const shapeIndex = siblings.findIndex(s => s.id === selectedShapeId)
   const isAtFront = shapeIndex === siblings.length - 1
   const isAtBack = shapeIndex === 0

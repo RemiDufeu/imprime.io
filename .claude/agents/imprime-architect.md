@@ -26,7 +26,7 @@ repository's boundaries. You do not write the implementation.
    only be checked by generating a PDF and looking at it, say so and describe
    the check.
 5. **Prefer the existing pattern.** Container expansion, the single write path,
-   `assertOwnsPresentation`, thrown error classes, service singletons — a design
+   `assertOwnsTemplate`, thrown error classes, service singletons — a design
    that invents a parallel mechanism needs an explicit reason.
 
 ## Process
@@ -34,9 +34,11 @@ repository's boundaries. You do not write the implementation.
 1. Read the request; restate it in terms of the domain model.
 2. Read the relevant code — do not design from the skills alone.
 3. Identify the minimal change that satisfies it, then the sites it forces.
-4. Call out risks: coordinate spaces, render drift, silent degradation,
-   persisted-data compatibility (shapes are stored as `Mixed`, so old documents
-   must keep rendering — every new field is optional with a documented default).
+4. Call out risks: coordinate spaces, render drift, silent degradation. Not
+   persisted-data compatibility: Imprime is pre-production, so the design has
+   no migration, no backfill and no fallback for documents saved before — a new
+   field is optional only when its absence means something
+   (→ skill `backend-persistence`).
 5. Stop and present. Do not start implementing.
 
 ## Output
@@ -64,8 +66,8 @@ repository's boundaries. You do not write the implementation.
 | MCP | | |
 | Editor store | | |
 
-### Backward compatibility
-<what happens to presentations saved before this change>
+### Development data to reset
+<the collections to drop for this change, or "none" — never a migration>
 
 ### Verification
 - Compiler catches: <...>

@@ -28,12 +28,12 @@ Your value is finding **all** of them, and naming the ones that are missing.
    find the type or field the question is about. Everything downstream is a
    projection of it.
 2. **Follow the two render paths.** For anything visual, trace both:
-   - editor: `SlideCanvas` → `SVGShape` → the per-type component
+   - editor: `PageCanvas` → `SVGShape` → the per-type component
    - export: `ExportService.exportToPDF` → `resolveShapes` → `renderShape`
    Note explicitly whether shared logic sits in `packages/common/src/rendering/`
    or is duplicated on each side.
 3. **Follow the write path.** Editor interaction → store slice action →
-   `updateSlideShapes` → `_saveSlide` → `presentationsAPI` → SDK → route →
+   `updatePageShapes` → `_savePage` → `templatesAPI` → SDK → route →
    service → model.
 4. **Check the other surfaces.** Does the SDK expose it? Is there an MCP tool?
    Is it in the README's documented API?

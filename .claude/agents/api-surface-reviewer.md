@@ -25,11 +25,11 @@ You report findings; you do not rewrite code.
 
 ### CRITICAL
 
-- **A presentation-scoped route without `requireOwnsPresentation`**, or an MCP
-  tool without `assertOwnsPresentation`. Authentication is not authorization:
+- **A template-scoped route without `requireOwnsTemplate`**, or an MCP
+  tool without `assertOwnsTemplate`. Authentication is not authorization:
   `requireAuth` only proves *someone* is logged in.
 - **An ownership failure reported as 403 or with a distinguishing message.** It
-  must be `NotFoundError` — a third party must not learn the presentation
+  must be `NotFoundError` — a third party must not learn the template
   exists.
 - **An MCP tool that takes an owner or user id as an argument.** Tools close
   over the `ownerId` resolved from the API key at session setup; an

@@ -17,7 +17,7 @@ bundle in production.
 consequences that bite immediately:
 
 - **Every relative import carries a `.js` extension**, even from a `.ts` source:
-  `import { slideService } from '../services/index.js'`. Omit it and the build
+  `import { pageService } from '../services/index.js'`. Omit it and the build
   passes but the runtime throws `ERR_MODULE_NOT_FOUND`. This is the opposite of
   the frontend, which is bundler-resolved and extensionless.
 - No `__dirname`. Use

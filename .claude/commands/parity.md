@@ -38,7 +38,7 @@ If yes, it belongs in `common`, not in one side.
 2. For every CRITICAL or HIGH finding, name the file in `common/rendering/`
    where the logic should live.
 3. Produce the manual comparison — the part that matters:
-   - which presentation to open (or what to build: the shapes and the variables
+   - which template to open (or what to build: the shapes and the variables
      that exercise the change)
    - which variable values to pass
    - what to look at in the editor

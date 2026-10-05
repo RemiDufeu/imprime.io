@@ -1,8 +1,8 @@
-import type { Shape, Slide, VariableData } from '@imprime/sdk'
+import type { Shape, Page, VariableData } from '@imprime/sdk'
 import type { StateCreator } from 'zustand'
 import { message } from 'antd'
-import type { PresentationSlice } from './PresentationSlice'
-import type { SlideSlice } from './SlideSlice'
+import type { TemplateSlice } from './TemplateSlice'
+import type { PageSlice } from './PageSlice'
 import type { SelectionSlice } from './SelectionSlice'
 import type { DocumentWriteSlice } from './DocumentWriteSlice'
 import type { TextEditorSlice } from './TextEditorSlice'
@@ -17,20 +17,20 @@ const MAX_HISTORY = 100
 // colour dragged across the picker, an arrow key held down.
 const MERGE_WINDOW_MS = 500
 
-export interface SlideSnapshot {
-    slide: Slide
+export interface PageSnapshot {
+    page: Page
     index: number
 }
 
 // The state one step restores. Undo and redo swap the live state for the
 // stored one, so the same entry serves both stacks.
 export type HistoryEntry =
-    // A slide's shape tree, and the shape to select again.
-    | { kind: 'shapes'; slideId: string; shapes: Shape[]; selection: string | null }
-    // Whether a slide exists. A snapshot brings it back under the same id, at
+    // A page's shape tree, and the shape to select again.
+    | { kind: 'shapes'; pageId: string; shapes: Shape[]; selection: string | null }
+    // Whether a page exists. A snapshot brings it back under the same id, at
     // the same place, with the same shapes; null removes it.
-    | { kind: 'slide'; slideId: string; snapshot: SlideSnapshot | null }
-    | { kind: 'slide-order'; slideIds: string[] }
+    | { kind: 'page'; pageId: string; snapshot: PageSnapshot | null }
+    | { kind: 'page-order'; pageIds: string[] }
     | { kind: 'title'; title: string }
     // A variable's definition; null removes it. It comes back under the same
     // id, because text runs and containers point to that id.
@@ -57,7 +57,7 @@ export interface HistorySlice {
 type Stack = 'undoStack' | 'redoStack'
 
 export const createHistorySlice: StateCreator<
-    HistorySlice & PresentationSlice & SlideSlice & SelectionSlice & DocumentWriteSlice & TextEditorSlice & VariableSlice,
+    HistorySlice & TemplateSlice & PageSlice & SelectionSlice & DocumentWriteSlice & TextEditorSlice & VariableSlice,
     [],
     [],
     HistorySlice
@@ -69,49 +69,49 @@ export const createHistorySlice: StateCreator<
 
     // Bring the document to the state `entry` describes, and return the entry
     // that brings it back to the state it is in now — or null when `entry` no
-    // longer applies (its slide is gone, or it already holds).
+    // longer applies (its page is gone, or it already holds).
     const apply = async (entry: HistoryEntry): Promise<HistoryEntry | null> => {
-        const { presentation } = get()
-        if (!presentation) return null
+        const { template } = get()
+        if (!template) return null
 
         switch (entry.kind) {
             case 'shapes': {
-                const index = presentation.slides.findIndex(s => s._id === entry.slideId)
+                const index = template.pages.findIndex(s => s._id === entry.pageId)
                 if (index === -1) return null
-                const inverse = { ...entry, shapes: presentation.slides[index].shapes }
-                const { currentSlideIndex, selectSlide, _writeSlideShapes, selectShape } = get()
-                if (index !== currentSlideIndex) selectSlide(index)
-                _writeSlideShapes(entry.slideId, entry.shapes)
+                const inverse = { ...entry, shapes: template.pages[index].shapes }
+                const { currentPageIndex, selectPage, _writePageShapes, selectShape } = get()
+                if (index !== currentPageIndex) selectPage(index)
+                _writePageShapes(entry.pageId, entry.shapes)
                 selectShape(entry.selection)
                 return inverse
             }
-            case 'slide': {
-                const index = presentation.slides.findIndex(s => s._id === entry.slideId)
+            case 'page': {
+                const index = template.pages.findIndex(s => s._id === entry.pageId)
                 const inverse = {
                     ...entry,
-                    snapshot: index === -1 ? null : { slide: presentation.slides[index], index },
+                    snapshot: index === -1 ? null : { page: template.pages[index], index },
                 }
                 if (entry.snapshot) {
                     if (index !== -1) return null
-                    await get()._insertSlide(entry.snapshot.index, entry.snapshot.slide)
+                    await get()._insertPage(entry.snapshot.index, entry.snapshot.page)
                 } else {
                     if (index === -1) return null
-                    await get()._removeSlide(entry.slideId)
+                    await get()._removePage(entry.pageId)
                 }
                 return inverse
             }
-            case 'slide-order': {
-                const inverse: HistoryEntry = { kind: 'slide-order', slideIds: presentation.slides.map(s => s._id) }
-                await get()._applySlideOrder(entry.slideIds)
+            case 'page-order': {
+                const inverse: HistoryEntry = { kind: 'page-order', pageIds: template.pages.map(s => s._id) }
+                await get()._applyPageOrder(entry.pageIds)
                 return inverse
             }
             case 'title': {
-                const inverse: HistoryEntry = { kind: 'title', title: presentation.title }
+                const inverse: HistoryEntry = { kind: 'title', title: template.title }
                 await get()._saveTitle(entry.title)
                 return inverse
             }
             case 'variable': {
-                const current = presentation.variableData?.find(v => v._id === entry.variableId) ?? null
+                const current = template.variableData?.find(v => v._id === entry.variableId) ?? null
                 const inverse = { ...entry, snapshot: current }
                 await get()._restoreVariable(entry.variableId, entry.snapshot)
                 return inverse
@@ -120,7 +120,7 @@ export const createHistorySlice: StateCreator<
     }
 
     // Pop the newest step that still applies off one stack, apply it, and push
-    // its inverse onto the other. A step the server refuses (4xx: a slide id
+    // its inverse onto the other. A step the server refuses (4xx: a page id
     // taken, a variable gone) would be refused again and block every step
     // under it, so it is dropped; any other failure (network, 5xx) puts it
     // back where it was, to be tried again.

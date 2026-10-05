@@ -1,8 +1,9 @@
 # Imprime — repository guide
 
 Imprime turns a visually-designed template into a generated PDF. A user places
-shapes and variables on 1920×1080 slides in a browser editor; a backend renders
-the same slides to PDF, substituting runtime data.
+shapes and variables on pages in a browser editor — A4, 16:9 or a custom size,
+chosen per template — and a backend renders the same pages to PDF, substituting
+runtime data.
 
 That double life — **the same document drawn twice, by two different renderers**
 — is the axis everything else turns around. Read `.claude/skills/render-parity`
@@ -54,7 +55,7 @@ not "green".
 Run `/verify` rather than remembering any of this. Because typecheck is the only
 gate, treat `any`, `as` casts and `@ts-ignore` as holes punched straight through
 the safety net — each one needs a comment saying why (see
-`packages/backend/src/mcp/tools/exportPresentation.ts` for the form: a link to
+`packages/backend/src/mcp/tools/exportTemplate.ts` for the form: a link to
 the upstream issue and a recheck condition).
 
 The export path has no static safety at all — `@react-pdf/renderer` accepts
@@ -63,7 +64,7 @@ generating a PDF, never by typecheck alone.
 
 ## Invariants
 
-1. **Render parity.** A visual feature exists in the editor (`packages/frontend/src/components/slide/svg/`)
+1. **Render parity.** A visual feature exists in the editor (`packages/frontend/src/components/page/svg/`)
    *and* in the export (`packages/backend/src/services/ExportService.ts`). Shared
    geometry, layout and resolution logic belongs in `packages/common/src/rendering/`
    so the two cannot drift. → skill `render-parity`
@@ -78,9 +79,9 @@ generating a PDF, never by typecheck alone.
 4. **Four surfaces expose one domain.** REST routes, the SDK client, the MCP
    tools and the editor store all speak `common/types.ts`. A domain change that
    lands on fewer than four leaves a hole. → skill `api-surfaces`
-5. **Ownership is checked per presentation, and denied as `NotFoundError`.**
-   `assertOwnsPresentation` — never disclose that someone else's presentation
-   exists. Every presentation-scoped route and MCP tool goes through it.
+5. **Ownership is checked per template, and denied as `NotFoundError`.**
+   `assertOwnsTemplate` — never disclose that someone else's template
+   exists. Every template-scoped route and MCP tool goes through it.
    Services trust their caller; the guard is in the middleware, so a new
    non-HTTP entry point must assert it itself. → skill `backend-services`
 6. **Store state is immutable.** Shape-tree helpers in
@@ -94,6 +95,12 @@ generating a PDF, never by typecheck alone.
    from antd's `var(--ant-*)` CSS variables; spacing from the local
    `var(--space-*)` scale in `src/index.css`. Brand changes go in
    `src/config/antd-theme.ts`. → skill `frontend-styling`
+9. **Pre-production: no data migrations.** Imprime is not in production, so
+   nothing stored has to survive a change. Change a schema, a collection, a
+   field or a shape directly and reset the development database — never write
+   or propose a migration script, a startup backfill, or a fallback whose only
+   job is reading data saved before the change. Holds until the user says
+   Imprime is in production. → skill `backend-persistence`
 
 ## Harness
 

@@ -1,6 +1,6 @@
 ---
 description: Diagnose a PDF that is wrong, empty, misplaced or different from the editor, by walking the export pipeline stage by stage.
-argument-hint: "<what is wrong> [presentation id]"
+argument-hint: "<what is wrong> [template id]"
 ---
 
 # Export Debug
@@ -14,7 +14,7 @@ data or resolution, not `@react-pdf/renderer`.
 ```
 1. validateVariables   required + empty → 400 before anything renders
 2. resolveShapes       hidden · if-group condition · for-group items · layout
-3. slide-edge filter   s.y < SLIDE_HEIGHT && s.x < SLIDE_WIDTH
+3. page-edge filter   s.y < pageSize.height && s.x < pageSize.width
 4. fetchImageData      missing image → red placeholder, logged not thrown
 5. renderShape         per type; containers never arrive here
 6. renderToBuffer      30s race → 408
@@ -24,7 +24,7 @@ data or resolution, not `@react-pdf/renderer`.
 
 Gather:
 
-- the presentation id, and the exact `variableValues` used;
+- the template id, and the exact `variableValues` used;
 - whether the editor shows it correctly (if both are wrong, it is not a parity
   problem — it is the data or the authored template);
 - the HTTP status and `X-Generation-Time` header.
@@ -44,7 +44,7 @@ speculating down the pipeline.
 |---|---|
 | Section missing entirely | `if-group` condition not strictly `true`, or unknown variable `_id` → `resolveVariable` returns `undefined` silently |
 | Repeat renders once or zero times | `itemsVariable` is not a non-empty array |
-| Content off-slide | `expandForGroup` bbox origin, or the stage-3 filter |
+| Content off-page | `expandForGroup` bbox origin, or the stage-3 filter |
 | Colour flat, shape invisible | `parseColor` — alpha must be split out |
 | Wrong font, no bold | family not in the catalog (`BUILTIN_FONTS`, the instance's imported fonts) / no file for that face |
 | Text wraps differently | expected: browser vs react-pdf metrics |
