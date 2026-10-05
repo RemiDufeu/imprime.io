@@ -78,6 +78,12 @@ Imprime is currently under active development. Here are the main planned updates
 - *image variable
 - condition on slide (if and for)
 
+## Layout
+- Margin
+- Improve flex systeme (child flex 1)
+- rethink the layout part
+- guide lines
+
 ## Editor usability
 - Multiple block selection and grouped operations
 
