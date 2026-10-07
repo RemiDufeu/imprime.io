@@ -1,23 +1,22 @@
 import { ImageModel } from '../models/Image.js'
 import { PageModel } from '../models/Page.js'
 import { isObjectIdString } from '../models/mappers.js'
-import { IMAGE_MIME_TYPES, type ImageDTO, type ImageMimeType } from '@imprime/common'
+import {
+  readImageInfo,
+  readImageSize,
+  sniffImageType,
+  splitDataUrl,
+  toImageDataUrl,
+  type ImageDTO,
+  type ImageMimeType,
+  type ImageSize,
+} from '@imprime/common'
 import { AppError, NotFoundError, ValidationError } from './errors.js'
 
 // How much image data one user may keep, orphans included until they expire
 // (ORPHAN_GRACE_SECONDS). One upload is capped by the JSON body limit.
 const MAX_IMAGE_BYTES_PER_OWNER = 500 * 1024 * 1024
 
-// The bytes each accepted format starts with. Keyed by every type the API
-// takes, so a format added to IMAGE_MIME_TYPES cannot be accepted unchecked.
-const IMAGE_SIGNATURES: Record<ImageMimeType, readonly number[]> = {
-  'image/png': [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
-  'image/jpeg': [0xff, 0xd8, 0xff],
-}
-
-// `data:image/png;base64,` before the data — what the editor sends. The SDK
-// sends bare base64. Both are stored as sent: the export reads either.
-const DATA_URL_PREFIX = /^data:([^;,]*)[^,]*;base64,/i
 const BASE64 = /^[A-Za-z0-9+/]+={0,2}$/
 
 const imageNotFound = () => new NotFoundError('Image not found', 'IMAGE_NOT_FOUND')
@@ -28,11 +27,7 @@ function normalizeMimeType(value: string): string {
   return type === 'image/jpg' ? 'image/jpeg' : type
 }
 
-function sniffImageType(head: Buffer): ImageMimeType | undefined {
-  return IMAGE_MIME_TYPES.find(type => IMAGE_SIGNATURES[type].every((byte, i) => head[i] === byte))
-}
-
-interface UploadedImage {
+interface UploadedImage extends ImageSize {
   mimeType: ImageMimeType
   size: number
 }
@@ -41,31 +36,60 @@ interface UploadedImage {
  * Reads the format from the bytes rather than trusting the declared type, so
  * an image accepted here is one the export draws as the editor shows it (see
  * IMAGE_MIME_TYPES). The declared type, and a data URL's, must agree with it.
+ * `data` is a data URL — what the editor sends — or bare base64 — what the SDK
+ * sends. Both are stored as sent: the export reads either.
  */
 function parseImage(upload: ImageDTO.Create | undefined): UploadedImage {
   if (!upload || typeof upload.data !== 'string' || !upload.data || typeof upload.mimeType !== 'string') {
     throw new ValidationError('Missing required fields: data, mimeType')
   }
 
-  const prefix = DATA_URL_PREFIX.exec(upload.data)
+  const dataUrl = splitDataUrl(upload.data)
   // Base64 is often wrapped over several lines; the export strips them too.
-  const base64 = (prefix ? upload.data.slice(prefix[0].length) : upload.data).replace(/\s/g, '')
+  const base64 = dataUrl ? dataUrl.base64 : upload.data.replace(/\s/g, '')
   if (!BASE64.test(base64)) {
     throw new ValidationError('Image data must be base64, or a base64 data URL', 'IMAGE_DATA_INVALID')
   }
 
-  // The longest signature is 8 bytes: 12 base64 characters decode to 9.
-  const mimeType = sniffImageType(Buffer.from(base64.slice(0, 12), 'base64'))
+  const bytes = Buffer.from(base64, 'base64')
+  const mimeType = sniffImageType(bytes)
   if (!mimeType) {
     throw new ValidationError('Only PNG and JPEG images are supported', 'IMAGE_TYPE_UNSUPPORTED')
   }
-  for (const declared of [upload.mimeType, prefix?.[1]]) {
+  for (const declared of [upload.mimeType, dataUrl?.mimeType]) {
     if (declared !== undefined && normalizeMimeType(declared) !== mimeType) {
       throw new ValidationError(`The image is ${mimeType}, not "${declared}"`, 'IMAGE_TYPE_MISMATCH')
     }
   }
 
-  return { mimeType, size: Buffer.byteLength(base64, 'base64') }
+  // Both renderers lay the image out from this size (getImageLayout): one
+  // that cannot be read is refused rather than stored with a guess.
+  const pixels = readImageSize(bytes, mimeType)
+  if (!pixels) {
+    throw new ValidationError('The image size cannot be read: the file is damaged', 'IMAGE_SIZE_UNREADABLE')
+  }
+
+  return { mimeType, size: bytes.length, ...pixels }
+}
+
+// An image held as a data URL — an image variable's value — as it is drawn.
+export interface DataUrlImage extends ImageSize {
+  dataUrl: string
+}
+
+/**
+ * `value` as an image the export can draw: a data URL of a PNG or JPEG whose
+ * size can be read. Undefined for anything else. The bytes decide the type:
+ * the URL is rewritten with theirs, since react-pdf decodes by the declared
+ * one — and the editor rewrites it the same way (frontend `readImageDataUrl`),
+ * so both draw the same thing from a URL that declares the wrong type.
+ */
+export function readImageDataUrl(value: string): DataUrlImage | undefined {
+  const dataUrl = splitDataUrl(value)
+  if (!dataUrl || !BASE64.test(dataUrl.base64)) return undefined
+  const info = readImageInfo(Buffer.from(dataUrl.base64, 'base64'))
+  if (!info) return undefined
+  return { dataUrl: toImageDataUrl(dataUrl.base64, info.mimeType), width: info.width, height: info.height }
 }
 
 /**
@@ -75,7 +99,7 @@ function parseImage(upload: ImageDTO.Create | undefined): UploadedImage {
  */
 export class ImageService {
   public async upload(data: ImageDTO.Create, ownerId: string): Promise<ImageDTO.Response> {
-    const { mimeType, size } = parseImage(data)
+    const { mimeType, size, width, height } = parseImage(data)
     if (await this.storedBytes(ownerId) + size > MAX_IMAGE_BYTES_PER_OWNER) {
       throw new AppError(
         `Image storage is full (${MAX_IMAGE_BYTES_PER_OWNER / 1024 / 1024} MB): remove images from your pages, or delete templates`,
@@ -90,6 +114,8 @@ export class ImageService {
       mimeType,
       originalName: typeof data.originalName === 'string' ? data.originalName : undefined,
       size,
+      width,
+      height,
     })
 
     await image.save()
@@ -99,6 +125,8 @@ export class ImageService {
       mimeType: image.mimeType,
       originalName: image.originalName,
       size: image.size,
+      width: image.width,
+      height: image.height,
       createdAt: image.createdAt,
     }
   }
@@ -115,6 +143,8 @@ export class ImageService {
       mimeType: image.mimeType,
       originalName: image.originalName,
       size: image.size,
+      width: image.width,
+      height: image.height,
       createdAt: image.createdAt,
     }
   }

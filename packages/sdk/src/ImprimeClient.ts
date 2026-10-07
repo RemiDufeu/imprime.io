@@ -25,7 +25,11 @@ import type {
   SsoSettingsDTO,
   SsoProvider,
   AccessSettingsDTO,
+  ImageFit,
+  ImageAlign,
+  ImageCrop,
 } from '@imprime/common'
+import { DEFAULT_IMAGE_ALIGN, DEFAULT_IMAGE_FIT } from '@imprime/common'
 
 export interface ImprimeClientOptions {
   baseUrl?: string
@@ -405,22 +409,32 @@ export class ImprimeClient {
   }
 
   /**
-   * Add an image to a page
+   * Add an image box to a page
    * @param templateId - Template ID
    * @param pageId - Page ID
-   * @param options - Image options
-   * @returns Updated template
+   * @param options - Image box options. The box shows the uploaded image
+   *   `imageId`, or the value of the image variable `imageVariable` at export
+   *   (`itemPath`: a field of the item an enclosing for-group iterates);
+   *   without either it is empty. `fit` defaults to 'contain' and `align` to
+   *   centred; `crop` is in fractions (0 to 1) of the image's natural size.
    */
   async addImage(
     templateId: string,
     pageId: string,
     options: {
-      imageId: string
+      imageId?: string
+      imageVariable?: string
+      itemPath?: string
       x: number
       y: number
       width: number
       height: number
       alt?: string
+      fit?: ImageFit
+      align?: ImageAlign
+      crop?: ImageCrop
+      opacity?: number
+      cornerRadius?: number
     }
   ): Promise<void> {
     const shape: ImageShape = {
@@ -431,7 +445,14 @@ export class ImprimeClient {
       width: options.width,
       height: options.height,
       imageId: options.imageId,
+      imageVariable: options.imageVariable,
+      itemPath: options.itemPath,
       alt: options.alt,
+      fit: options.fit ?? DEFAULT_IMAGE_FIT,
+      align: options.align ?? DEFAULT_IMAGE_ALIGN,
+      crop: options.crop,
+      opacity: options.opacity,
+      cornerRadius: options.cornerRadius,
     }
     return this.addShape(templateId, pageId, shape)
   }
@@ -638,7 +659,8 @@ export class ImprimeClient {
 
   /**
    * Export template to PDF
-   * @param variableValues - Optional record of variable ID to value mappings
+   * @param variableValues - Optional record of variable name to value; an
+   *   image variable (or image field of a list item) takes a PNG or JPEG data URL
    * @returns PDF blob URL that can be used for download
    */
   async exportToPDF(templateId: string, variableValues?: Record<string, VariableValueType>): Promise<Blob> {

@@ -54,13 +54,8 @@ export function PageCanvas({
         const coords = getSVGCoordinates(e.clientX, e.clientY)
         if (!coords) return
 
-        // If shape/text/group tool is selected, start drawing
-        if (selectedTool === 'rectangle' ||
-            selectedTool === 'ellipse' ||
-            selectedTool === 'text' ||
-            selectedTool === 'group' ||
-            selectedTool === 'if-group' ||
-            selectedTool === 'for-group') {
+        // Every tool but 'move' draws its shape (ToolSlice.drawnShape).
+        if (selectedTool !== 'move') {
             startDrawing(coords.x, coords.y)
         } else if (clickedOnEmpty) {
             // Deselect shapes only if clicked on empty area

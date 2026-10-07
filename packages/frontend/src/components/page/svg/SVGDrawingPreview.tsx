@@ -1,6 +1,7 @@
 import { getDashArray } from '@imprime/sdk'
 import { useEditorStore } from '../../../store/editor/EditorStore'
 import { ContainerFrame } from './ContainerFrame'
+import { ImagePlaceholder } from './ImagePlaceholder'
 
 export function SVGDrawingPreview() {
     const drawingData = useEditorStore(state => state.drawingData)
@@ -76,6 +77,9 @@ export function SVGDrawingPreview() {
                     pointerEvents="none"
                 />
             )
+
+        case 'image':
+            return <ImagePlaceholder status="empty" x={x} y={y} width={width} height={height} />
 
         case 'group':
         case 'if-group':

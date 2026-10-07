@@ -37,7 +37,7 @@ export const selectSelectedShape = (s: SelectionState): Shape | null => {
         : null
 }
 
-export type ContextBarType = 'none' | 'shape' | 'text' | 'group' | 'if-group' | 'for-group'
+export type ContextBarType = 'none' | 'shape' | 'text' | 'image' | 'group' | 'if-group' | 'for-group'
 
 function contextBarFor(type: Shape['type'] | ToolType): ContextBarType {
     switch (type) {
@@ -45,6 +45,7 @@ function contextBarFor(type: Shape['type'] | ToolType): ContextBarType {
         case 'ellipse':
             return 'shape'
         case 'text':
+        case 'image':
         case 'group':
         case 'if-group':
         case 'for-group':

@@ -1,4 +1,5 @@
 import type { Shape } from '@imprime/sdk'
+import { DEFAULT_IMAGE_ALIGN, DEFAULT_IMAGE_FIT } from '@imprime/sdk'
 import type { StateCreator } from 'zustand'
 import type { TemplateSlice } from './TemplateSlice'
 import type { PageSlice } from './PageSlice'
@@ -7,7 +8,7 @@ import type { SelectionSlice } from './SelectionSlice'
 import { findInnermostGroupAt, insertShape, nextShapeName } from '../../utils/shapeTree'
 import { selectCurrentPage } from './selectors'
 
-export type ToolType = 'move' | 'rectangle' | 'ellipse' | 'text' | 'group' | 'if-group' | 'for-group'
+export type ToolType = 'move' | 'rectangle' | 'ellipse' | 'text' | 'image' | 'group' | 'if-group' | 'for-group'
 
 export type StrokeStyle = 'solid' | 'dashed' | 'dotted'
 
@@ -64,6 +65,9 @@ export const createToolSlice: StateCreator<
         switch (tool) {
             case 'text':
                 return { ...base, type: 'text', paragraphes: [{ type: 'paragraph', children: [{ text: '' }] }] }
+            // Empty: its image is imported from the image bar once it exists.
+            case 'image':
+                return { ...base, type: 'image', fit: DEFAULT_IMAGE_FIT, align: DEFAULT_IMAGE_ALIGN }
             case 'group':
             case 'if-group':
             case 'for-group':

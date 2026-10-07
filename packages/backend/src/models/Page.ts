@@ -1,6 +1,6 @@
 import { Schema, model, Types, HydratedDocument } from 'mongoose'
 import type { Shape } from '@imprime/common'
-import { isContainerShape } from '@imprime/common'
+import { collectImageIds } from '@imprime/common'
 
 // `shapes` is stored as Mixed — Mongoose can't validate the discriminated
 export interface IPage {
@@ -14,19 +14,6 @@ export interface IPage {
   imageIds: string[]
   createdAt?: Date
   updatedAt?: Date
-}
-
-// Every image a shape tree shows, containers included.
-export function collectImageIds(shapes: Shape[]): string[] {
-  const ids: string[] = []
-  for (const shape of shapes) {
-    if (shape.type === 'image') {
-      if (shape.imageId) ids.push(shape.imageId)
-    } else if (isContainerShape(shape)) {
-      ids.push(...collectImageIds(shape.children))
-    }
-  }
-  return ids
 }
 
 const PageSchema = new Schema<IPage>({

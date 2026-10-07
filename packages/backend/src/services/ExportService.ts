@@ -16,6 +16,7 @@ import type {
   ListMarker,
   TextFormatting,
   VariableValueType,
+  VariableItemField,
   ResolveContext,
   FontCatalog
 } from '@imprime/common'
@@ -27,6 +28,10 @@ import {
   stringifyVariableValue,
   getEllipseGeometry,
   getRectangleCornerRadius,
+  getImageLayout,
+  getImageCornerRadius,
+  getImageOpacity,
+  toImageDataUrl,
   getParagraphStyle,
   getRunTextStyle,
   resolveFontFace,
@@ -39,7 +44,7 @@ import {
   getBulletBox,
   PARAGRAPH_SPACING
 } from '@imprime/common'
-import type { ImageService } from './ImageService.js'
+import { readImageDataUrl, type ImageService } from './ImageService.js'
 import type { FontService } from './FontService.js'
 import { AppError, ValidationError } from './errors.js'
 import { isImportedFontRegistered, registerBuiltinFonts, registerImportedFonts } from '../config/fonts.js'
@@ -51,10 +56,19 @@ export interface RenderOptions {
   variableValues?: Record<string, VariableValueType>
 }
 
-// What one export fetched before drawing: image data URLs by image id, and the
+// An image as the export draws it: its data URL, and the natural size that
+// lays it out in its box.
+interface ImageAsset {
+  dataUrl: string
+  width: number
+  height: number
+}
+
+// What one export fetched before drawing: images — by image id for an
+// uploaded one, by the data URL itself for an image variable's value — and the
 // fonts its runs can resolve to.
 interface RenderAssets {
-  images: Map<string, string>
+  images: Map<string, ImageAsset>
   fonts: FontCatalog
 }
 
@@ -89,7 +103,20 @@ export class ExportService {
     }
   }
 
-  private validateVariables(template: Template, variableValues: Record<string, VariableValueType>): void {
+  /**
+   * Required variables must have a value, and every image a value holds — an
+   * image variable's, or an image field's of a list's items, nested lists
+   * included — must be one the export can draw. The error names the value, as
+   * the caller wrote it: `photos[2].file`. An empty one is left to the
+   * variable's default, or to an empty box.
+   *
+   * Returns the images read, by value: the resolved boxes hold the same
+   * strings (`resolvedImage`), so they are not read twice.
+   */
+  private validateVariables(
+    template: Template,
+    variableValues: Record<string, VariableValueType>
+  ): Map<string, ImageAsset> {
     const requiredVariables = template.variableData?.filter(v => v.required) || []
 
     for (const variable of requiredVariables) {
@@ -97,21 +124,75 @@ export class ExportService {
         throw new ValidationError(`Required variable "${variable.name}" is missing`)
       }
     }
+
+    const images = new Map<string, ImageAsset>()
+    const checkImage = (value: unknown, label: string) => {
+      if (value === undefined || value === null || (typeof value === 'string' && value.trim() === '')) return
+      if (typeof value === 'string' && images.has(value)) return
+      const image = typeof value === 'string' ? readImageDataUrl(value) : undefined
+      if (!image || typeof value !== 'string') {
+        throw new ValidationError(`Variable "${label}" is not a PNG or JPEG data URL`, 'INVALID_IMAGE_VALUE')
+      }
+      images.set(value, image)
+    }
+    const checkItems = (items: unknown, fields: VariableItemField[] | undefined, label: string) => {
+      if (!Array.isArray(items)) return
+      items.forEach((item: unknown, index) => {
+        if (item === null || typeof item !== 'object') return
+        for (const field of fields ?? []) {
+          // Own properties only: a field named like an Object.prototype member
+          // must not read the prototype's.
+          const value: unknown = Object.hasOwn(item, field.name) ? Reflect.get(item, field.name) : undefined
+          const path = `${label}[${index}].${field.name}`
+          if (field.type === 'image') checkImage(value, path)
+          else if (field.type === 'object-list') checkItems(value, field.itemFields, path)
+        }
+      })
+    }
+    for (const variable of template.variableData ?? []) {
+      const value = variableValues[variable.name]
+      if (variable.type === 'image') checkImage(value, variable.name)
+      else if (variable.type === 'object-list') checkItems(value, variable.itemFields, variable.name)
+    }
+    return images
   }
 
-  // Only `ownerId`'s images: a shape's image id is anyone's to write, and an
-  // export must not draw someone else's. One not found is left out.
-  private async fetchImageData(resolvedPages: Page[], ownerId: string): Promise<Map<string, string>> {
+  /**
+   * Every image the resolved boxes draw, `variableImages` (already read by
+   * `validateVariables`) included. An image variable's value that was not
+   * checked there — a default, or a string variable bound to a box through
+   * the API — is read now, and fails the export the same way.
+   *
+   * Only `ownerId`'s uploaded images: a shape's image id is anyone's to write,
+   * and an export must not draw someone else's. One not found is left out.
+   */
+  private async fetchImageData(
+    resolvedPages: Page[],
+    ownerId: string,
+    variableImages: Map<string, ImageAsset>
+  ): Promise<Map<string, ImageAsset>> {
     const imageIds = new Set<string>()
+    const imageDataMap = new Map(variableImages)
 
     for (const page of resolvedPages) {
       for (const shape of page.shapes) {
-        if (shape.type === 'image') {
+        if (shape.type !== 'image') continue
+        const value = shape.resolvedImage
+        if (value !== undefined) {
+          if (imageDataMap.has(value)) continue
+          const image = readImageDataUrl(value)
+          if (!image) {
+            throw new ValidationError(
+              'An image variable holds something that is not a PNG or JPEG data URL',
+              'INVALID_IMAGE_VALUE'
+            )
+          }
+          imageDataMap.set(value, image)
+        } else if (shape.imageId) {
           imageIds.add(shape.imageId)
         }
       }
     }
-    const imageDataMap = new Map<string, string>()
 
     if (imageIds.size === 0) {
       return imageDataMap
@@ -120,15 +201,8 @@ export class ExportService {
     const imagePromises = Array.from(imageIds).map(async (imageId) => {
       try {
         const image = await this.imageService.getById(imageId, ownerId)
-        let cleanData = image.data.replace(/[\s\n\r]/g, '')
-        let dataUrl: string
-        if (cleanData.startsWith('data:')) {
-          dataUrl = cleanData
-        } else {
-          dataUrl = `data:${image.mimeType};base64,${cleanData}`
-        }
-
-        return { imageId, dataUrl }
+        const dataUrl = toImageDataUrl(image.data, image.mimeType)
+        return { imageId, asset: { dataUrl, width: image.width, height: image.height } }
       } catch (error) {
         console.error(`Error fetching image ${imageId}:`, error)
         return null
@@ -139,7 +213,7 @@ export class ExportService {
 
     for (const result of results) {
       if (result) {
-        imageDataMap.set(result.imageId, result.dataUrl)
+        imageDataMap.set(result.imageId, result.asset)
       }
     }
 
@@ -385,11 +459,21 @@ export class ExportService {
     }, paragraphElements))
   }
 
-  private renderImage(shape: ImageShape, imageDataMap: Map<string, string>): React.ReactElement {
+  /**
+   * The whole image, stretched to the rect `getImageLayout` gives, inside a
+   * View the size of the box that clips it — react-pdf clips the children of
+   * an `overflow: hidden` View, rounded by its `borderRadius`. The border is
+   * drawn on top, as a rectangle's. An empty box draws its border only.
+   */
+  private renderImage(shape: ImageShape, pageSize: PageSize, images: Map<string, ImageAsset>): React.ReactElement {
     const { x, y, width, height, imageId } = shape
-    const imageData = imageDataMap.get(imageId)
+    const border = this.renderImageBorder(shape, pageSize)
+    // A bound box draws what its variable resolved to, and nothing else.
+    const source = shape.imageVariable ? shape.resolvedImage : imageId
+    if (!source) return border ?? React.createElement(View, { key: shape.id })
 
-    if (!imageData) {
+    const image = images.get(source)
+    if (!image) {
       console.error(`Image data not found for imageId: ${imageId}`)
 
       return React.createElement(View, {
@@ -412,18 +496,60 @@ export class ExportService {
       )
     }
 
-    return React.createElement(Image, {
-      key: shape.id,
-      src: imageData,
+    const layout = getImageLayout(shape, image)
+    // `fixed`, as a text box's: the image may overflow the page, and an
+    // absolutely positioned box must not be reflowed onto a next page.
+    const picture = React.createElement(View, {
+      key: border ? 'image' : shape.id,
+      fixed: true,
       style: {
         position: 'absolute',
         left: x,
         top: y,
         width,
         height,
-        objectFit: 'fill'
+        overflow: 'hidden',
+        borderRadius: getImageCornerRadius(shape),
       }
-    })
+    }, React.createElement(Image, {
+      fixed: true,
+      src: image.dataUrl,
+      style: {
+        position: 'absolute',
+        left: layout.x - x,
+        top: layout.y - y,
+        width: layout.width,
+        height: layout.height,
+        objectFit: 'fill',
+        opacity: getImageOpacity(shape),
+      }
+    }))
+
+    return border ? React.createElement(React.Fragment, { key: shape.id }, picture, border) : picture
+  }
+
+  // The box's border, as a rectangle's: centred on the box's edge, its
+  // corners rounded as the image is clipped. None without a width or colour.
+  private renderImageBorder(shape: ImageShape, pageSize: PageSize): React.ReactElement | null {
+    const stroke = this.parseColor(shape.stroke, 'none')
+    if (!shape.strokeWidth || stroke.color === 'none') return null
+    const cornerRadius = getImageCornerRadius(shape)
+
+    return this.renderInSvgLayer(shape, pageSize, ({ left, top }) =>
+      React.createElement(Rect, {
+        x: shape.x - left,
+        y: shape.y - top,
+        width: shape.width,
+        height: shape.height,
+        fill: 'none',
+        rx: cornerRadius,
+        ry: cornerRadius,
+        stroke: stroke.color,
+        strokeOpacity: stroke.opacity,
+        strokeWidth: shape.strokeWidth,
+        strokeDasharray: getDashArray(shape.strokeStyle)
+      })
+    )
   }
 
   // Containers never reach this point: resolveShapes has already flattened the
@@ -442,7 +568,7 @@ export class ExportService {
       case 'text':
         return this.renderTextBox(shape, ctx, assets.fonts)
       case 'image':
-        return this.renderImage(shape, assets.images)
+        return this.renderImage(shape, pageSize, assets.images)
       default:
         return React.createElement(View, {})
     }
@@ -473,7 +599,7 @@ export class ExportService {
   public async exportToPDF(template: Template, ownerId: string, options: RenderOptions = {}): Promise<Buffer> {
     const variableValues = options.variableValues || {}
 
-    this.validateVariables(template, variableValues)
+    const variableImages = this.validateVariables(template, variableValues)
 
     const ctx: ResolveContext = { variableValues, template }
     const { pageSize } = template
@@ -484,7 +610,7 @@ export class ExportService {
     }))
 
     const [images, fonts] = await Promise.all([
-      this.fetchImageData(resolvedPages, ownerId),
+      this.fetchImageData(resolvedPages, ownerId, variableImages),
       this.loadFonts(resolvedPages),
     ])
     const assets: RenderAssets = { images, fonts }

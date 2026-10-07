@@ -21,7 +21,7 @@ exportToPDF(template, ownerId, { variableValues })
   validateVariables          required variables must be non-empty (no default fallback)
   resolveShapes per page    containers flattened → absolute leaves
   filter                     drop shapes whose x or y is past the page edge
-  fetchImageData             one batched pass, imageId → data URL, ownerId's images only
+  fetchImageData             one batched pass, imageId → data URL + natural size, ownerId's images only
   renderPage per page      Page (template.pageSize) + one element per shape
   acquireRenderSlot          4 renders at once, 2 per owner → AppError(429 EXPORT_BUSY)
   renderToBuffer             raced against a 30s timeout → AppError(408)

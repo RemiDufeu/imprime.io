@@ -16,7 +16,7 @@ interface ItemListInputProps {
 
 function describeFields(fields: VariableItemField[] | undefined): string {
   if (!fields || fields.length === 0) return 'No fields declared yet'
-  return fields.map(f => `${f.name}: ${f.type}`).join(', ')
+  return fields.map(f => `${f.name}: ${f.type === 'image' ? 'image data URL' : f.type}`).join(', ')
 }
 
 /**

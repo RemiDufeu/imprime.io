@@ -8,7 +8,7 @@ import "./EditorHeader.css";
 import { useEditorStore } from "../../store/editor/EditorStore";
 import { MOD_LABEL } from "../../utils/hotkeys";
 import { selectCanRedo, selectCanUndo } from "../../store/editor/selectors";
-import { ItemListInput } from "../../components/common";
+import { ImageValueInput, ItemListInput } from "../../components/common";
 import { DropdownVariablesContent } from "../EditorPage/components/PageEditor/TopBar/Context-toolbar/DropdownVariablesContent/DropdownVariablesContent";
 import { VariableFormModal } from "../EditorPage/components/PageEditor/TopBar/Context-toolbar/DropdownVariablesContent/VariableFormModal";
 
@@ -175,15 +175,25 @@ export default function EditorHeader() {
             layout="vertical"
         >
             {template?.variableData?.map(variable => {
-                const defaultHint = variable.default !== undefined && variable.default !== null
-                    ? `Default: ${Array.isArray(variable.default) ? `${variable.default.length} items` : String(variable.default)}`
-                    : 'None';
+                let defaultHint = 'None';
+                if (variable.default !== undefined && variable.default !== null) {
+                    // An image's default is a data URL, far too long to print.
+                    if (variable.type === 'image') defaultHint = 'Default: an image';
+                    else if (Array.isArray(variable.default)) defaultHint = `Default: ${variable.default.length} items`;
+                    else defaultHint = `Default: ${String(variable.default)}`;
+                }
 
                 let input: React.ReactNode;
                 let valuePropName: string | undefined;
                 if (variable.type === 'boolean') {
                     input = <Switch />;
                     valuePropName = 'checked';
+                } else if (variable.type === 'image') {
+                    input = (
+                        <ImageValueInput
+                            vectorSize={template ? Math.max(template.pageSize.width, template.pageSize.height) : undefined}
+                        />
+                    );
                 } else if (variable.type === 'object-list') {
                     input = <ItemListInput itemFields={variable.itemFields} />;
                 } else {

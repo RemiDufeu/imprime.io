@@ -9,6 +9,9 @@ export interface ImageDocument extends Document {
   mimeType: string // image/jpeg, image/png, etc.
   originalName?: string
   size: number // size in bytes
+  // Natural size in pixels, EXIF orientation applied (see ImageService).
+  width: number
+  height: number
   // Set while no page shows the image; see ORPHAN_GRACE_SECONDS.
   orphanedAt?: Date
   createdAt: Date
@@ -21,6 +24,8 @@ const ImageSchema = new Schema({
   mimeType: { type: String, required: true, default: 'image/jpeg' },
   originalName: { type: String },
   size: { type: Number, required: true },
+  width: { type: Number, required: true },
+  height: { type: Number, required: true },
   orphanedAt: { type: Date },
 }, { timestamps: true })
 

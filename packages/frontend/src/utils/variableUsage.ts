@@ -3,7 +3,7 @@ import { isContainerShape } from './shapeTree'
 
 // How a shape consumes a variable. Each kind has its own tolerance for the type
 // it lands on, which is what `referenceTargetType` below is compared against.
-export type VariableReferenceKind = 'text' | 'condition' | 'items'
+export type VariableReferenceKind = 'text' | 'image' | 'condition' | 'items'
 
 export interface VariableReference {
   kind: VariableReferenceKind
@@ -28,6 +28,10 @@ function collectFromShapes(shapes: Shape[], variableId: string, out: VariableRef
       collectFromParagraphs(shape.paragraphes, variableId, out)
       continue
     }
+    if (shape.type === 'image') {
+      if (shape.imageVariable === variableId) out.push({ kind: 'image', itemPath: shape.itemPath ?? '' })
+      continue
+    }
     if (shape.type === 'if-group' && shape.conditionVariable === variableId) {
       out.push({ kind: 'condition', itemPath: shape.itemPath ?? '' })
     }
@@ -41,9 +45,9 @@ function collectFromShapes(shapes: Shape[], variableId: string, out: VariableRef
 }
 
 /**
- * Every place in the template that points at a variable — text runs,
- * if-group conditions and for-group sources — including the ones nested inside
- * containers.
+ * Every place in the template that points at a variable — text runs, image
+ * boxes, if-group conditions and for-group sources — including the ones nested
+ * inside containers.
  *
  * This is the editor's own view, used to tell the author what an edit is about
  * to break. It is not the backend's deletion guard, which is narrower.
@@ -60,6 +64,7 @@ export function findVariableReferences(pages: Page[], variableId: string): Varia
 // absent: `stringifyVariableValue` prints whatever it is given, so only a path
 // that no longer resolves breaks it.
 const REQUIRED_TYPE: Partial<Record<VariableReferenceKind, VariableType>> = {
+  image: 'image',
   condition: 'boolean',
   items: 'object-list',
 }
@@ -72,5 +77,6 @@ export function describeReference(reference: VariableReference, variableName: st
   const target = reference.itemPath === '' ? variableName : `${variableName}.${reference.itemPath}`
   if (reference.kind === 'condition') return `if ${target}`
   if (reference.kind === 'items') return `for each ${target}`
+  if (reference.kind === 'image') return `image ${target}`
   return `text ${target}`
 }

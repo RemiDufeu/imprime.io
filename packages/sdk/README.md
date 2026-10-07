@@ -175,6 +175,50 @@ Second paragraph',
 })
 ```
 
+#### `addImage(templateId, pageId, options)`
+Add an image box to a page. The image (see `uploadImage`) is drawn inside the
+box and clipped to it, whatever the box's proportions; without `imageId` the
+box is empty and draws nothing but its border.
+
+```typescript
+const image = await client.uploadImage(base64Png, 'image/png', 'logo.png')
+
+await client.addImage('674abc123def456', 'page-123', {
+  imageId: image._id,      // optional: omit for an empty box
+  x: 50,
+  y: 50,
+  width: 300,
+  height: 200,
+  fit: 'cover',            // optional: 'fill' | 'contain' | 'cover', default: 'contain'
+  align: { horizontal: 'left', vertical: 'top' }, // optional, where the image sits when it does not match the box; default: centred
+  crop: { x: 0.25, y: 0, width: 0.5, height: 1 }, // optional, the part shown, in fractions of the image's size; default: all of it
+  opacity: 0.8,            // optional, 0 to 1, default: 1
+  cornerRadius: 12,        // optional, at most half the box's shorter side, default: 0
+  alt: 'Company logo'      // optional
+})
+```
+
+A border is set like any shape's, with `updateShape` (`stroke`, `strokeWidth`,
+`strokeStyle`).
+
+Instead of `imageId`, a box can show an **image variable**, resolved at
+export: `imageVariable` is the variable's `_id`, and `itemPath` a field of the
+item an enclosing for-group iterates (`'photo'`, or `'photos.file'` in a nested
+one). The variable's value — and its `default`, used when an export gives
+none — is a PNG or JPEG data URL; an `object-list` declares image fields with
+`{ name: 'photo', type: 'image' }` in its `itemFields`.
+
+```typescript
+await client.addImage('674abc123def456', 'page-123', {
+  imageVariable: logoVariable._id,
+  x: 50, y: 50, width: 300, height: 200,
+})
+
+await client.exportToPDF('674abc123def456', {
+  logo: 'data:image/png;base64,iVBORw0KGgo…',
+})
+```
+
 #### `updateShape(templateId, pageId, shapeId, updates)`
 Update a shape's properties.
 
@@ -377,10 +421,20 @@ Limits worth handling:
 - **Images are PNG or JPEG**, the formats the PDF export draws. The format
   is read from the data, not from `mimeType`: `uploadImage` fails with
   `400 IMAGE_TYPE_UNSUPPORTED` for any other format, `400 IMAGE_TYPE_MISMATCH`
-  when `mimeType` (or the data URL's type) names another one, and
-  `400 IMAGE_DATA_INVALID` when `data` is not base64.
+  when `mimeType` (or the data URL's type) names another one,
+  `400 IMAGE_DATA_INVALID` when `data` is not base64, and
+  `400 IMAGE_SIZE_UNREADABLE` when the file is damaged and its pixel size
+  cannot be read. That size (`width`, `height`, EXIF orientation applied)
+  comes back with the image: it is what `fit`, `align` and `crop` lay it out
+  from.
 - **Exports run a few at a time**: 4 on the server, 2 per user. Beyond, an
   export fails with `429 EXPORT_BUSY`: retry after a short wait.
+- **Image variables take PNG or JPEG data URLs**, nothing else (no URL, no
+  image id). An export fails with `400 INVALID_IMAGE_VALUE`, naming the value
+  (`albums[0].photos[1].file`), when one is not; an empty value falls back to
+  the variable's default. The request body, images included, is capped at
+  10 MB. An image variable's `default` is checked when it is saved:
+  `400 INVALID_VARIABLE_DEFAULT`.
 
 ## TypeScript Support
 

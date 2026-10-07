@@ -21,6 +21,7 @@ const TOOLS: Array<{
   { type: 'rectangle', label: 'Add rectangle', icon: <PlusSquareOutlined /> },
   { type: 'ellipse', label: 'Add ellipse', icon: <PlusCircleOutlined /> },
   { type: 'text', label: 'Add text box', icon: <FontSizeOutlined /> },
+  { type: 'image', label: 'Add image box', icon: <PictureOutlined /> },
   { type: 'group', label: 'Add layout group', icon: <GroupOutlined /> },
   { type: 'if-group', label: 'Add if group', icon: <BranchesOutlined /> },
   { type: 'for-group', label: 'Add for group', icon: <RetweetOutlined /> },
@@ -30,16 +31,11 @@ export default function Toolbar() {
   const selectedTool = useEditorStore(state => state.selectedTool)
   const setTool = useEditorStore(state => state.setTool)
   const selectShape = useEditorStore(state => state.selectShape)
-  const handleImageUpload = useEditorStore(state => state.handleImageUpload)
   const { token } = theme.useToken()
 
   const handleToolClick = (toolType: ToolType) => {
     selectShape(null)
     setTool(toolType)
-  }
-
-  const handleImageClick = () => {
-    handleImageUpload()
   }
 
   return (
@@ -57,17 +53,6 @@ export default function Toolbar() {
           />
         </Tooltip>
       ))}
-      <Tooltip title="Add image">
-        <Button
-          className="btn"
-          style={{
-            color: token.colorTextSecondary
-          }}
-          type="text"
-          icon={<PictureOutlined />}
-          onClick={handleImageClick}
-        />
-      </Tooltip>
     </div>
   )
 }

@@ -2,8 +2,9 @@ import { Alert, Input, Button, Form, Switch, Select } from 'antd'
 import { useState } from 'react'
 import { useEditorStore } from '../../../../../../../store/editor/EditorStore'
 import type { VariableData, VariableItemField, VariableType, VariableValueType } from '@imprime/sdk'
-import { ItemListInput } from '../../../../../../../components/common'
+import { ImageValueInput, ItemListInput } from '../../../../../../../components/common'
 import { itemFieldAtPath } from '../../../../../../../utils/variableScope'
+import { selectPageSize } from '../../../../../../../store/editor/selectors'
 import {
   describeReference,
   findVariableReferences,
@@ -26,6 +27,7 @@ interface VariableFormData {
 const TYPE_LABEL: Record<VariableType, string> = {
   'string': 'String',
   'boolean': 'Boolean',
+  'image': 'Image',
   'object-list': 'List',
 }
 
@@ -102,6 +104,8 @@ export function VariableForm({ variable, onSaved, onCancel, lockedType }: Variab
   const updateVariable = useEditorStore(state => state.updateVariable)
   const isLoadingVariables = useEditorStore(state => state.isLoadingVariables)
   const pages = useEditorStore(state => state.template?.pages)
+  const pageSize = useEditorStore(selectPageSize)
+  const vectorSize = Math.max(pageSize.width, pageSize.height)
 
   // References the edit is about to break — the ones that resolve today and
   // would not under the pending definition. Pre-existing breakage is left
@@ -181,9 +185,28 @@ export function VariableForm({ variable, onSaved, onCancel, lockedType }: Variab
         <Form.Item
           label="Default Value"
           name="defaultValue"
-          tooltip={isRequired ? 'Disabled when variable is required' : 'A JSON array of objects'}
+          tooltip={
+            isRequired
+              ? 'Disabled when variable is required'
+              : 'A JSON array of objects; an image field takes a PNG or JPEG data URL'
+          }
         >
           <ItemListInput disabled={isRequired} itemFields={itemFields} />
+        </Form.Item>
+      )
+    }
+    if (selectedType === 'image') {
+      return (
+        <Form.Item
+          label="Default Value"
+          name="defaultValue"
+          tooltip={
+            isRequired
+              ? 'Disabled when variable is required'
+              : 'Drawn when an export gives none, and shown in the editor meanwhile'
+          }
+        >
+          <ImageValueInput disabled={isRequired} vectorSize={vectorSize} />
         </Form.Item>
       )
     }

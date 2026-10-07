@@ -1,0 +1,31 @@
+.image-value-input {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+}
+
+.image-value-input-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-s);
+}
+
+.image-value-input-preview {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    flex-shrink: 0;
+    border: var(--ant-line-width) var(--ant-line-type) var(--ant-color-border);
+    border-radius: var(--ant-border-radius-sm);
+    background-color: var(--ant-color-fill-quaternary);
+    color: var(--ant-color-text-quaternary);
+    overflow: hidden;
+}
+
+.image-value-input-preview img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}

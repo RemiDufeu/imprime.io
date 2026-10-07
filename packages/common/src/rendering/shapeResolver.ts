@@ -4,6 +4,7 @@ import type {
   IfGroupShape,
   ForGroupShape,
   TextBoxShape,
+  ImageShape,
   VariableElement,
   CustomText,
 } from '../types.js'
@@ -180,6 +181,24 @@ function bakeTextBox(
   }
 }
 
+// A box bound to a variable commits to its image here, while the scope stack
+// is still live, as an item-scoped text run does: the renderer cannot know
+// which iteration a box came from. Every box goes through here, bound or not,
+// so `resolvedImage` only ever holds what this wrote. A value that is not a
+// string — or an empty one, with no default to fall back on — leaves the box
+// empty. Whether a string is a drawable image is the renderer's to check.
+function bakeImage(shape: ImageShape, ctx: ResolveContext | undefined, scope: VariableScope): ImageShape {
+  const { resolvedImage: _authored, ...authored } = shape
+  if (!shape.imageVariable) return authored
+
+  const value = resolveVariable(shape.imageVariable, ctx, shape.itemPath, scope)
+  return {
+    ...authored,
+    imageId: undefined,
+    resolvedImage: typeof value === 'string' && value.trim() !== '' ? value : undefined,
+  }
+}
+
 /**
  * Flatten a shape tree into absolute-positioned leaves: containers are expanded
  * (conditions evaluated, iterations materialised), hidden shapes are dropped.
@@ -204,6 +223,9 @@ export function resolveShapes(
         break
       case 'text':
         out.push(bakeTextBox(shape, ctx, scope))
+        break
+      case 'image':
+        out.push(bakeImage(shape, ctx, scope))
         break
       default:
         out.push(shape)

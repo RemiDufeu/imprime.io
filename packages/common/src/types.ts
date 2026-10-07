@@ -89,10 +89,57 @@ export interface TextBoxShape extends BaseShape {
   verticalAlign?: TextVerticalAlign
 }
 
+// How an image fills its box: stretched to it ('fill'), whole and as large as
+// it fits ('contain'), or covering it, the overflow cut off ('cover').
+export type ImageFit = 'fill' | 'contain' | 'cover'
+
+// Where the image sits in its box when it does not match the box's
+// proportions: the gap 'contain' leaves, the overflow 'cover' cuts off.
+export interface ImageAlign {
+  horizontal: 'left' | 'center' | 'right'
+  vertical: 'top' | 'middle' | 'bottom'
+}
+
+// The part of the image shown, in fractions (0 to 1) of its natural size.
+// Read through `getImageCrop`, which sanitises values written via the API.
+export interface ImageCrop {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+// A box an image is drawn in. The image is drawn through `getImageLayout`
+// and clipped to the box, whatever its proportions.
+//
+// It shows one image: an uploaded one (`imageId`), or the value of an image
+// variable (`imageVariable`), which the editor's picker sets one at a time.
+// Neither is an empty box, waiting for an image: a placeholder in the editor,
+// nothing in the PDF but its border.
 export interface ImageShape extends BaseShape {
   type: 'image'
-  imageId: string // Reference to Image document ID
+  // Reference to an Image document. Ignored while `imageVariable` is set.
+  imageId?: string
+  // Reference to an image variable (VariableData._id), resolved at export.
+  imageVariable?: string
+  // Dotted path to an image field of the item iterated by an enclosing
+  // for-group bound to `imageVariable` — same addressing as
+  // `VariableElement.itemPath`. Unset evaluates the variable itself.
+  itemPath?: string
+  // What `imageVariable` resolved to: a data URL. Written by `resolveShapes`
+  // for every image box, so never authored — whatever a page stores here is
+  // overwritten before anything is drawn.
+  resolvedImage?: string
   alt?: string
+  fit: ImageFit
+  align: ImageAlign
+  // Unset shows the whole image.
+  crop?: ImageCrop
+  // 0 to 1. Unset is opaque.
+  opacity?: number
+  // Rounds the clip and the border. Unset is square. Read through
+  // `getImageCornerRadius`.
+  cornerRadius?: number
 }
 
 export type GroupLayoutDirection = 'none' | 'horizontal' | 'vertical'
@@ -209,7 +256,8 @@ export interface VariableData {
   itemFields?: VariableItemField[]
 }
 
-export type VariableType = "string" | "boolean" | "object-list"
+// An 'image' variable holds a PNG or JPEG data URL — a string, as values go.
+export type VariableType = "string" | "boolean" | "image" | "object-list"
 
 // One declared property of an `object-list` item. Recursive: a property that is
 // itself an `object-list` declares its own fields, which is what lets a
@@ -311,6 +359,10 @@ export namespace ImageDTO {
     mimeType: string
     originalName?: string
     size: number
+    // Natural size in pixels, as displayed: a JPEG's EXIF orientation is
+    // applied, as both the browser and the PDF renderer apply it.
+    width: number
+    height: number
     createdAt: Date
   }
 

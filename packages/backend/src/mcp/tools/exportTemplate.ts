@@ -36,7 +36,7 @@ const inputSchema = {
   variableValues: variableValuesSchema
     .optional()
     .describe(
-      'Optional map of variable name → value for substitution. Accepts string, boolean, or a list of objects whose properties are strings, booleans or nested lists'
+      'Optional map of variable name → value for substitution. Accepts string, boolean, or a list of objects whose properties are strings, booleans or nested lists. An image variable, or an image property of a list item, takes a PNG or JPEG data URL (data:image/png;base64,…)'
     ),
 }
 

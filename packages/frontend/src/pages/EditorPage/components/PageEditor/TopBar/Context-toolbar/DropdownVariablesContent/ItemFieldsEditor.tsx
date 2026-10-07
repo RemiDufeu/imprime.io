@@ -6,6 +6,7 @@ import './ItemFieldsEditor.css'
 const FIELD_TYPE_OPTIONS: { value: VariableType; label: string }[] = [
   { value: 'string', label: 'String' },
   { value: 'boolean', label: 'Boolean' },
+  { value: 'image', label: 'Image' },
   { value: 'object-list', label: 'List' },
 ]
 
