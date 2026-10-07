@@ -68,6 +68,14 @@ algorithm, so wrapping can still differ from the editor by a word.
 them — change them there, never locally. Hyphenation is off on purpose (see
 Fonts): the browser never hyphenates.
 
+**An image react-pdf cannot parse is left out silently.** The export succeeds,
+the box is empty, and the only trace is a console line. JPEGs go through
+jay-peg, which reads a JFIF segment as exactly 16 bytes: an iPhone photo
+(APP0 extended with "AMPF") made it throw "Unknown version 16717".
+`pdfJpeg.ts` strips JFIF segments and anything after the image's end from every
+JPEG before rendering. Suspect this first when an image shows in the editor and
+not in the PDF: a PDF of a few KB for a page with photos is the giveaway.
+
 ## Fonts
 
 Two kinds of family, one resolution.

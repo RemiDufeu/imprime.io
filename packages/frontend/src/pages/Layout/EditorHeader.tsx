@@ -107,6 +107,10 @@ export default function EditorHeader() {
         }
     };
 
+    // How large a vector image picked for an image value is redrawn: as large
+    // as the page, so that it stays sharp across it.
+    const vectorSize = template ? Math.max(template.pageSize.width, template.pageSize.height) : undefined;
+
     return (
     <>
     <div className="header-container">
@@ -189,13 +193,9 @@ export default function EditorHeader() {
                     input = <Switch />;
                     valuePropName = 'checked';
                 } else if (variable.type === 'image') {
-                    input = (
-                        <ImageValueInput
-                            vectorSize={template ? Math.max(template.pageSize.width, template.pageSize.height) : undefined}
-                        />
-                    );
+                    input = <ImageValueInput vectorSize={vectorSize} />;
                 } else if (variable.type === 'object-list') {
-                    input = <ItemListInput itemFields={variable.itemFields} />;
+                    input = <ItemListInput itemFields={variable.itemFields} vectorSize={vectorSize} />;
                 } else {
                     input = <Input placeholder={typeof variable.default === 'string' ? variable.default : `Enter ${variable.name}`} />;
                 }

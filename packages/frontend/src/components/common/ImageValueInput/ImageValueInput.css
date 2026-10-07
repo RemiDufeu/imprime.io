@@ -29,3 +29,26 @@
     max-height: 100%;
     object-fit: contain;
 }
+
+.image-value-input.compact .image-value-input-row {
+    gap: 2px;
+}
+
+.image-value-input.compact .image-value-input-preview {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    cursor: pointer;
+}
+
+.image-value-input.compact .image-value-input-preview:hover:not(:disabled) {
+    border-color: var(--ant-color-primary-hover);
+}
+
+.image-value-input.compact .image-value-input-preview:disabled {
+    cursor: not-allowed;
+}
+
+.image-value-input-preview.error {
+    border-color: var(--ant-color-error);
+}

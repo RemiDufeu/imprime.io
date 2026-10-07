@@ -1,83 +1,36 @@
-import { Input, Typography } from 'antd'
-import { useEffect, useState } from 'react'
 import type { VariableItem, VariableItemField } from '@imprime/sdk'
+import { ItemListEditor } from './ItemListEditor'
 import './ItemListInput.css'
 
 interface ItemListInputProps {
-  // antd Form control contract: the form owns the parsed value.
+  // antd Form control contract: the form owns the value.
   value?: VariableItem[]
   onChange?: (value: VariableItem[] | undefined) => void
-  // Declared item schema, shown as a hint. Not enforced — the fields a
-  // template declares and the data an integration sends drift on their own
-  // schedules, and the renderer already degrades gracefully on a missing field.
+  // Declared item schema: the columns. Data the schema does not declare is
+  // kept as it is, not shown — the fields a template declares and the data an
+  // integration sends drift on their own schedules.
   itemFields?: VariableItemField[]
   disabled?: boolean
-}
-
-function describeFields(fields: VariableItemField[] | undefined): string {
-  if (!fields || fields.length === 0) return 'No fields declared yet'
-  return fields.map(f => `${f.name}: ${f.type === 'image' ? 'image data URL' : f.type}`).join(', ')
+  // How large a vector image picked for an image field is redrawn.
+  vectorSize?: number
 }
 
 /**
- * JSON entry for a list of objects. Deliberately not a row editor: nested lists
- * make that a tree of dynamic forms, and this value is test data that gets
- * pasted far more often than it gets typed field by field.
+ * A list variable's value — its default, or the one an export is given — as
+ * a table of its items, nested lists included.
  */
-export function ItemListInput({ value, onChange, itemFields, disabled }: ItemListInputProps) {
-  // The raw text is local so a half-typed document stays on screen. `value` is
-  // only written back when the text parses.
-  const [text, setText] = useState(() => (value === undefined ? '' : JSON.stringify(value, null, 2)))
-  const [error, setError] = useState<string | undefined>()
-
-  // The form clears the value when the variable is switched to required, and
-  // the stale text would otherwise stay on screen contradicting it.
-  useEffect(() => {
-    if (value === undefined) {
-      setText('')
-      setError(undefined)
-    }
-  }, [value])
-
-  const handleChange = (next: string) => {
-    setText(next)
-
-    if (next.trim() === '') {
-      setError(undefined)
-      onChange?.(undefined)
-      return
-    }
-
-    try {
-      const parsed: unknown = JSON.parse(next)
-      if (!Array.isArray(parsed)) {
-        setError('Expected a JSON array of objects')
-        return
-      }
-      if (parsed.some(item => item === null || typeof item !== 'object' || Array.isArray(item))) {
-        setError('Every element must be an object')
-        return
-      }
-      setError(undefined)
-      onChange?.(parsed as VariableItem[])
-    } catch {
-      setError('Invalid JSON')
-    }
-  }
-
+export function ItemListInput({ value, onChange, itemFields, disabled, vectorSize }: ItemListInputProps) {
   return (
     <div className="item-list-input">
-      <Input.TextArea
-        value={text}
-        onChange={e => handleChange(e.target.value)}
+      <ItemListEditor
+        items={value ?? []}
+        fields={itemFields ?? []}
         disabled={disabled}
-        autoSize={{ minRows: 4, maxRows: 12 }}
-        placeholder={'[\n  { "name": "Pikachu" }\n]'}
-        status={error ? 'error' : undefined}
+        vectorSize={vectorSize}
+        // An emptied list is no value, as a cleared field is: the default then
+        // applies, and a required variable is reported missing.
+        onChange={items => onChange?.(items.length > 0 ? items : undefined)}
       />
-      <Typography.Text type={error ? 'danger' : 'secondary'} className="item-list-hint">
-        {error ?? describeFields(itemFields)}
-      </Typography.Text>
     </div>
   )
 }

@@ -45,6 +45,7 @@ import {
   PARAGRAPH_SPACING
 } from '@imprime/common'
 import { readImageDataUrl, type ImageService } from './ImageService.js'
+import { dataUrlForReactPdf } from './pdfJpeg.js'
 import type { FontService } from './FontService.js'
 import { AppError, ValidationError } from './errors.js'
 import { isImportedFontRegistered, registerBuiltinFonts, registerImportedFonts } from '../config/fonts.js'
@@ -613,6 +614,10 @@ export class ExportService {
       this.fetchImageData(resolvedPages, ownerId, variableImages),
       this.loadFonts(resolvedPages),
     ])
+    // Once per image, however many boxes draw it: see pdfJpeg.ts.
+    for (const [key, image] of images) {
+      images.set(key, { ...image, dataUrl: dataUrlForReactPdf(image.dataUrl) })
+    }
     const assets: RenderAssets = { images, fonts }
     const pages = resolvedPages.map(page => this.renderPage(page, pageSize, assets, ctx))
 

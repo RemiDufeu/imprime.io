@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { Button, Typography } from 'antd'
+import { Button, Tooltip, Typography } from 'antd'
 import { DeleteOutlined, PictureOutlined, UploadOutlined } from '@ant-design/icons'
 import { imageFileToDataUrl, readImageDataUrl } from '../../../utils/imageFile'
 import './ImageValueInput.css'
@@ -18,13 +18,22 @@ interface ImageValueInputProps {
   onChange?: (value: string | undefined) => void
   disabled?: boolean
   vectorSize?: number
+  // For a table cell: the thumbnail is the button, and an error shows on
+  // hover rather than under it.
+  compact?: boolean
 }
 
 /**
  * An image variable's value: a file picked from the computer, held as a data
  * URL — what the export takes — and checked as the server will check it.
  */
-export function ImageValueInput({ value, onChange, disabled, vectorSize = DEFAULT_VECTOR_SIZE }: ImageValueInputProps) {
+export function ImageValueInput({
+  value,
+  onChange,
+  disabled,
+  vectorSize = DEFAULT_VECTOR_SIZE,
+  compact = false,
+}: ImageValueInputProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [error, setError] = useState<string | undefined>()
 
@@ -50,15 +59,31 @@ export function ImageValueInput({ value, onChange, disabled, vectorSize = DEFAUL
     onChange?.(image.dataUrl)
   }
 
+  const preview = value ? <img src={value} alt="" draggable={false} /> : <PictureOutlined />
+  const choose = () => inputRef.current?.click()
+
   return (
-    <div className="image-value-input">
+    <div className={compact ? 'image-value-input compact' : 'image-value-input'}>
       <div className="image-value-input-row">
-        <div className="image-value-input-preview">
-          {value ? <img src={value} alt="" draggable={false} /> : <PictureOutlined />}
-        </div>
-        <Button size="small" icon={<UploadOutlined />} disabled={disabled} onClick={() => inputRef.current?.click()}>
-          {value ? 'Replace' : 'Choose image'}
-        </Button>
+        {compact ? (
+          <Tooltip title={error ?? (value ? 'Replace image' : 'Choose image')}>
+            <button
+              type="button"
+              className={error ? 'image-value-input-preview error' : 'image-value-input-preview'}
+              disabled={disabled}
+              onClick={choose}
+            >
+              {preview}
+            </button>
+          </Tooltip>
+        ) : (
+          <>
+            <div className="image-value-input-preview">{preview}</div>
+            <Button size="small" icon={<UploadOutlined />} disabled={disabled} onClick={choose}>
+              {value ? 'Replace' : 'Choose image'}
+            </Button>
+          </>
+        )}
         {value && (
           <Button
             size="small"
@@ -83,7 +108,7 @@ export function ImageValueInput({ value, onChange, disabled, vectorSize = DEFAUL
           }}
         />
       </div>
-      {error && <Typography.Text type="danger">{error}</Typography.Text>}
+      {error && !compact && <Typography.Text type="danger">{error}</Typography.Text>}
     </div>
   )
 }

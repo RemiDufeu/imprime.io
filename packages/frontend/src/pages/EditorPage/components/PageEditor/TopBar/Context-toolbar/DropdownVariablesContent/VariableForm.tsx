@@ -185,13 +185,9 @@ export function VariableForm({ variable, onSaved, onCancel, lockedType }: Variab
         <Form.Item
           label="Default Value"
           name="defaultValue"
-          tooltip={
-            isRequired
-              ? 'Disabled when variable is required'
-              : 'A JSON array of objects; an image field takes a PNG or JPEG data URL'
-          }
+          tooltip={isRequired ? 'Disabled when variable is required' : 'One row per item, one column per field'}
         >
-          <ItemListInput disabled={isRequired} itemFields={itemFields} />
+          <ItemListInput disabled={isRequired} itemFields={itemFields} vectorSize={vectorSize} />
         </Form.Item>
       )
     }
