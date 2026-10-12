@@ -130,7 +130,6 @@ export interface ImageShape extends BaseShape {
   // for every image box, so never authored — whatever a page stores here is
   // overwritten before anything is drawn.
   resolvedImage?: string
-  alt?: string
   fit: ImageFit
   align: ImageAlign
   // Unset shows the whole image.

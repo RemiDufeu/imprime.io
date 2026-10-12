@@ -18,7 +18,8 @@ import type {
   VariableValueType,
   VariableItemField,
   ResolveContext,
-  FontCatalog
+  FontCatalog,
+  DataUrlImage
 } from '@imprime/common'
 import {
   getDashArray,
@@ -57,19 +58,11 @@ export interface RenderOptions {
   variableValues?: Record<string, VariableValueType>
 }
 
-// An image as the export draws it: its data URL, and the natural size that
-// lays it out in its box.
-interface ImageAsset {
-  dataUrl: string
-  width: number
-  height: number
-}
-
 // What one export fetched before drawing: images — by image id for an
 // uploaded one, by the data URL itself for an image variable's value — and the
 // fonts its runs can resolve to.
 interface RenderAssets {
-  images: Map<string, ImageAsset>
+  images: Map<string, DataUrlImage>
   fonts: FontCatalog
 }
 
@@ -117,7 +110,7 @@ export class ExportService {
   private validateVariables(
     template: Template,
     variableValues: Record<string, VariableValueType>
-  ): Map<string, ImageAsset> {
+  ): Map<string, DataUrlImage> {
     const requiredVariables = template.variableData?.filter(v => v.required) || []
 
     for (const variable of requiredVariables) {
@@ -126,7 +119,7 @@ export class ExportService {
       }
     }
 
-    const images = new Map<string, ImageAsset>()
+    const images = new Map<string, DataUrlImage>()
     const checkImage = (value: unknown, label: string) => {
       if (value === undefined || value === null || (typeof value === 'string' && value.trim() === '')) return
       if (typeof value === 'string' && images.has(value)) return
@@ -170,8 +163,8 @@ export class ExportService {
   private async fetchImageData(
     resolvedPages: Page[],
     ownerId: string,
-    variableImages: Map<string, ImageAsset>
-  ): Promise<Map<string, ImageAsset>> {
+    variableImages: Map<string, DataUrlImage>
+  ): Promise<Map<string, DataUrlImage>> {
     const imageIds = new Set<string>()
     const imageDataMap = new Map(variableImages)
 
@@ -466,7 +459,7 @@ export class ExportService {
    * an `overflow: hidden` View, rounded by its `borderRadius`. The border is
    * drawn on top, as a rectangle's. An empty box draws its border only.
    */
-  private renderImage(shape: ImageShape, pageSize: PageSize, images: Map<string, ImageAsset>): React.ReactElement {
+  private renderImage(shape: ImageShape, pageSize: PageSize, images: Map<string, DataUrlImage>): React.ReactElement {
     const { x, y, width, height, imageId } = shape
     const border = this.renderImageBorder(shape, pageSize)
     // A bound box draws what its variable resolved to, and nothing else.

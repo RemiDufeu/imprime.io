@@ -7,6 +7,7 @@ import {
   sniffImageType,
   splitDataUrl,
   toImageDataUrl,
+  type DataUrlImage,
   type ImageDTO,
   type ImageMimeType,
   type ImageSize,
@@ -70,11 +71,6 @@ function parseImage(upload: ImageDTO.Create | undefined): UploadedImage {
   }
 
   return { mimeType, size: bytes.length, ...pixels }
-}
-
-// An image held as a data URL — an image variable's value — as it is drawn.
-export interface DataUrlImage extends ImageSize {
-  dataUrl: string
 }
 
 /**

@@ -95,7 +95,6 @@ export const createImportSlice: StateCreator<
             if (!image) return false
             get().updateShape(shapeId, {
                 imageId: image._id,
-                alt: file.name,
                 crop: undefined,
                 imageVariable: undefined,
                 itemPath: undefined,
@@ -131,7 +130,6 @@ export const createImportSlice: StateCreator<
                 width,
                 height,
                 imageId: image._id,
-                alt: file.name,
                 fit: DEFAULT_IMAGE_FIT,
                 align: DEFAULT_IMAGE_ALIGN,
             }

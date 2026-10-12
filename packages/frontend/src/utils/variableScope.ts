@@ -53,7 +53,8 @@ function fieldsAtPath(variable: VariableData, path: string): VariableItemField[]
  * order they are nested.
  *
  * `type` filters to what the caller can consume: 'string' for a text run,
- * 'boolean' for an if-group condition, 'object-list' for a nested for-group.
+ * 'boolean' for an if-group condition, 'image' for an image box,
+ * 'object-list' for a nested for-group.
  */
 export function itemFieldsInScope(
   shapes: Shape[],

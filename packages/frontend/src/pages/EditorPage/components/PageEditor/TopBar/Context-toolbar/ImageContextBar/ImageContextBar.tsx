@@ -71,7 +71,6 @@ export function ImageContextBar() {
               imageId: undefined,
               imageVariable: undefined,
               itemPath: undefined,
-              alt: undefined,
               crop: undefined,
             })}
           />

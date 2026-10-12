@@ -1,4 +1,4 @@
-import type { ImageMimeType, ImageSize } from '@imprime/sdk'
+import type { DataUrlImage, ImageMimeType } from '@imprime/sdk'
 import { isImageMimeType, readImageInfo, splitDataUrl, toImageDataUrl } from '@imprime/sdk'
 
 // Image files as the API takes them: a PNG or JPEG data URL, whether it is
@@ -50,11 +50,6 @@ export async function imageFileToDataUrl(
     if (isImageMimeType(file.type)) return { dataUrl: original, mimeType: file.type }
     const dataUrl = toPngDataUrl(await loadImage(original), file.type === 'image/svg+xml', vectorSize)
     return { dataUrl, mimeType: 'image/png' }
-}
-
-// An image held as a data URL, as both renderers draw it.
-export interface DataUrlImage extends ImageSize {
-    dataUrl: string
 }
 
 /**

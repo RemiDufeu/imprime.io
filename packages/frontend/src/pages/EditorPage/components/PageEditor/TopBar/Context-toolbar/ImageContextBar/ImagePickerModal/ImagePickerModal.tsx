@@ -61,7 +61,7 @@ export function ImagePickerModal({ shape, onClose }: ImagePickerModalProps) {
   })
 
   const chooseImage = (imageId: string) => {
-    updateShape(shape.id, { imageId, alt: undefined, crop: undefined, imageVariable: undefined, itemPath: undefined })
+    updateShape(shape.id, { imageId, crop: undefined, imageVariable: undefined, itemPath: undefined })
     onClose()
   }
 
@@ -71,7 +71,6 @@ export function ImagePickerModal({ shape, onClose }: ImagePickerModalProps) {
       imageVariable: option.variableId,
       itemPath: option.itemPath,
       imageId: undefined,
-      alt: undefined,
       crop: undefined,
     })
     onClose()

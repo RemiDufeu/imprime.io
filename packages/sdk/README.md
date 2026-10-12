@@ -194,7 +194,6 @@ await client.addImage('674abc123def456', 'page-123', {
   crop: { x: 0.25, y: 0, width: 0.5, height: 1 }, // optional, the part shown, in fractions of the image's size; default: all of it
   opacity: 0.8,            // optional, 0 to 1, default: 1
   cornerRadius: 12,        // optional, at most half the box's shorter side, default: 0
-  alt: 'Company logo'      // optional
 })
 ```
 

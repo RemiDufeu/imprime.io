@@ -1,11 +1,11 @@
 import { useId } from 'react'
-import type { ImageShape } from '@imprime/sdk'
+import type { DataUrlImage, ImageShape } from '@imprime/sdk'
 import { getDashArray, getImageCornerRadius, getImageLayout, getImageOpacity } from '@imprime/sdk'
 import { useEditorStore } from '../../../store/editor/EditorStore'
 import { variableReferenceLabel } from '../../../utils/variableScope'
 import { ImagePlaceholder } from './ImagePlaceholder'
 import { ImageVariableBadge } from './ImageVariableBadge'
-import { readDataUrlImage, useImageData, type LoadedImage } from './useImageData'
+import { readDataUrlImage, useImageData } from './useImageData'
 
 interface SVGImageProps {
     shape: ImageShape
@@ -26,7 +26,7 @@ export function SVGImage({ shape }: SVGImageProps) {
     const { x, y, width, height } = shape
     const cornerRadius = getImageCornerRadius(shape)
 
-    let image: LoadedImage | null = data.status === 'loaded' ? data.image : null
+    let image: DataUrlImage | null = data.status === 'loaded' ? data.image : null
     let label: string | undefined
     if (shape.imageVariable) {
         label = variableReferenceLabel(variables ?? [], shape.imageVariable, shape.itemPath) ?? 'Unknown variable'

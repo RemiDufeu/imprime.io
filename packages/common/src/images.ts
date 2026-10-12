@@ -76,6 +76,12 @@ export interface ImageInfo extends ImageSize {
   mimeType: ImageMimeType
 }
 
+// An image held as a data URL, with the natural size that lays it out in its
+// box (getImageLayout): what both renderers draw.
+export interface DataUrlImage extends ImageSize {
+  dataUrl: string
+}
+
 // The bytes each accepted format starts with. Keyed by every accepted type, so
 // a format added to IMAGE_MIME_TYPES cannot be accepted unchecked.
 const IMAGE_SIGNATURES: Record<ImageMimeType, readonly number[]> = {

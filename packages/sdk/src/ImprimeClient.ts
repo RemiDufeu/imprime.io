@@ -429,7 +429,6 @@ export class ImprimeClient {
       y: number
       width: number
       height: number
-      alt?: string
       fit?: ImageFit
       align?: ImageAlign
       crop?: ImageCrop
@@ -447,7 +446,6 @@ export class ImprimeClient {
       imageId: options.imageId,
       imageVariable: options.imageVariable,
       itemPath: options.itemPath,
-      alt: options.alt,
       fit: options.fit ?? DEFAULT_IMAGE_FIT,
       align: options.align ?? DEFAULT_IMAGE_ALIGN,
       crop: options.crop,
