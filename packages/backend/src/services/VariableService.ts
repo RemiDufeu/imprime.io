@@ -8,9 +8,10 @@ import {
   variableToDTO,
   variableUpdateToModel,
 } from '../models/mappers.js'
-import type { VariableDTO, VariableData } from '@imprime/common'
+import type { VariableDTO, VariableData, VariableType, VariableValueType } from '@imprime/common'
 import { collectVariableIds } from '@imprime/common'
 import { touchTemplate } from './TemplateService.js'
+import { readImageDataUrl } from './ImageService.js'
 import { NotFoundError, ConflictError, ValidationError } from './errors.js'
 
 const nameConflict = () =>
@@ -20,6 +21,19 @@ const variableIdTaken = () => new ConflictError('Variable id already in use', 'V
 
 function isDuplicateName(err: unknown): boolean {
   return typeof err === 'object' && err !== null && (err as { code?: number }).code === 11000
+}
+
+// An image variable's default is drawn whenever an export leaves it empty:
+// one the export cannot draw would fail every such export, so it is refused
+// here instead. Values of the other types are not checked.
+function assertDrawableDefault(type: VariableType, value: VariableValueType | null | undefined): void {
+  if (type !== 'image' || value === undefined || value === null) return
+  if (typeof value !== 'string' || !readImageDataUrl(value)) {
+    throw new ValidationError(
+      'The default of an image variable must be a PNG or JPEG data URL',
+      'INVALID_VARIABLE_DEFAULT',
+    )
+  }
 }
 
 export class VariableService {
@@ -37,6 +51,8 @@ export class VariableService {
         throw variableIdTaken()
       }
     }
+
+    assertDrawableDefault(data.type, data.default)
 
     const exists = await VariableDataModel.exists({
       templateId: template._id,
@@ -95,6 +111,7 @@ export class VariableService {
     if (data.required === true && data.default === undefined) {
       variable.default = undefined
     }
+    assertDrawableDefault(variable.type, variable.default)
 
     try {
       await variable.save()

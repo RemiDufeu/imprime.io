@@ -15,6 +15,16 @@ export type { PageFormat, PageFormatId } from './pageSize.js'
 export { getDashArray } from './strokeUtils.js'
 export { getEllipseGeometry, getRectangleCornerRadius } from './svgRenderers.js'
 export type { EllipseGeometry } from './svgRenderers.js'
+export {
+  getImageLayout,
+  getImageCrop,
+  getImageCornerRadius,
+  getImageOpacity,
+  DEFAULT_IMAGE_FIT,
+  DEFAULT_IMAGE_ALIGN,
+  FULL_IMAGE_CROP,
+} from './imageLayout.js'
+export type { ImageRect } from './imageLayout.js'
 export { layoutGroupChildren, distributeMainAxis, crossAxisOffset } from './groupLayout.js'
 export { resolveShapes, childrenBBox } from './shapeResolver.js'
 export type { ChildrenBBox } from './shapeResolver.js'

@@ -1,9 +1,10 @@
 /**
  * Variable references in a shape tree.
  *
- * A tree points at variables by id in three places: a text run bound to a
- * variable, an if-group's condition, and a for-group's list. Every walk over
- * those references goes through here, so adding a fourth kind is one change.
+ * A tree points at variables by id in four places: a text run bound to a
+ * variable, an image box's image, an if-group's condition, and a for-group's
+ * list. Every walk over those references goes through here, so adding a fifth
+ * kind is one change.
  */
 
 import type { CustomText, Paragraph, Shape, VariableElement } from './types.js'
@@ -20,6 +21,8 @@ export function collectVariableIds(shapes: Shape[]): Set<string> {
             if ('type' in child && child.type === 'variable') ids.add(child.variableId)
           }
         }
+      } else if (shape.type === 'image') {
+        if (shape.imageVariable) ids.add(shape.imageVariable)
       } else if (isContainerShape(shape)) {
         if (shape.type === 'if-group' && shape.conditionVariable) ids.add(shape.conditionVariable)
         if (shape.type === 'for-group' && shape.itemsVariable) ids.add(shape.itemsVariable)
@@ -33,9 +36,9 @@ export function collectVariableIds(shapes: Shape[]): Set<string> {
 
 /**
  * `shape` with each variable reference passed through `rebind`. A returned id
- * replaces the reference; null drops it: an if-group or for-group is left
- * unbound, and a text run becomes plain text, `placeholder(run)`, in the run's
- * formatting.
+ * replaces the reference; null drops it: an image box, if-group or for-group is
+ * left unbound, and a text run becomes plain text, `placeholder(run)`, in the
+ * run's formatting.
  */
 export function rebindVariables(
   shape: Shape,
@@ -55,6 +58,15 @@ export function rebindVariables(
       children: paragraph.children.map(rebindRun),
     }))
     return { ...shape, paragraphes }
+  }
+
+  if (shape.type === 'image') {
+    if (!shape.imageVariable) return shape
+    const imageVariable = rebind(shape.imageVariable)
+    if (imageVariable === shape.imageVariable) return shape
+    return imageVariable !== null
+      ? { ...shape, imageVariable }
+      : { ...shape, imageVariable: undefined, itemPath: undefined }
   }
 
   if (!isContainerShape(shape)) return shape

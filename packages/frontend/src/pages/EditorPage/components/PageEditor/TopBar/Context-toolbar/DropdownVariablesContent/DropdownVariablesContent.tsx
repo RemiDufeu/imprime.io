@@ -8,14 +8,17 @@ import './DropdownVariablesContent.css'
 const TYPE_BADGE_LABEL: Record<VariableType, string> = {
   'string': 'string',
   'boolean': 'boolean',
+  'image': 'image',
   'object-list': 'list',
 }
 
 // A list's default is a row of objects — summarise it rather than stringify it,
-// which would print '[object Object]'.
+// which would print '[object Object]'. An image's is a data URL, far too long
+// to print.
 function formatDefault(variable: VariableData): string {
   const value = variable.default
   if (Array.isArray(value)) return `${value.length} item${value.length === 1 ? '' : 's'}`
+  if (variable.type === 'image') return 'an image'
   return String(value)
 }
 

@@ -11,10 +11,17 @@ A variable is what turns a document into a template. Definitions live on the
 template; values arrive at export time.
 
 ```ts
-VariableData  { _id, type, name, default?, required? }
-VariableType  'string' | 'boolean' | 'string-list'
-VariableValueType  string | boolean | string[]
+VariableData  { _id, type, name, default?, required?, itemFields? }
+VariableType  'string' | 'boolean' | 'image' | 'object-list'
+VariableValueType  string | boolean | VariableItem[]
 ```
+
+An `image` value is a PNG or JPEG **data URL** — a string. Its `default` is one
+too, stored on the definition and checked when saved (`INVALID_VARIABLE_DEFAULT`).
+Every image value an export receives, list items included, is checked before
+rendering (`ExportService.validateVariables` → `INVALID_IMAGE_VALUE`, naming
+`albums[0].photos[1].file`). An image box binds through `imageVariable` +
+`itemPath`; `resolveShapes` writes what it resolves to into `resolvedImage`.
 
 ## The id/name indirection
 
@@ -106,10 +113,11 @@ Enforced in `packages/backend/src/services/VariableService.ts`:
 
 ### References
 
-A tree points at a variable in three places: a text run, an `if-group`'s
-`conditionVariable`, a `for-group`'s `itemsVariable`. `collectVariableIds` and
+A tree points at a variable in four places: a text run, an image box's
+`imageVariable`, an `if-group`'s `conditionVariable`, a `for-group`'s
+`itemsVariable`. `collectVariableIds` and
 `rebindVariables` (common `variableReferences.ts`) are the only walks over them —
-the in-use guard reads the first, the editor's paste the second. A fourth kind
+the in-use guard reads the first, the editor's paste the second. A fifth kind
 of reference is added there, once.
 
 ### Known gap

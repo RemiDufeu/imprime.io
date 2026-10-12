@@ -1,13 +1,68 @@
-.item-list-input {
+.item-list-input,
+.item-list-editor {
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
 }
 
-.item-list-input .ant-input {
-  font-family: var(--ant-font-family-code);
+/* A wide schema scrolls inside the form rather than widening it. */
+.item-list-scroll {
+  overflow-x: auto;
 }
 
-.item-list-input .item-list-hint {
+.item-list-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--ant-font-size-sm);
+}
+
+.item-list-table th {
+  padding: var(--space-xs);
+  border-bottom: var(--ant-line-width) var(--ant-line-type) var(--ant-color-border);
+  color: var(--ant-color-text-secondary);
+  font-weight: 500;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.item-list-table td {
+  padding: var(--space-xs);
+  border-bottom: var(--ant-line-width) var(--ant-line-type) var(--ant-color-split);
+  vertical-align: middle;
+}
+
+.item-list-table td .ant-input {
+  min-width: 120px;
+}
+
+.item-list-type {
+  margin-left: var(--space-xs);
+  color: var(--ant-color-text-tertiary);
+  font-weight: normal;
+}
+
+/* Shrink to their content. */
+.item-list-table .item-list-index,
+.item-list-table .item-list-actions {
+  width: 1px;
+  white-space: nowrap;
+}
+
+.item-list-table .item-list-index {
+  color: var(--ant-color-text-tertiary);
+  text-align: right;
+}
+
+.item-list-nested > td {
+  background-color: var(--ant-color-fill-quaternary);
+}
+
+.item-list-nested-label {
+  margin-bottom: var(--space-xs);
+  color: var(--ant-color-text-secondary);
+  font-size: var(--ant-font-size-sm);
+}
+
+.item-list-empty {
   font-size: var(--ant-font-size-sm);
 }

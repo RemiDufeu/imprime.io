@@ -1,9 +1,9 @@
 import { TemplateModel } from '../models/Template.js'
-import { PageModel, collectImageIds } from '../models/Page.js'
+import { PageModel } from '../models/Page.js'
 import { VariableDataModel } from '../models/VariableData.js'
 import { isObjectIdString, pageCreateToModel, pageToDTO, pageUpdateToModel, toObjectId } from '../models/mappers.js'
 import type { Shape, Page, PageDTO } from '@imprime/common'
-import { isContainerShape } from '@imprime/common'
+import { collectImageIds, isContainerShape } from '@imprime/common'
 import type { Types } from 'mongoose'
 import type { ImageService } from './ImageService.js'
 import { touchTemplate } from './TemplateService.js'
@@ -156,6 +156,13 @@ export class PageService {
             }
           })
         })
+      } else if (shape.type === 'image') {
+        if (shape.imageVariable !== undefined && !validVariableIds.has(shape.imageVariable)) {
+          errors.push(
+            `Invalid variable reference in shape ${shapeIndex}: ` +
+            `imageVariable "${shape.imageVariable}" does not exist in this template`
+          )
+        }
       } else if (isContainerShape(shape)) {
         errors.push(...this.validateVariableReferences(shape.children, validVariableIds))
       }

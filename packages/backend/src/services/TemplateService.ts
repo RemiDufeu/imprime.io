@@ -1,5 +1,5 @@
 import { TemplateModel } from '../models/Template.js'
-import { PageModel, collectImageIds } from '../models/Page.js'
+import { PageModel } from '../models/Page.js'
 import { VariableDataModel } from '../models/VariableData.js'
 import {
   templateCreateToModel,
@@ -14,7 +14,7 @@ import {
 } from '../models/mappers.js'
 import type { Types } from 'mongoose'
 import type { Template, TemplateDTO, TemplateSummary } from '@imprime/common'
-import { isValidPageSize, MAX_PAGE_DIMENSION, MIN_PAGE_DIMENSION } from '@imprime/common'
+import { collectImageIds, isValidPageSize, MAX_PAGE_DIMENSION, MIN_PAGE_DIMENSION } from '@imprime/common'
 import type { ImageService } from './ImageService.js'
 import { NotFoundError, ValidationError } from './errors.js'
 

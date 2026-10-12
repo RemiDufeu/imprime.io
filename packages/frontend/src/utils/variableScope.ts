@@ -53,7 +53,8 @@ function fieldsAtPath(variable: VariableData, path: string): VariableItemField[]
  * order they are nested.
  *
  * `type` filters to what the caller can consume: 'string' for a text run,
- * 'boolean' for an if-group condition, 'object-list' for a nested for-group.
+ * 'boolean' for an if-group condition, 'image' for an image box,
+ * 'object-list' for a nested for-group.
  */
 export function itemFieldsInScope(
   shapes: Shape[],
@@ -103,4 +104,17 @@ export function decodeItemFieldValue(
   const index = value.indexOf(SEPARATOR)
   if (index === -1) return { variableId: value }
   return { variableId: value.slice(0, index), itemPath: value.slice(index + SEPARATOR.length) }
+}
+
+// How a reference reads to the author: `logo`, or `items.photo` for a field of
+// an iterated item — the label the pickers offer. Undefined when the variable
+// no longer exists.
+export function variableReferenceLabel(
+  variables: VariableData[],
+  variableId: string,
+  itemPath: string | undefined,
+): string | undefined {
+  const variable = variables.find(v => v._id === variableId)
+  if (!variable) return undefined
+  return itemPath ? `${variable.name}.${itemPath}` : variable.name
 }

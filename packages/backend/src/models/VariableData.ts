@@ -10,7 +10,7 @@ export interface IVariableData {
   itemFields?: VariableItemField[]
 }
 
-const VARIABLE_TYPES: VariableType[] = ['string', 'boolean', 'object-list']
+const VARIABLE_TYPES: VariableType[] = ['string', 'boolean', 'image', 'object-list']
 
 // Declared with the nested `{ type: ... }` form because one of the paths is
 // itself called `type`: the bare `{ type: String }` shorthand would be read as

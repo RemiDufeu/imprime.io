@@ -21,7 +21,7 @@ exportToPDF(template, ownerId, { variableValues })
   validateVariables          required variables must be non-empty (no default fallback)
   resolveShapes per page    containers flattened → absolute leaves
   filter                     drop shapes whose x or y is past the page edge
-  fetchImageData             one batched pass, imageId → data URL, ownerId's images only
+  fetchImageData             one batched pass, imageId → data URL + natural size, ownerId's images only
   renderPage per page      Page (template.pageSize) + one element per shape
   acquireRenderSlot          4 renders at once, 2 per owner → AppError(429 EXPORT_BUSY)
   renderToBuffer             raced against a 30s timeout → AppError(408)
@@ -67,6 +67,14 @@ algorithm, so wrapping can still differ from the editor by a word.
 (24) live in `common/rendering/pageContentStyles.ts` and both renderers read
 them — change them there, never locally. Hyphenation is off on purpose (see
 Fonts): the browser never hyphenates.
+
+**An image react-pdf cannot parse is left out silently.** The export succeeds,
+the box is empty, and the only trace is a console line. JPEGs go through
+jay-peg, which reads a JFIF segment as exactly 16 bytes: an iPhone photo
+(APP0 extended with "AMPF") made it throw "Unknown version 16717".
+`pdfJpeg.ts` strips JFIF segments and anything after the image's end from every
+JPEG before rendering. Suspect this first when an image shows in the editor and
+not in the PDF: a PDF of a few KB for a page with photos is the giveaway.
 
 ## Fonts
 

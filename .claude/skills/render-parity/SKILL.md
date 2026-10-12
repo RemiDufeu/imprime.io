@@ -30,6 +30,7 @@ Anything where "the editor and the PDF must agree" is the requirement:
 | `pageSize.ts` | `PAGE_FORMATS` (A4 portrait, A4 landscape, 16:9), `DEFAULT_PAGE_SIZE`, `isValidPageSize` — the size is per template (`Template.pageSize`), read in the editor through `selectPageSize` |
 | `strokeUtils.ts` | `getDashArray` — dashed/dotted stroke patterns |
 | `svgRenderers.ts` | `getEllipseGeometry`, `getRectangleCornerRadius` — shape geometry from a bounding box |
+| `imageLayout.ts` | `getImageLayout` (fit, alignment and crop → the rect the *whole* image is drawn at, clipped to the box), `getImageCrop`, `getImageCornerRadius` (clamped as react-pdf clamps a clip), `getImageOpacity` |
 | `groupLayout.ts` | `distributeMainAxis`, `crossAxisOffset`, `layoutGroupChildren` — the flexbox subset |
 | `shapeResolver.ts` | `resolveShapes`, `childrenBBox` — container expansion |
 | `variables.ts` | `resolveVariable`, `isEmptyVariableValue`, `stringifyVariableValue` |

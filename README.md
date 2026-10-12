@@ -77,8 +77,6 @@ Sign in with an email and a password, or with Google, GitHub or Microsoft. The a
 Imprime is currently under active development. Here are the main planned updates:
 
 ## Block enhancements
-- image rework : fill mode change it etc...
-- image variable
 - condition on page (if and for)
 
 ## Layout

@@ -1,0 +1,38 @@
+.image-align-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 8px);
+    grid-template-rows: repeat(3, 8px);
+    gap: 2px;
+    padding: 2px;
+    border: var(--ant-line-width) var(--ant-line-type) var(--ant-color-border);
+    border-radius: var(--ant-border-radius-sm);
+}
+
+.image-align-cell {
+    padding: 0;
+    border: none;
+    border-radius: var(--ant-border-radius-xs);
+    background-color: var(--ant-color-fill-secondary);
+    cursor: pointer;
+}
+
+.image-align-cell:hover:not(:disabled) {
+    background-color: var(--ant-color-primary-hover);
+}
+
+.image-align-cell.active {
+    background-color: var(--ant-color-primary);
+}
+
+.image-align-cell:disabled {
+    background-color: var(--ant-color-fill-quaternary);
+    cursor: not-allowed;
+}
+
+.image-align-cell.active:disabled {
+    background-color: var(--ant-color-text-disabled);
+}
+
+.image-binding-tag {
+    margin-inline-end: 0;
+}
