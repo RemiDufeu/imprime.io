@@ -72,12 +72,12 @@ export function registerExportTemplate(server: McpServer, ownerId: string): void
       try {
         await assertOwnsTemplate(templateId, ownerId)
         const template = await templateService.getById(templateId)
-        const pdfBuffer = await exportService.exportToPDF(template, ownerId, {
+        const { pdf, warnings } = await exportService.exportToPDF(template, ownerId, {
           variableValues: variableValues ?? {},
         })
 
         const filename = `${template.title || 'template'}.pdf`
-        const token = putPdf(pdfBuffer, filename)
+        const token = putPdf(pdf, filename)
         const downloadUrl = `${getApiBaseUrl()}/api/export/download/${token}`
 
         const structured = {
@@ -86,11 +86,19 @@ export function registerExportTemplate(server: McpServer, ownerId: string): void
           expiresInSeconds: DOWNLOAD_TTL_SECONDS,
         }
 
+        // Content left out of the PDF, in the text rather than the structured
+        // result: any field added to `outputSchema` pushes registerTool's
+        // inference past the TS2589 regression noted above, onto the call
+        // itself. The text is what a model reads anyway.
+        const warningText = warnings.length > 0
+          ? `\nWarning — not everything fits:\n${warnings.map(warning => `- ${warning.message}`).join('\n')}`
+          : ''
+
         return {
           content: [
             {
               type: 'text',
-              text: `PDF ready: ${downloadUrl}\n(Single-use link, valid ${DOWNLOAD_TTL_SECONDS / 60} minutes.)`,
+              text: `PDF ready: ${downloadUrl}\n(Single-use link, valid ${DOWNLOAD_TTL_SECONDS / 60} minutes.)${warningText}`,
             },
             {
               type: 'resource_link',

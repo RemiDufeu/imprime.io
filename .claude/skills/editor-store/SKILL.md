@@ -164,9 +164,10 @@ which reads the page (the one on screen unless `options.pageId` says
 otherwise), applies a pure `transform` that returns the new tree or null to do
 nothing, and writes. `updatePageShapes` does four things in order:
 
-1. **reflow** — `reflowGroups(shapes)` re-applies `layoutGroupChildren` to every
-   auto-layout group in the tree, so downstream consumers (rendering,
-   hit-testing, selection) read final positions, not pre-layout ones;
+1. **reflow** — `layoutTree(shapes)` (common, the export's own) sizes every
+   hugging group and re-lays-out every auto-layout group in the tree, so
+   downstream consumers (rendering, hit-testing, selection) read final sizes
+   and positions, not pre-layout ones;
 2. **record** — `_recordHistory` pushes the previous tree onto the undo stack
    and clears redo. `hint.mergeKey` folds writes closer than 500 ms into one
    step (`updateShape` keys on shape id + updated fields, so a dragged colour

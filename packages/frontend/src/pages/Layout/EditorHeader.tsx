@@ -78,12 +78,21 @@ export default function EditorHeader() {
 
         setIsExporting(true);
         try {
-            await templatesAPI.downloadPDF(
+            const warnings = await templatesAPI.downloadPDF(
                 template._id,
                 `${template.title || 'template'}.pdf`,
                 variableValues
             );
-            message.success('PDF exported successfully!');
+            // The PDF is made, but not all of it: content that grew past its
+            // page with these values was left out.
+            if (warnings.length > 0) {
+                message.warning({
+                    content: `PDF exported, but some content does not fit. ${warnings.map(warning => warning.message).join(' ')}`,
+                    duration: 8,
+                });
+            } else {
+                message.success('PDF exported successfully!');
+            }
             setIsVariableModalOpen(false);
             form.resetFields();
         } catch (error) {

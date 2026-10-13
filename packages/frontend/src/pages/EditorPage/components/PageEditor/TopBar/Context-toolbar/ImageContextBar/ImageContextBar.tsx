@@ -7,6 +7,8 @@ import { useEditorStore } from '../../../../../../../store/editor/EditorStore'
 import { selectSelectedShape } from '../../../../../../../store/editor/selectors'
 import { variableReferenceLabel } from '../../../../../../../utils/variableScope'
 import { StrokeControls, type StrokeValue } from '../StrokeControls'
+import { ConditionControl } from '../ConditionControl'
+import { FlexControl } from '../FlexControl'
 import { ImageAlignGrid } from './ImageAlignGrid'
 import { ImageCropModal } from './ImageCropModal/ImageCropModal'
 import { ImagePickerModal } from './ImagePickerModal/ImagePickerModal'
@@ -36,7 +38,7 @@ export function ImageContextBar() {
     ? variableReferenceLabel(variables ?? [], shape.imageVariable, shape.itemPath) ?? 'Unknown variable'
     : undefined
   const stroke: StrokeValue = {
-    stroke: shape.stroke ?? drawStyle.stroke,
+    stroke: shape.stroke,
     strokeWidth: shape.strokeWidth ?? 0,
     strokeStyle: shape.strokeStyle ?? 'solid',
   }
@@ -124,10 +126,15 @@ export function ImageContextBar() {
 
       <Divider type="vertical" style={{ height: '24px' }} />
 
-      {/* A width alone draws nothing: the colour shown is written with every
-          edit, so a box without one gets it. Always, so that an edit's undo
+      {/* A width alone draws nothing: any border edit but clearing the colour
+          gives a box without one the drawing colour. Always, so that an edit's undo
           step merges with the next same edit (`updateShape` keys on fields). */}
-      <StrokeControls value={stroke} onChange={(patch) => updateShape(shape.id, { stroke: stroke.stroke, ...patch })} />
+      <StrokeControls value={stroke} onChange={(patch) => updateShape(shape.id, { stroke: shape.stroke ?? drawStyle.stroke, ...patch })} />
+
+      <Divider type="vertical" style={{ height: '24px' }} />
+
+      <FlexControl shape={shape} />
+      <ConditionControl shape={shape} />
 
       {picking && <ImagePickerModal shape={shape} onClose={() => setPicking(false)} />}
 

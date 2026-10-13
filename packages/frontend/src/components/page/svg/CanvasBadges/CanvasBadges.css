@@ -1,0 +1,43 @@
+/* Sizes are in em of the row's font size, not on the --space-* scale: a badge
+   is drawn in page units and follows the zoom. */
+
+.canvas-badges {
+    overflow: visible;
+    pointer-events: none;
+}
+
+.canvas-badges-row {
+    display: flex;
+    gap: 0.4em;
+    width: max-content;
+    font-size: var(--canvas-badge-font-size);
+    font-family: var(--ant-font-family);
+    line-height: 1;
+}
+
+.canvas-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3em;
+    height: var(--canvas-badge-height);
+    padding: 0 0.6em;
+    border-radius: calc(var(--canvas-badge-height) / 2);
+    color: var(--ant-color-text-light-solid);
+    white-space: nowrap;
+}
+
+.canvas-badge.repeat {
+    background: var(--ant-color-warning);
+}
+
+.canvas-badge.condition {
+    background: var(--ant-color-info);
+}
+
+.canvas-badge.muted {
+    background: var(--ant-color-text-tertiary);
+}
+
+.canvas-badge.variable {
+    background: var(--ant-color-primary);
+}

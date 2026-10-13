@@ -142,7 +142,16 @@ export class PageService {
 
   private validateVariableReferences(shapes: Shape[], validVariableIds: Set<string>): string[] {
     const errors: string[] = []
+    const checkBinding = (shapeIndex: number, field: string, variableId: string | undefined) => {
+      if (variableId !== undefined && !validVariableIds.has(variableId)) {
+        errors.push(
+          `Invalid variable reference in shape ${shapeIndex}: ` +
+          `${field} "${variableId}" does not exist in this template`
+        )
+      }
+    }
     shapes.forEach((shape, shapeIndex) => {
+      checkBinding(shapeIndex, 'visibleWhen.variableId', shape.visibleWhen?.variableId)
       if (shape.type === 'text') {
         shape.paragraphes?.forEach((paragraph, paraIndex) => {
           paragraph.children?.forEach((child, childIndex) => {
@@ -164,6 +173,7 @@ export class PageService {
           )
         }
       } else if (isContainerShape(shape)) {
+        checkBinding(shapeIndex, 'repeat.variableId', shape.repeat?.variableId)
         errors.push(...this.validateVariableReferences(shape.children, validVariableIds))
       }
     })

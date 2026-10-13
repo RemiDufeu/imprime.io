@@ -2,12 +2,12 @@
  * Variable references in a shape tree.
  *
  * A tree points at variables by id in four places: a text run bound to a
- * variable, an image box's image, an if-group's condition, and a for-group's
- * list. Every walk over those references goes through here, so adding a fifth
- * kind is one change.
+ * variable, an image box's image, any shape's `visibleWhen` condition, and a
+ * group's `repeat` list. Every walk over those references goes through here,
+ * so adding a fifth kind is one change.
  */
 
-import type { CustomText, Paragraph, Shape, VariableElement } from './types.js'
+import type { CustomText, Paragraph, RepeatBinding, Shape, VariableElement, VisibilityCondition } from './types.js'
 import { isContainerShape } from './types.js'
 
 /** Every variable id `shapes` refers to, containers included. */
@@ -15,6 +15,7 @@ export function collectVariableIds(shapes: Shape[]): Set<string> {
   const ids = new Set<string>()
   const visit = (list: Shape[]) => {
     for (const shape of list) {
+      if (shape.visibleWhen?.variableId) ids.add(shape.visibleWhen.variableId)
       if (shape.type === 'text') {
         for (const paragraph of shape.paragraphes ?? []) {
           for (const child of paragraph.children ?? []) {
@@ -24,8 +25,7 @@ export function collectVariableIds(shapes: Shape[]): Set<string> {
       } else if (shape.type === 'image') {
         if (shape.imageVariable) ids.add(shape.imageVariable)
       } else if (isContainerShape(shape)) {
-        if (shape.type === 'if-group' && shape.conditionVariable) ids.add(shape.conditionVariable)
-        if (shape.type === 'for-group' && shape.itemsVariable) ids.add(shape.itemsVariable)
+        if (shape.repeat?.variableId) ids.add(shape.repeat.variableId)
         visit(shape.children)
       }
     }
@@ -34,13 +34,39 @@ export function collectVariableIds(shapes: Shape[]): Set<string> {
   return ids
 }
 
+// A condition or a repeat whose variable is dropped keeps the binding with no
+// variable: the shape stays conditional — never shown — and the group stays a
+// repeat of nothing, rather than silently becoming unconditional.
+function rebindBinding<T extends VisibilityCondition | RepeatBinding>(
+  binding: T | undefined,
+  rebind: (variableId: string) => string | null,
+): T | undefined {
+  if (!binding?.variableId) return binding
+  const variableId = rebind(binding.variableId)
+  if (variableId === binding.variableId) return binding
+  return variableId !== null
+    ? { ...binding, variableId }
+    : { ...binding, variableId: undefined, itemPath: undefined }
+}
+
 /**
  * `shape` with each variable reference passed through `rebind`. A returned id
- * replaces the reference; null drops it: an image box, if-group or for-group is
- * left unbound, and a text run becomes plain text, `placeholder(run)`, in the
- * run's formatting.
+ * replaces the reference; null drops it: an image box is left unbound, a
+ * condition or a repeat is left without a variable (see `rebindBinding`), and
+ * a text run becomes plain text, `placeholder(run)`, in the run's formatting.
  */
 export function rebindVariables(
+  shape: Shape,
+  rebind: (variableId: string) => string | null,
+  placeholder: (run: VariableElement) => string
+): Shape {
+  const own = rebindOwnReferences(shape, rebind, placeholder)
+  const visibleWhen = rebindBinding(own.visibleWhen, rebind)
+  return visibleWhen === own.visibleWhen ? own : { ...own, visibleWhen }
+}
+
+// The references particular to the shape's type.
+function rebindOwnReferences(
   shape: Shape,
   rebind: (variableId: string) => string | null,
   placeholder: (run: VariableElement) => string
@@ -70,19 +96,9 @@ export function rebindVariables(
   }
 
   if (!isContainerShape(shape)) return shape
-  const children = shape.children.map(child => rebindVariables(child, rebind, placeholder))
-
-  if (shape.type === 'if-group' && shape.conditionVariable) {
-    const conditionVariable = rebind(shape.conditionVariable)
-    return conditionVariable !== null
-      ? { ...shape, children, conditionVariable }
-      : { ...shape, children, conditionVariable: undefined, itemPath: undefined }
+  return {
+    ...shape,
+    children: shape.children.map(child => rebindVariables(child, rebind, placeholder)),
+    repeat: rebindBinding(shape.repeat, rebind),
   }
-  if (shape.type === 'for-group' && shape.itemsVariable) {
-    const itemsVariable = rebind(shape.itemsVariable)
-    return itemsVariable !== null
-      ? { ...shape, children, itemsVariable }
-      : { ...shape, children, itemsVariable: undefined, itemPath: undefined }
-  }
-  return { ...shape, children }
 }

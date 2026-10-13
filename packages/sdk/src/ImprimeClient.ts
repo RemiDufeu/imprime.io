@@ -28,8 +28,31 @@ import type {
   ImageFit,
   ImageAlign,
   ImageCrop,
+  ExportDTO,
 } from '@imprime/common'
-import { DEFAULT_IMAGE_ALIGN, DEFAULT_IMAGE_FIT } from '@imprime/common'
+import { DEFAULT_IMAGE_ALIGN, DEFAULT_IMAGE_FIT, EXPORT_WARNINGS_HEADER } from '@imprime/common'
+
+// The warnings of an export, from the header they travel in. A header that is
+// not the JSON the API writes yields none rather than failing a PDF that was
+// made.
+function parseExportWarnings(header: string | null): ExportDTO.Warning[] {
+  if (!header) return []
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(header)
+  } catch {
+    return []
+  }
+  if (!Array.isArray(parsed)) return []
+  return parsed.flatMap((item: unknown): ExportDTO.Warning[] => {
+    if (typeof item !== 'object' || item === null) return []
+    if (!('code' in item && 'page' in item && 'shapes' in item && 'message' in item)) return []
+    const { code, page, shapes, message } = item
+    return code === 'CONTENT_OFF_PAGE' && typeof page === 'number' && typeof shapes === 'number' && typeof message === 'string'
+      ? [{ code, page, shapes, message }]
+      : []
+  })
+}
 
 export interface ImprimeClientOptions {
   baseUrl?: string
@@ -414,7 +437,7 @@ export class ImprimeClient {
    * @param pageId - Page ID
    * @param options - Image box options. The box shows the uploaded image
    *   `imageId`, or the value of the image variable `imageVariable` at export
-   *   (`itemPath`: a field of the item an enclosing for-group iterates);
+   *   (`itemPath`: a field of the item an enclosing repeated group iterates);
    *   without either it is empty. `fit` defaults to 'contain' and `align` to
    *   centred; `crop` is in fractions (0 to 1) of the image's natural size.
    */
@@ -656,12 +679,17 @@ export class ImprimeClient {
   // ============================================
 
   /**
-   * Export template to PDF
+   * Export template to PDF, with what the caller should know about it.
    * @param variableValues - Optional record of variable name to value; an
    *   image variable (or image field of a list item) takes a PNG or JPEG data URL
-   * @returns PDF blob URL that can be used for download
+   * @returns The PDF, and its warnings: one per page whose content went beyond
+   *   the page's edge and was left out — typically a repeated list longer than
+   *   the page. Empty when everything fits.
    */
-  async exportToPDF(templateId: string, variableValues?: Record<string, VariableValueType>): Promise<Blob> {
+  async exportPDF(
+    templateId: string,
+    variableValues?: Record<string, VariableValueType>
+  ): Promise<{ pdf: Blob; warnings: ExportDTO.Warning[] }> {
     const url = `${this.baseUrl}/export/${templateId}/pdf`
 
     const controller = new AbortController()
@@ -684,25 +712,43 @@ export class ImprimeClient {
         throw new Error(`HTTP ${response.status}: ${errorText}`)
       }
 
-      return response.blob()
+      return {
+        pdf: await response.blob(),
+        warnings: parseExportWarnings(response.headers.get(EXPORT_WARNINGS_HEADER)),
+      }
     } finally {
       clearTimeout(timeoutId)
     }
   }
 
   /**
+   * Export template to PDF — the PDF alone; `exportPDF` also returns its
+   * warnings.
+   * @param variableValues - Optional record of variable name to value; an
+   *   image variable (or image field of a list item) takes a PNG or JPEG data URL
+   */
+  async exportToPDF(templateId: string, variableValues?: Record<string, VariableValueType>): Promise<Blob> {
+    return (await this.exportPDF(templateId, variableValues)).pdf
+  }
+
+  /**
    * Download template as PDF file
    * Helper method that triggers a browser download
    * Note: This method is only available in browser environments
-   * @param variableValues - Optional record of variable ID to value mappings
+   * @param variableValues - Optional record of variable name to value
+   * @returns The export's warnings (see `exportPDF`)
    */
-  async downloadPDF(templateId: string, filename?: string, variableValues?: Record<string, VariableValueType>): Promise<void> {
+  async downloadPDF(
+    templateId: string,
+    filename?: string,
+    variableValues?: Record<string, VariableValueType>
+  ): Promise<ExportDTO.Warning[]> {
     if (typeof window === 'undefined' || typeof document === 'undefined') {
       throw new Error('downloadPDF is only available in browser environments')
     }
 
-    const blob = await this.exportToPDF(templateId, variableValues)
-    const url = window.URL.createObjectURL(blob)
+    const { pdf, warnings } = await this.exportPDF(templateId, variableValues)
+    const url = window.URL.createObjectURL(pdf)
     const a = document.createElement('a')
     a.href = url
     a.download = filename || `template-${templateId}.pdf`
@@ -710,5 +756,6 @@ export class ImprimeClient {
     a.click()
     document.body.removeChild(a)
     window.URL.revokeObjectURL(url)
+    return warnings
   }
 }

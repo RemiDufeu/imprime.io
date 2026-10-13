@@ -26,6 +26,8 @@ import { selectSelectedShape } from '../../../../../../store/editor/selectors'
 import { DebouncedColorPicker } from '../../../../../../components/common'
 import { InsertVariableButton } from './InsertVariableButton/InsertVariableButton'
 import { IconMenuButton, type IconMenuOption } from './IconMenuButton/IconMenuButton'
+import { ConditionControl } from './ConditionControl'
+import { FlexControl } from './FlexControl'
 
 // Each family's name is shown in the family itself.
 function fontOption(entry: FontCatalogEntry) {
@@ -142,6 +144,7 @@ export function TextContextBar() {
             <DebouncedColorPicker
               value={format.color}
               onChange={(color: string) => applyTextFormat({ color })}
+              onClear={() => applyTextFormat({ color: null })}
               size="small"
               showText={false}
             />
@@ -279,6 +282,14 @@ export function TextContextBar() {
             <InsertVariableButton />
           </div>
         </div>
+
+        {textBox && (
+          <>
+            <div className="toolbar-divider" />
+            <FlexControl shape={textBox} />
+            <ConditionControl shape={textBox} />
+          </>
+        )}
       </div>
     </>
   )

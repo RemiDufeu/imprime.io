@@ -1,5 +1,5 @@
 import React from 'react'
-import { Document, Page as PDFPage, View, Text as PDFText, Image, Svg, Rect, Ellipse, renderToBuffer } from '@react-pdf/renderer'
+import { Document, Page as PDFPage, View, Text as PDFText, Image, Svg, Rect, Ellipse, Path, renderToBuffer } from '@react-pdf/renderer'
 import type {
   Template,
   Page,
@@ -19,7 +19,8 @@ import type {
   VariableItemField,
   ResolveContext,
   FontCatalog,
-  DataUrlImage
+  DataUrlImage,
+  ExportDTO
 } from '@imprime/common'
 import {
   getDashArray,
@@ -28,7 +29,8 @@ import {
   isEmptyVariableValue,
   stringifyVariableValue,
   getEllipseGeometry,
-  getRectangleCornerRadius,
+  getBoxPaths,
+  getBorderOverhang,
   getImageLayout,
   getImageCornerRadius,
   getImageOpacity,
@@ -56,6 +58,11 @@ registerBuiltinFonts()
 
 export interface RenderOptions {
   variableValues?: Record<string, VariableValueType>
+}
+
+export interface ExportResult {
+  pdf: Buffer
+  warnings: ExportDTO.Warning[]
 }
 
 // What one export fetched before drawing: images — by image id for an
@@ -239,18 +246,19 @@ export class ExportService {
   /**
    * Wrap one vector shape in its own absolutely-positioned `Svg` layer, clipped
    * to the page. `draw` receives the layer's origin so it can express the shape
-   * in layer-local coordinates.
+   * in layer-local coordinates. `overhang` is how far the stroke reaches
+   * outside the shape's box: half its width, unless the shape says otherwise.
    */
   private renderInSvgLayer(
     shape: BaseShape,
     pageSize: PageSize,
-    draw: (origin: { left: number; top: number }) => React.ReactElement
+    draw: (origin: { left: number; top: number }) => React.ReactElement | React.ReactElement[],
+    overhang = (shape.strokeWidth || 0) / 2
   ): React.ReactElement {
-    const sw = shape.strokeWidth || 0
-    const left = Math.max(0, shape.x - sw / 2)
-    const top = Math.max(0, shape.y - sw / 2)
-    const width = Math.max(0, Math.min(pageSize.width, shape.x + shape.width + sw / 2) - left)
-    const height = Math.max(0, Math.min(pageSize.height, shape.y + shape.height + sw / 2) - top)
+    const left = Math.max(0, shape.x - overhang)
+    const top = Math.max(0, shape.y - overhang)
+    const width = Math.max(0, Math.min(pageSize.width, shape.x + shape.width + overhang) - left)
+    const height = Math.max(0, Math.min(pageSize.height, shape.y + shape.height + overhang) - top)
 
     if (width <= 0 || height <= 0) {
       return React.createElement(View, { key: shape.id })
@@ -262,27 +270,34 @@ export class ExportService {
     }, draw({ left, top }))
   }
 
+  // A rectangle — or a group's own box, which `resolveShapes` emits as one:
+  // the fill under its outline, then the border, side by side when the sides
+  // differ. The paths are `getBoxPaths`', as the editor's.
   private renderRectangle(shape: RectangleShape, pageSize: PageSize): React.ReactElement {
     const fill = this.parseColor(shape.fill, 'none')
     const stroke = this.parseColor(shape.stroke, 'none')
-    const cornerRadius = getRectangleCornerRadius(shape)
+    const dash = getDashArray(shape.strokeStyle)
 
-    return this.renderInSvgLayer(shape, pageSize, ({ left, top }) =>
-      React.createElement(Rect, {
-        x: shape.x - left,
-        y: shape.y - top,
-        width: shape.width,
-        height: shape.height,
-        fill: fill.color,
-        fillOpacity: fill.opacity,
-        rx: cornerRadius,
-        ry: cornerRadius,
+    return this.renderInSvgLayer(shape, pageSize, ({ left, top }) => {
+      const paths = getBoxPaths(
+        { x: shape.x - left, y: shape.y - top, width: shape.width, height: shape.height },
+        shape
+      )
+      const elements = [
+        React.createElement(Path, { key: 'fill', d: paths.fill, fill: fill.color, fillOpacity: fill.opacity }),
+      ]
+      if (stroke.color === 'none') return elements
+      paths.strokes.forEach((path, i) => elements.push(React.createElement(Path, {
+        key: `stroke-${i}`,
+        d: path.d,
+        fill: 'none',
         stroke: stroke.color,
         strokeOpacity: stroke.opacity,
-        strokeWidth: shape.strokeWidth || 0,
-        strokeDasharray: getDashArray(shape.strokeStyle)
-      })
-    )
+        strokeWidth: path.width,
+        strokeDasharray: dash
+      })))
+      return elements
+    }, getBorderOverhang(shape))
   }
 
   private renderEllipse(shape: EllipseShape, pageSize: PageSize): React.ReactElement {
@@ -590,18 +605,35 @@ export class ExportService {
   }
 
   /** `ownerId` owns the template: only their images are drawn. */
-  public async exportToPDF(template: Template, ownerId: string, options: RenderOptions = {}): Promise<Buffer> {
+  /**
+   * The PDF, and what the caller should know about it: the content left out
+   * because it starts beyond its page — one warning per page concerned.
+   */
+  public async exportToPDF(template: Template, ownerId: string, options: RenderOptions = {}): Promise<ExportResult> {
     const variableValues = options.variableValues || {}
 
     const variableImages = this.validateVariables(template, variableValues)
 
     const ctx: ResolveContext = { variableValues, template }
     const { pageSize } = template
-    const resolvedPages: Page[] = template.pages.map(page => ({
-      ...page,
-      shapes: resolveShapes(page.shapes, ctx)
-        .filter(s => s.y < pageSize.height && s.x < pageSize.width),
-    }))
+    // A shape starting beyond the page is left out — react-pdf would start a
+    // new page for it — and the caller told, since content that grew with its
+    // data can land there without anyone placing it so.
+    const warnings: ExportDTO.Warning[] = []
+    const resolvedPages: Page[] = template.pages.map((page, index) => {
+      const shapes = resolveShapes(page.shapes, ctx)
+      const onPage = shapes.filter(s => s.y < pageSize.height && s.x < pageSize.width)
+      const leftOut = shapes.length - onPage.length
+      if (leftOut > 0) {
+        warnings.push({
+          code: 'CONTENT_OFF_PAGE',
+          page: index + 1,
+          shapes: leftOut,
+          message: `Page ${index + 1}: ${leftOut} shape${leftOut > 1 ? 's' : ''} start beyond the edge of the page and ${leftOut > 1 ? 'are' : 'is'} left out of the PDF.`,
+        })
+      }
+      return { ...page, shapes: onPage }
+    })
 
     const [images, fonts] = await Promise.all([
       this.fetchImageData(resolvedPages, ownerId, variableImages),
@@ -629,7 +661,7 @@ export class ExportService {
       )
     ])
 
-    return pdfBuffer
+    return { pdf: pdfBuffer, warnings }
   }
 
   // @react-pdf/renderer does not parse 8-digit hex (#RRGGBBAA) or rgba() — alpha

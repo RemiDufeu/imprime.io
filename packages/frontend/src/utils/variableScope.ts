@@ -1,8 +1,8 @@
-import type { Shape, VariableData, VariableItemField, VariableType } from '@imprime/sdk'
+import type { GroupShape, Shape, VariableData, VariableItemField, VariableType } from '@imprime/sdk'
 import { ITEM_PATH_SEPARATOR, joinItemPath } from '@imprime/sdk'
-import { findAncestorPath } from './shapeTree'
+import { findAncestorPath, findShapeById } from './shapeTree'
 
-// One field of a for-group's current item, reachable from a given shape. The
+// One field of a repeat's current item, reachable from a given shape. The
 // editor cannot show what a field will hold — it never resolves values — so the
 // pickers offer declared fields and the renderer resolves them at export.
 export interface ItemFieldOption {
@@ -48,30 +48,41 @@ function fieldsAtPath(variable: VariableData, path: string): VariableItemField[]
 }
 
 /**
- * The item fields a shape can address, taken from the for-groups it sits
- * inside. Outermost group first, so a picker lists the enclosing loops in the
- * order they are nested.
+ * The repeated groups whose item a shape reads, outermost first: the ones it
+ * sits inside, and — with `includeSelf` — the shape itself when it is one. A
+ * shape's condition is checked copy by copy, so it reads its own repeat's item;
+ * the repeat's own list cannot, and leaves it out.
+ */
+export function repeatsInScope(shapes: Shape[], shapeId: string, includeSelf: boolean): GroupShape[] {
+  const ancestors = findAncestorPath(shapes, shapeId)
+  if (!ancestors) return []
+  const self = includeSelf ? findShapeById(shapes, shapeId)?.shape : undefined
+  const chain: GroupShape[] = self?.type === 'group' ? [...ancestors, self] : ancestors
+  return chain.filter(group => group.repeat?.variableId !== undefined)
+}
+
+/**
+ * The item fields a shape can address, taken from the repeats it sits
+ * inside (see `repeatsInScope`). Outermost group first, so a picker lists the
+ * enclosing loops in the order they are nested.
  *
  * `type` filters to what the caller can consume: 'string' for a text run,
- * 'boolean' for an if-group condition, 'image' for an image box,
- * 'object-list' for a nested for-group.
+ * 'boolean' for a condition, 'image' for an image box, 'object-list' for a
+ * nested repeat.
  */
 export function itemFieldsInScope(
   shapes: Shape[],
   shapeId: string,
   variables: VariableData[],
   type: VariableType,
+  includeSelf = false,
 ): ItemFieldOption[] {
-  const ancestors = findAncestorPath(shapes, shapeId)
-  if (!ancestors) return []
-
   const options: ItemFieldOption[] = []
-  for (const ancestor of ancestors) {
-    if (ancestor.type !== 'for-group' || !ancestor.itemsVariable) continue
-    const variable = variables.find(v => v._id === ancestor.itemsVariable)
+  for (const group of repeatsInScope(shapes, shapeId, includeSelf)) {
+    const variable = variables.find(v => v._id === group.repeat?.variableId)
     if (!variable) continue
 
-    const basePath = ancestor.itemPath ?? ''
+    const basePath = group.repeat?.itemPath ?? ''
     for (const field of fieldsAtPath(variable, basePath)) {
       if (field.type !== type) continue
       const itemPath = joinItemPath(basePath, field.name)

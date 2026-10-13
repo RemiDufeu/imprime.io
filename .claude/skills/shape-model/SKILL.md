@@ -1,6 +1,6 @@
 ---
 name: shape-model
-description: The Imprime shape model — the Shape discriminated union, container types (group/if-group/for-group), coordinate spaces, id lifecycle, and how resolveShapes flattens an authored tree into renderable leaves. Use when adding or changing a shape type, working on containers or layout, or reasoning about shape coordinates and ids.
+description: The Imprime shape model — the Shape discriminated union, the group container (layout, box, repeat) and visibleWhen conditions, coordinate spaces, id lifecycle, and how resolveShapes flattens an authored tree into renderable leaves. Use when adding or changing a shape type, working on containers or layout, or reasoning about shape coordinates and ids.
 metadata:
   origin: adapted from ECC (github.com/affaan-m/ECC)
 ---
@@ -11,12 +11,18 @@ Defined in `packages/common/src/types.ts`. Everything downstream — editor,
 store, SDK, PDF — is a projection of this union.
 
 ```
-Shape = RectangleShape | EllipseShape | TextBoxShape | ImageShape
-      | GroupShape | IfGroupShape | ForGroupShape
+Shape = RectangleShape | EllipseShape | TextBoxShape | ImageShape | GroupShape
 ```
 
 All extend `BaseShape`: `id`, `x`, `y`, `width`, `height`, optional `stroke`,
-`strokeWidth`, `strokeStyle`, `hidden`, `name`.
+`strokeWidth`, `strokeStyle`, `hidden`, `name`, `visibleWhen`.
+
+`RectangleShape` and `GroupShape` also take `BoxStyle`: `strokeWidths` (one
+border width per side, overriding `strokeWidth`) and `cornerRadius` (a number,
+or `CornerRadii` per corner). Both are drawn through `getBoxPaths`
+(`common/rendering/boxGeometry.ts`): the outline and the per-side border as SVG
+path data, corners as cubic Béziers, which the editor puts in `<path>` and the
+export in react-pdf's `Path`.
 
 ## Ids
 
@@ -27,8 +33,9 @@ Do not "fix" this by moving shape ids server-side — the whole shape tree is
 persisted as one embedded document on the page.
 
 Ids are unique **within their source tree**, which is why `resolveShapes`
-re-forges them when a `for-group` duplicates children: `reidShape` appends
-`::for-<groupId>-<i>` recursively, so the renderer never sees a duplicate key.
+re-forges them when a repeated group is copied: `reidShape` appends
+`::rep-<groupId>-<i>` recursively, so the renderer never sees a duplicate key.
+A group's box leaves are `<groupId>::fill` and `<groupId>::border`.
 
 ## Coordinate spaces
 
@@ -46,24 +53,34 @@ This is the most common source of off-by-a-parent bugs.
   `ungroupShape` both do this; copy that pattern rather than inventing another.
 - `resolveShapes` translates everything to page space, once, at export time.
 
-## Containers
+## Groups, conditions, repeats
 
-`isContainerShape(shape)` — a single type guard, defined in `common/src/types.ts`,
-re-exported by `packages/frontend/src/utils/shapeTree.ts` "so tree helpers and
-their callers import the guard from one place". Never write
-`type === 'group' || type === 'if-group' || ...` at a new site; it will be
-incomplete the day a fourth container lands.
+`group` is the only container. `isContainerShape(shape)` — defined in
+`common/src/types.ts`, re-exported by `packages/frontend/src/utils/shapeTree.ts`
+— is still the guard every recursion site uses, so a second container type
+would be one change.
 
-| Type | Children appear when | Extra fields |
-|---|---|---|
-| `group` | always | `layout`, `justify`, `align`, `gap` |
-| `if-group` | the condition variable is **strictly `true`** | `conditionVariable` |
-| `for-group` | once per item of a list variable | `itemsVariable`, `layout`, `justify`, `align`, `gap` |
+| Field | Meaning |
+|---|---|
+| `layout` | `'none'` (default: children keep their own `x`/`y`), `'horizontal'`, `'vertical'`, or `'stack'` (children over each other; main axis horizontal, so `justify` places across and `align` down) |
+| `justify`, `align`, `gap` | the flexbox subset of `groupLayout.ts`; `justify` is along the main axis, `align` across it |
+| `padding` | `Sides`, inset of the laid-out children; ignored by `'none'` |
+| `hug` | along a row's or column's main axis only, the group's size is its children's + gaps + padding (`hugGroup`); ignored by `'none'`/`'stack'`. A size the parent imposes (`grow`, `stretch`: `getImposedAxes`) wins, and a hugging group ignores its children's `grow`. Resizing it by hand along that axis turns it off |
+| child's `grow` | on any shape (`BaseShape`), read by a `'horizontal'`/`'vertical'` parent only: CSS flex-grow with basis 0 — the free main-axis space (inner size − fixed children − gaps) is shared by `grow`, the child's own size on that axis ignored (`growMainSizes`) |
+| `fill`, border, `cornerRadius` | the group's own box: background under its children, border over them (as a Figma frame's) |
+| `repeat` | `{ variableId?, itemPath? }`: the group is drawn once per item, each copy a **sibling** placed by the parent's layout, or stacked downwards in a free-form parent |
 
-`layout` defaults to `'none'` for `group` (free-form, children keep their own
-`x`/`y`): a group is a plain grouping until it is given a direction.
-`for-group` defaults to `'vertical'` instead, because a repeat with no
-direction has no meaningful free-form interpretation.
+`visibleWhen` (`{ variableId?, itemPath?, negate? }`) is on **every** shape,
+not just groups: shown only when the value is exactly `true` (`false` with
+`negate`). A shape whose condition fails takes no room in a layout.
+
+A repeat's or condition's `variableId` is unset only when a paste dropped a
+reference it could not rebind (`rebindVariables`): the repeat then draws
+nothing and the shape never shows — never silently unconditional.
+
+A repeat has no drawing tool: a group becomes one from the group bar's Repeat
+control. `shapeKind` reads a repeated group as `'repeat'` for its layers-panel
+icon and fallback name.
 
 ## `resolveShapes`
 
@@ -71,28 +88,40 @@ direction has no meaningful free-form interpretation.
 absolute-positioned leaves. Called **only** by `ExportService` (see skill
 `render-parity` for why).
 
+Three passes — data, layout, page space:
+
 ```
-for each shape:
-  hidden          → drop
-  group           → layoutGroupChildren, translate by (x, y), recurse
-  if-group        → resolveVariable(condition) !== true ? drop : translate + recurse
-  for-group       → resolveVariable(items) must be a non-empty array;
-                    per item: reid children, translate by
-                    (x + xOff - bbox.minX, y + yOff - bbox.minY), recurse
-  anything else   → emit as-is
+instantiate(siblings):            ← per list of siblings, before any layout
+  hidden                → drop
+  group with repeat     → one copy per item (reid, scope frame pushed);
+                          each copy kept only if its visibleWhen holds in its
+                          own scope; free-form parent: copy i shifted down by i × height
+  visibleWhen fails     → drop
+  (free-form parent: the copies go in a hugging column at the group's place)
+  text / image          → bake item-scoped values
+layoutTree(tree)          ← measure bottom-up (hugGroup), then place top-down
+                            (layoutGroupChildren); the editor's write path
+                            runs the same function on the authored tree
+flatten(tree)             ← page space: background? · children · border?
 ```
 
-Two subtleties worth preserving:
+Subtleties worth preserving:
 
 - **A group with an active layout recomputes child positions** instead of
-  trusting the persisted `x`/`y`. That is the only way it stays correct when
-  children come from dynamic data.
-- **`for-group` iterations are offset by the children's tight bbox origin**
-  (`childrenBBox().minX/minY`). Without that subtraction the authored `minX`
-  gets added on top of the layout offset and pushes iterations off-page.
-
-`childrenBBox` returns the tight extent (`max - min`), deliberately excluding
-empty space between the parent's origin and its topmost/leftmost child.
+  trusting the persisted `x`/`y`, and it lays out the *instances* — copies
+  in, failed conditions out — so dynamic data reflows its siblings.
+- **A copy's condition is checked against its own item**, which is how a
+  repeated row filters itself (`visibleWhen: { itemPath: 'inStock' }`).
+- **Measure-then-place is exact in one pass** only because nothing the
+  placement does changes a size a hug counted: a hugging group ignores its
+  children's `grow`, `stretch` acts across its axis, and no text is measured.
+  A rule that breaks that (text measurement, cross-axis hug) needs real
+  iteration.
+- **Only the main axis hugs.** A row cannot take the height of its tallest
+  child; a column of copies inside a fixed-height row overflows it.
+- The editor persists what `layoutTree` computes, so a growing child's main
+  size is overwritten on every write — resizing it by hand along that axis
+  does not stick.
 
 ## Adding a shape type
 

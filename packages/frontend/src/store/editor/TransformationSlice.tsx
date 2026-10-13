@@ -1,5 +1,6 @@
 import type { StateCreator } from 'zustand'
 import type { Shape } from '@imprime/sdk'
+import { getHugAxis } from '@imprime/sdk'
 import type { ShapeSlice } from './ShapeSlice'
 import type { TemplateSlice } from './TemplateSlice'
 import type { PageSlice } from './PageSlice'
@@ -202,7 +203,14 @@ export const createTransformationSlice: StateCreator<
                 ) {
                     reparent(dragData, transformationData, selectedShapeId)
                 } else {
-                    get().updateShape(selectedShapeId, transformationData)
+                    // Sizing a hugging group by hand along the axis it hugs
+                    // gives it that size: it stops hugging, as in Figma.
+                    // Otherwise the layout would put its content size back.
+                    const shape = selectSelectedShape(get())
+                    const hugAxis = dragData.kind === 'resize' && shape?.type === 'group' ? getHugAxis(shape) : null
+                    const original = hugAxis === 'width' ? dragData.originalWidth : dragData.originalHeight
+                    const releasesHug = hugAxis !== null && transformationData[hugAxis] !== original
+                    get().updateShape(selectedShapeId, releasesHug ? { ...transformationData, hug: false } : transformationData)
                 }
             }
 

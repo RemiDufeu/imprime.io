@@ -1,11 +1,11 @@
 import type { Shape } from '@imprime/sdk'
+import { layoutTree } from '@imprime/sdk'
 import type { StateCreator } from 'zustand'
 import type { TemplateSlice } from './TemplateSlice'
 import type { PageSlice } from './PageSlice'
 import type { SelectionSlice } from './SelectionSlice'
 import type { HistorySlice } from './HistorySlice'
 import { templatesAPI } from '../../api/api'
-import { reflowGroups } from '../../utils/groupLayout'
 import { selectCurrentPage } from './selectors'
 
 // What a shape write tells the history about itself.
@@ -93,10 +93,11 @@ export const createDocumentWriteSlice: StateCreator<
             if (!template) return
             const previous = template.pages.find(page => page._id === pageId)?.shapes
             if (!previous) return
-            // Groups with an active layout are re-laid-out before the write, so
-            // every consumer downstream reads final, real shape positions
+            // Hugging groups are sized and groups with a layout re-laid-out
+            // before the write — by the export's own `layoutTree` — so every
+            // consumer downstream reads final, real shape positions
             // (rendering, hit-testing, selection).
-            const reflowed = reflowGroups(shapes)
+            const reflowed = layoutTree(shapes)
 
             _recordHistory({
                 kind: 'shapes',

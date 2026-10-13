@@ -3,6 +3,8 @@ import { theme } from 'antd'
 import { useCallback, useRef, cloneElement, isValidElement, useEffect } from 'react'
 import { useEditorStore } from '../../../store/editor/EditorStore'
 import type { ResizeHandle } from '../../../store/editor/TransformationSlice'
+import { previewCondition } from '../../../utils/conditionPreview'
+import { ShapeBadges } from './ShapeBadges'
 
 interface SVGSelectionWrapperProps {
     shape: Shape
@@ -13,6 +15,9 @@ interface SVGSelectionWrapperProps {
 const HANDLE_SIZE = 12
 const HANDLE_OFFSET = HANDLE_SIZE / 2
 const TEXT_BORDER_WIDTH = 12
+// A shape its condition would leave out of an export with the default values
+// is still drawn and edited, faded.
+const GHOST_OPACITY = 0.35
 
 const RESIZE_HANDLES: {
     position: ResizeHandle
@@ -41,6 +46,7 @@ export function SVGSelectionWrapper({ shape, readonly, children }: SVGSelectionW
     const isTransforming = useEditorStore((s) =>
         s.selectedShapeId === shape.id && s.dragData !== null
     )
+    const conditionPreview = useEditorStore((s) => previewCondition(s.template, shape))
 
     const selectShape = useEditorStore((s) => s.selectShape)
     const startDrag = useEditorStore((s) => s.startDrag)
@@ -122,11 +128,14 @@ export function SVGSelectionWrapper({ shape, readonly, children }: SVGSelectionW
                 onClick={handleClick}
                 onMouseDown={shape.type != 'text' ? handleDragStart : undefined}
                 style={{ cursor }}
+                opacity={conditionPreview === 'hidden' ? GHOST_OPACITY : undefined}
             >
                 {isValidElement(children)
                     ? cloneElement(children, { shape: displayShape } as any)
                     : children}
             </g>
+
+            {!readonly && <ShapeBadges shape={displayShape} preview={conditionPreview} />}
 
             {showSelection && (
                 <g>

@@ -3,8 +3,11 @@ import { ColorPicker } from 'antd'
 import type { Color } from 'antd/es/color-picker'
 
 interface DebouncedColorPickerProps {
-  value: string
+  // Unset shows the picker cleared: no colour.
+  value: string | undefined
   onChange: (color: string) => void
+  // Every colour can be cleared: the paint is then absent, or the default.
+  onClear: () => void
   showText?: boolean
   size?: 'small' | 'middle' | 'large',
   onOpenChange?: (open: boolean) => void
@@ -20,18 +23,20 @@ export function DebouncedColorPicker({
   showText = true,
   size = 'small',
   onOpenChange,
+  onClear,
 }: DebouncedColorPickerProps) {
   const [previewColor, setPreviewColor] = useState<string | null>(null)
 
   const handleColorChange = (color: Color) => {
-    setPreviewColor(color.toHexString())
+    setPreviewColor(color.cleared ? null : color.toHexString())
   }
 
+  // Clearing reports a change too, with a cleared colour: `onClear` is its
+  // only write.
   const handleColorChangeComplete = (color: Color) => {
-    const hexColor = color.toHexString()
     setPreviewColor(null)
-
-    onChange(hexColor)
+    if (color.cleared) return
+    onChange(color.toHexString())
   }
 
   const displayColor = previewColor || value
@@ -44,6 +49,8 @@ export function DebouncedColorPicker({
       onChangeComplete={handleColorChangeComplete}
       showText={showText}
       size={size}
+      allowClear
+      onClear={onClear}
     />
   )
 }

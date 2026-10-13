@@ -1,7 +1,10 @@
 import type { ImageAlign } from '@imprime/sdk'
+import { AlignGrid, type GridPosition } from '../AlignGrid/AlignGrid'
 
-const VERTICAL: ImageAlign['vertical'][] = ['top', 'middle', 'bottom']
-const HORIZONTAL: ImageAlign['horizontal'][] = ['left', 'center', 'right']
+const HORIZONTAL: Record<ImageAlign['horizontal'], GridPosition> = { left: 'start', center: 'center', right: 'end' }
+const VERTICAL: Record<ImageAlign['vertical'], GridPosition> = { top: 'start', middle: 'center', bottom: 'end' }
+const TO_HORIZONTAL: Record<GridPosition, ImageAlign['horizontal']> = { start: 'left', center: 'center', end: 'right' }
+const TO_VERTICAL: Record<GridPosition, ImageAlign['vertical']> = { start: 'top', center: 'middle', end: 'bottom' }
 
 interface ImageAlignGridProps {
   value: ImageAlign
@@ -10,25 +13,18 @@ interface ImageAlignGridProps {
   onChange: (align: ImageAlign) => void
 }
 
-// The nine places an image can sit in its box, laid out as they are.
+// The nine places an image can sit in its box.
 export function ImageAlignGrid({ value, disabled, onChange }: ImageAlignGridProps) {
   return (
-    <div className="image-align-grid" role="radiogroup" aria-label="Image alignment">
-      {VERTICAL.map(vertical => HORIZONTAL.map(horizontal => {
-        const active = value.vertical === vertical && value.horizontal === horizontal
-        return (
-          <button
-            key={`${vertical}-${horizontal}`}
-            type="button"
-            role="radio"
-            aria-checked={active}
-            title={vertical === 'middle' && horizontal === 'center' ? 'Center' : `${vertical} ${horizontal}`}
-            disabled={disabled}
-            className={active ? 'image-align-cell active' : 'image-align-cell'}
-            onClick={() => onChange({ horizontal, vertical })}
-          />
-        )
-      }))}
-    </div>
+    <AlignGrid
+      horizontal={HORIZONTAL[value.horizontal]}
+      vertical={VERTICAL[value.vertical]}
+      disabled={disabled}
+      label="Image alignment"
+      onChange={(horizontal, vertical) => onChange({
+        horizontal: TO_HORIZONTAL[horizontal],
+        vertical: TO_VERTICAL[vertical],
+      })}
+    />
   )
 }

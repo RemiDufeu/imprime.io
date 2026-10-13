@@ -5,18 +5,17 @@ import {
     FontSizeOutlined,
     PictureOutlined,
     FolderOutlined,
-    BranchesOutlined,
     RetweetOutlined,
 } from '@ant-design/icons'
+import { shapeKind } from '../../../../../../../utils/shapeTree'
 
 export function shapeIcon(shape: Shape) {
-    switch (shape.type) {
+    switch (shapeKind(shape)) {
         case 'rectangle': return <BorderOutlined />
         case 'ellipse': return <Loading3QuartersOutlined />
         case 'text': return <FontSizeOutlined />
         case 'image': return <PictureOutlined />
         case 'group': return <FolderOutlined />
-        case 'if-group': return <BranchesOutlined />
-        case 'for-group': return <RetweetOutlined />
+        case 'repeat': return <RetweetOutlined />
     }
 }

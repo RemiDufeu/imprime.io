@@ -1,3 +1,4 @@
+import { theme } from 'antd'
 import { getDashArray } from '@imprime/sdk'
 import { useEditorStore } from '../../../store/editor/EditorStore'
 import { ContainerFrame } from './ContainerFrame'
@@ -7,6 +8,7 @@ export function SVGDrawingPreview() {
     const drawingData = useEditorStore(state => state.drawingData)
     const drawStyle = useEditorStore(state => state.drawStyle)
     const selectedTool = useEditorStore(state => state.selectedTool)
+    const { token } = theme.useToken()
 
     if (!drawingData) return null
 
@@ -32,7 +34,7 @@ export function SVGDrawingPreview() {
                     y={y}
                     width={width}
                     height={height}
-                    fill={drawStyle.fill}
+                    fill={drawStyle.fill ?? 'none'}
                     stroke={drawStyle.stroke}
                     strokeWidth={drawStyle.strokeWidth}
                     strokeDasharray={getDashArray(drawStyle.strokeStyle)}
@@ -54,7 +56,7 @@ export function SVGDrawingPreview() {
                     cy={cy}
                     rx={rx}
                     ry={ry}
-                    fill={drawStyle.fill}
+                    fill={drawStyle.fill ?? 'none'}
                     stroke={drawStyle.stroke}
                     strokeWidth={drawStyle.strokeWidth}
                     strokeDasharray={getDashArray(drawStyle.strokeStyle)}
@@ -71,7 +73,8 @@ export function SVGDrawingPreview() {
                     width={width}
                     height={height}
                     fill="none"
-                    stroke={drawStyle.stroke}
+                    // Outlined even when the drawing style has no stroke.
+                    stroke={drawStyle.stroke ?? token.colorBorder}
                     strokeWidth={2}
                     strokeDasharray="5,5"
                     pointerEvents="none"
@@ -82,11 +85,9 @@ export function SVGDrawingPreview() {
             return <ImagePlaceholder status="empty" x={x} y={y} width={width} height={height} />
 
         case 'group':
-        case 'if-group':
-        case 'for-group':
             return (
                 <ContainerFrame
-                    type={type}
+                    repeat={false}
                     x={x}
                     y={y}
                     width={width}

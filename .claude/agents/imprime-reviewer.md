@@ -49,7 +49,7 @@ those areas, say which other agent should also run.
   `packages/frontend/src/utils/shapeTree.ts` rebuilds instead.
 - **Bypassing the single write path.** A shape action calling
   `templatesAPI.updatePage` directly instead of `updatePageShapes`, which
-  skips `reflowGroups` and the retry logic.
+  skips `layoutTree` (the reflow) and the retry logic.
 - **A type hole in the only safety net.** `any`, `as` on a domain type,
   `@ts-ignore`, or a `default:` case that swallows a new union member. This repo
   has no tests — the compiler is the test suite. A suppression is acceptable

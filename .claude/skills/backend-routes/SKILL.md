@@ -129,7 +129,9 @@ the SDK method and the editor's API wrapper with it. → skill `api-surfaces`
 - a small helper (`setPdfDownloadHeaders`) sets `Content-Type`,
   `Content-Disposition` with **both** an ASCII-sanitised `filename` and an
   RFC 5987 `filename*=UTF-8''…`, and `Content-Length`;
-- a custom `X-Generation-Time` header carries timing for debugging;
+- a custom `X-Generation-Time` header carries timing for debugging, and
+  `X-Export-Warnings` (`EXPORT_WARNINGS_HEADER`, exposed through CORS) the
+  export's warnings as JSON, since the body is the PDF;
 - the one-shot download route (`GET /download/:token`) is **deliberately
   unguarded by ownership** because the token itself is the capability —
   single-use, 10-minute TTL, from `pdfDownloadStore`.

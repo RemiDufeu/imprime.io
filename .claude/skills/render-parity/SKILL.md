@@ -29,11 +29,12 @@ Anything where "the editor and the PDF must agree" is the requirement:
 |---|---|
 | `pageSize.ts` | `PAGE_FORMATS` (A4 portrait, A4 landscape, 16:9), `DEFAULT_PAGE_SIZE`, `isValidPageSize` — the size is per template (`Template.pageSize`), read in the editor through `selectPageSize` |
 | `strokeUtils.ts` | `getDashArray` — dashed/dotted stroke patterns |
-| `svgRenderers.ts` | `getEllipseGeometry`, `getRectangleCornerRadius` — shape geometry from a bounding box |
+| `svgRenderers.ts` | `getEllipseGeometry` — ellipse geometry from a bounding box |
+| `boxGeometry.ts` | `getBoxPaths` (outline + per-side border as path data, Bézier corners, CSS radius fitting), `getBorderWidths`, `getCornerRadii`, `getPadding`, `getBorderOverhang` — every rectangle and group box |
 | `imageLayout.ts` | `getImageLayout` (fit, alignment and crop → the rect the *whole* image is drawn at, clipped to the box), `getImageCrop`, `getImageCornerRadius` (clamped as react-pdf clamps a clip), `getImageOpacity` |
-| `groupLayout.ts` | `distributeMainAxis`, `crossAxisOffset`, `layoutGroupChildren` — the flexbox subset |
-| `shapeResolver.ts` | `resolveShapes`, `childrenBBox` — container expansion |
-| `variables.ts` | `resolveVariable`, `isEmptyVariableValue`, `stringifyVariableValue` |
+| `groupLayout.ts` | `distributeMainAxis`, `crossAxisOffset`, `layoutGroupChildren` — the flexbox subset, padding, `stack` |
+| `shapeResolver.ts` | `resolveShapes` — repeats, conditions, group expansion; `getGroupBox` — a group's background and border as rectangles |
+| `variables.ts` | `resolveVariable`, `isConditionMet`, `isEmptyVariableValue`, `stringifyVariableValue` |
 | `pageContentStyles.ts` | text formatting: `getPageContentWrapperStyles` (box, vertical alignment), `getParagraphStyle` (alignment, line height, sanitised), `getTextDecoration`, `getTextTransform`, `parseFontSize`, `DEFAULT_FONT_SIZE`, `DEFAULT_LINE_HEIGHT`, `PARAGRAPH_SPACING` |
 | `listStyles.ts` | lists: `getListStyle` (sanitised), `getListMarkers` (numbering), `getListMarkerFormatting`, `getListLayout` / `getBulletBox` (item and marker geometry) |
 
@@ -64,28 +65,37 @@ Legitimately asymmetric, and must not be forced into `common`:
 
 `resolveShapes()` is called in exactly one place: `ExportService.exportToPDF`.
 The editor never calls it. This is deliberate — you cannot select, drag or
-rename a shape that only exists because a `for-group` materialised it.
+rename a shape that only exists because a repeat materialised it.
 
 So in the editor:
 
-- containers stay nested; `SVGGroup` draws a `<g transform="translate(x y)">`
-  and recurses, so children keep parent-relative coordinates;
-- an `if-group` renders its children regardless of the condition;
-- a `for-group` renders its children exactly once;
+- groups stay nested; `SVGGroup` draws a `<g transform="translate(x y)">`
+  and recurses, so children keep parent-relative coordinates. It draws the
+  group's box in the export's order — `getGroupBox`'s background, the
+  children, the border — under the editor-only dashed frame;
+- a repeated group shows **one copy**, the authored one, with a `⟳ list` badge;
+- a `visibleWhen` shape is always drawn, with a `? variable` badge, and only
+  **faded** when `previewCondition` (`utils/conditionPreview.ts`) finds the
+  defaults would hide it — reading item fields from each repeat's first default
+  item, through the shared `isConditionMet`. Its siblings do not reflow: the
+  editor's layout keeps every authored child, the export's leaves it out;
 - `hidden` shapes are skipped by `SVGSelectionWrapper` (still listed in the
   shape tree panel, still selectable there).
 
 And in the export, `resolveShapes` flattens all of that to absolute-positioned
-leaves: `hidden` dropped, conditions evaluated, iterations materialised with
-re-forged ids (`reidShape`), coordinates translated into page space. By the
-time `renderShape` runs, **no container can reach it**.
+leaves: `hidden` dropped, conditions evaluated, repeat copies materialised with
+re-forged ids (`reidShape`), group boxes emitted as rectangles, coordinates
+translated into page space. By the time `renderShape` runs, **no group can
+reach it**.
 
-The one place the editor deliberately mirrors resolution is auto-layout:
-`reflowGroups` (`packages/frontend/src/utils/groupLayout.ts`) re-applies
-`layoutGroupChildren` to the authored tree on every shape update
-(`PageSlice.updatePageShapes`), so a laid-out group looks the same in the
-editor as `expandGroup` will make it at export time. If you add a layout rule,
-check both call sites still agree.
+The one place the editor deliberately mirrors resolution is layout: the write
+path (`DocumentWriteSlice.updatePageShapes`) runs `layoutTree`
+(`common/rendering/groupLayout.ts`) on the authored tree on every shape
+update, and `resolveShapes` runs the same function on the tree its data
+produced. So a laid-out group looks the same in the editor as at export —
+except where the data differs: one copy per repeat and every conditional
+shape in the editor, so a hugging group is smaller there than in the PDF.
+Add a layout rule inside `layoutTree` and both sides have it.
 
 ## Checklist for a visual change
 

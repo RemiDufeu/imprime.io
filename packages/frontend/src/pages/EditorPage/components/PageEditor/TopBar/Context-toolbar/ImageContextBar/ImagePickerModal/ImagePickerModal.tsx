@@ -32,7 +32,7 @@ interface ImagePickerModalProps {
 
 // Where an image box's image comes from: an image the presentation already
 // shows, a new upload, or an image variable — the template's own, or an image
-// field of an item a for-group around the box iterates. Picking one replaces
+// field of an item a repeat around the box iterates. Picking one replaces
 // whatever the box showed, and closes.
 export function ImagePickerModal({ shape, onClose }: ImagePickerModalProps) {
   const pages = useEditorStore(state => state.template?.pages)

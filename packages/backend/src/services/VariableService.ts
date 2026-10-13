@@ -153,8 +153,8 @@ export class VariableService {
     return variables.map(variableToDTO)
   }
 
-  // Anywhere in the trees: text runs inside containers, if-group conditions
-  // and for-group lists all point at the variable by id.
+  // Anywhere in the trees: text runs inside groups, image boxes, conditions
+  // and repeats all point at the variable by id.
   private async isVariableInUse(templateId: string, variableId: string): Promise<boolean> {
     const pages = await PageModel.find({
       templateId: toObjectId(templateId),

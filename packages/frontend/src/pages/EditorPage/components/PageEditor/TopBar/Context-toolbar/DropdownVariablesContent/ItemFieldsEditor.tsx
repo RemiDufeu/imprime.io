@@ -19,7 +19,7 @@ interface ItemFieldsEditorProps {
   value?: VariableItemField[]
   onChange?: (value: VariableItemField[]) => void
   // Nesting depth, used only to indent. A `List` field declares its own item
-  // fields, which is what lets a for-group nest on it.
+  // fields, which is what lets a repeat nest on it.
   depth?: number
 }
 

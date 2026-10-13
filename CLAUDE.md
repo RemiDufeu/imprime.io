@@ -69,8 +69,9 @@ generating a PDF, never by typecheck alone.
    geometry, layout and resolution logic belongs in `packages/common/src/rendering/`
    so the two cannot drift. → skill `render-parity`
 2. **The editor shows the authored tree; the export shows the resolved tree.**
-   `resolveShapes()` is called only by `ExportService`. Containers stay nested in
-   the editor, conditions are not evaluated, `for-group`s are not repeated.
+   `resolveShapes()` is called only by `ExportService`. Groups stay nested in
+   the editor, `visibleWhen` conditions are not applied (a shape they would
+   hide with the default values is only faded), a `repeat` group shows one copy.
    → skill `shape-model`
 3. **One definition of variable semantics.** `resolveVariable`,
    `isEmptyVariableValue` and `stringifyVariableValue` in

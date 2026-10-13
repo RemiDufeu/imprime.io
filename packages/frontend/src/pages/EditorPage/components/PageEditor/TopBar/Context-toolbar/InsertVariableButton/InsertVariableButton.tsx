@@ -18,7 +18,7 @@ export function InsertVariableButton() {
     const currentPage = useCurrentPage()
 
     // Only strings can be inlined into text: a template-wide string
-    // variable, or a string field of an item an enclosing for-group iterates.
+    // variable, or a string field of an item an enclosing repeat iterates.
     const textVariables = (variables ?? [])
         .filter(v => v.type === 'string')
         .map(v => ({ key: encodeItemFieldValue(v._id, ''), label: v.name }))

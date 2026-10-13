@@ -185,33 +185,40 @@ export function isDescendantOf(shapes: Shape[], shapeId: string, ancestorId: str
   return false
 }
 
-const TYPE_LABEL: Record<Shape['type'], string> = {
+// What a shape is to the author: its type, except that a repeated group reads
+// as a repeat — in the layers panel's icon, and its name when it has none.
+export type ShapeKind = Shape['type'] | 'repeat'
+
+export function shapeKind(shape: Shape): ShapeKind {
+  return shape.type === 'group' && shape.repeat ? 'repeat' : shape.type
+}
+
+const KIND_LABEL: Record<ShapeKind, string> = {
   rectangle: 'Rectangle',
   ellipse: 'Ellipse',
   text: 'Text',
   image: 'Image',
   group: 'Group',
-  'if-group': 'If',
-  'for-group': 'For',
+  repeat: 'Repeat',
 }
 
 // What the layers panel shows for a shape. Shapes created before `name`
-// existed have none, so fall back to their type rather than an empty row.
+// existed have none, so fall back to their kind rather than an empty row.
 export function shapeDisplayName(shape: Shape): string {
-  return shape.name ?? TYPE_LABEL[shape.type]
+  return shape.name ?? KIND_LABEL[shapeKind(shape)]
 }
 
 // Auto-generate a fresh name for a newly-created shape
-export function nextShapeName(shapes: Shape[], type: Shape['type']): string {
+export function nextShapeName(shapes: Shape[], kind: ShapeKind): string {
   let count = 0
   const walk = (list: Shape[]) => {
     for (const s of list) {
-      if (s.type === type) count += 1
+      if (shapeKind(s) === kind) count += 1
       if (isContainerShape(s)) walk(s.children)
     }
   }
   walk(shapes)
-  return `${TYPE_LABEL[type]} ${count + 1}`
+  return `${KIND_LABEL[kind]} ${count + 1}`
 }
 
 // Find the innermost container whose absolute bounding box contains (px, py).

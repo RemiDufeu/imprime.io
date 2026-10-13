@@ -1,4 +1,4 @@
-import type { Template, VariableItem, VariableValueType } from '../types.js'
+import type { Template, VariableItem, VariableValueType, VisibilityCondition } from '../types.js'
 
 // Values are keyed by variable *name* (that's the surface the export endpoint,
 // the MCP tool and the UI all expose). The template is carried alongside so
@@ -9,14 +9,14 @@ export interface ResolveContext {
 }
 
 /**
- * One level of for-group iteration. Frames are pushed by `expandForGroup` and
- * live only for the duration of `resolveShapes` — they are not part of
- * `ResolveContext`, which is built once per export and is template-wide.
+ * One level of repeat iteration. Frames are pushed as `resolveShapes` expands a
+ * repeated group, and live only for the duration of that call — they are not
+ * part of `ResolveContext`, which is built once per export and is template-wide.
  */
 export interface VariableScopeFrame {
   variableId: string
   // Dotted path, from the variable's root, to the list this frame iterates:
-  // '' for the top-level list, 'moves' for a for-group nested on the `moves`
+  // '' for the top-level list, 'moves' for a repeat nested on the `moves`
   // field. It is the prefix a reference must carry to address this frame.
   path: string
   value: VariableItem
@@ -93,17 +93,16 @@ function frameFor(
 /**
  * What a variable evaluates to for this render: the supplied runtime value, or
  * the variable's `default` when that value is absent. Shapes reference
- * variables by `_id` (`conditionVariable`, `itemsVariable`, a text run's
+ * variables by `_id` (a condition's or a repeat's `variableId`, a text run's
  * `variableId`), hence the id → name indirection.
  *
- * With `itemPath` set, the reference addresses a field of a for-group's current
+ * With `itemPath` set, the reference addresses a field of a repeat's current
  * item instead, and is resolved against `scope` alone: a path is inert outside
  * the loop that binds it, so it fails closed rather than being reinterpreted
  * against the variable's whole value.
  *
- * Single definition on purpose: the condition of an if-group, the items of a
- * for-group and the text of a variable run must agree on what "this variable is
- * empty" means.
+ * Single definition on purpose: a shape's condition, a group's repeat and the
+ * text of a variable run must agree on what "this variable is empty" means.
  */
 export function resolveVariable(
   variableId: string | undefined,
@@ -129,4 +128,20 @@ export function resolveVariable(
 
   const runtime = ctx.variableValues[variable.name]
   return isEmptyVariableValue(runtime) ? variable.default : runtime
+}
+
+/**
+ * Whether a shape's `visibleWhen` lets it show: the value must be exactly
+ * `true`, or exactly `false` with `negate`. Nothing is coerced, so a missing
+ * value hides the shape both ways — a boolean variable that may be absent
+ * needs a `default`.
+ */
+export function isConditionMet(
+  condition: VisibilityCondition | undefined,
+  ctx: ResolveContext | undefined,
+  scope: VariableScope = [],
+): boolean {
+  if (!condition) return true
+  const value = resolveVariable(condition.variableId, ctx, condition.itemPath, scope)
+  return condition.negate ? value === false : value === true
 }

@@ -1,16 +1,17 @@
 import type {
   Shape,
   GroupShape,
-  IfGroupShape,
-  ForGroupShape,
+  RectangleShape,
   TextBoxShape,
   ImageShape,
   VariableElement,
   CustomText,
 } from '../types.js'
 import { isContainerShape } from '../types.js'
-import { layoutGroupChildren, distributeMainAxis, crossAxisOffset } from './groupLayout.js'
+import { layoutTree } from './groupLayout.js'
+import { getBorderOverhang } from './boxGeometry.js'
 import {
+  isConditionMet,
   resolveVariable,
   stringifyVariableValue,
   type ResolveContext,
@@ -20,10 +21,8 @@ import {
 
 export type { ResolveContext }
 
-// Move a set of children from their parent's local space into the parent's own
-// space. Every container expansion needs this, hence the one helper.
-function translate(shapes: Shape[], dx: number, dy: number): Shape[] {
-  return shapes.map(shape => ({ ...shape, x: shape.x + dx, y: shape.y + dy }) as Shape)
+function translate(shape: Shape, dx: number, dy: number): Shape {
+  return { ...shape, x: shape.x + dx, y: shape.y + dy } as Shape
 }
 
 function reidShape(shape: Shape, suffix: string): Shape {
@@ -33,102 +32,145 @@ function reidShape(shape: Shape, suffix: string): Shape {
     : { ...shape, id } as Shape
 }
 
-export interface ChildrenBBox {
-  minX: number
-  minY: number
-  width: number
-  height: number
+// A copy of a repeated group, and the scope its variables resolve in: the
+// frame of its own item on top of its parent's.
+interface Copy {
+  shape: GroupShape
+  scope: VariableScope
 }
 
-// Tight bounding box of the given children. Returns actual extent (max - min)
-// so it excludes any empty space between the parent's origin and the topmost/
-// leftmost child.
-export function childrenBBox(children: Shape[]): ChildrenBBox {
-  if (children.length === 0) return { minX: 0, minY: 0, width: 0, height: 0 }
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-  for (const c of children) {
-    if (c.x < minX) minX = c.x
-    if (c.y < minY) minY = c.y
-    if (c.x + c.width > maxX) maxX = c.x + c.width
-    if (c.y + c.height > maxY) maxY = c.y + c.height
-  }
-  return { minX, minY, width: maxX - minX, height: maxY - minY }
-}
+// The copies of a repeated group, one per item, each with its item's frame.
+// A group whose list is unset, unknown, not a list or empty has none.
+function repeatGroup(group: GroupShape, ctx: ResolveContext | undefined, scope: VariableScope): Copy[] {
+  const variableId = group.repeat?.variableId
+  if (!variableId) return []
 
-// When the group has an active layout, children positions are recomputed from
-// the layout rules instead of trusting their persisted x/y — the only way this
-// stays correct once children come from dynamic data.
-function expandGroup(group: GroupShape, ctx: ResolveContext | undefined, scope: VariableScope): Shape[] {
-  // Binds nothing itself, but must carry the scope through: a text run nested
-  // `for-group > group > text` otherwise loses its binding.
-  return resolveShapes(translate(layoutGroupChildren(group), group.x, group.y), ctx, scope)
-}
+  const items = resolveVariable(variableId, ctx, group.repeat?.itemPath, scope)
+  if (!Array.isArray(items)) return []
 
-function expandIfGroup(group: IfGroupShape, ctx: ResolveContext | undefined, scope: VariableScope): Shape[] {
-  // Strictly the boolean `true`: a string or a list is never coerced.
-  if (resolveVariable(group.conditionVariable, ctx, group.itemPath, scope) !== true) return []
-  return resolveShapes(translate(group.children, group.x, group.y), ctx, scope)
-}
-
-// Per-iteration (x, y) offset relative to the for-group's own origin. Each
-// iteration occupies the children's tight bbox, so they are laid out as
-// `count` identically-sized items — the same distribution a group applies to
-// its children.
-function forGroupIterationOffsets(group: ForGroupShape, count: number): { xOff: number; yOff: number }[] {
-  if (count <= 0) return []
-
-  const isRow = (group.layout ?? 'vertical') === 'horizontal'
-  const bbox = childrenBBox(group.children)
-  const iterMain = isRow ? bbox.width : bbox.height
-  const iterCross = isRow ? bbox.height : bbox.width
-
-  const mainOffsets = distributeMainAxis(
-    Array.from({ length: count }, () => iterMain),
-    isRow ? group.width : group.height,
-    group.gap ?? 0,
-    group.justify ?? 'start',
-  )
-  const crossPos = crossAxisOffset(group.align ?? 'start', isRow ? group.height : group.width, iterCross)
-
-  return mainOffsets.map(mainPos => ({
-    xOff: isRow ? mainPos : crossPos,
-    yOff: isRow ? crossPos : mainPos,
-  }))
-}
-
-function expandForGroup(group: ForGroupShape, ctx: ResolveContext | undefined, scope: VariableScope): Shape[] {
-  const itemsVariable = group.itemsVariable
-  if (!itemsVariable) return []
-
-  const items = resolveVariable(itemsVariable, ctx, group.itemPath, scope)
-  if (!Array.isArray(items) || items.length === 0) return []
-
-  // Children are shifted by the tight bbox origin so each iteration lands at
-  // (group.x + xOff, group.y + yOff) — otherwise the authored minX/minY get
-  // added on top of the layout offset and push iterations off-page.
-  const bbox = childrenBBox(group.children)
-  const offsets = forGroupIterationOffsets(group, items.length)
-
-  const out: Shape[] = []
-  for (let i = 0; i < items.length; i++) {
-    const { xOff, yOff } = offsets[i]
-    // Each iteration reforges ids so the renderer never sees duplicate keys —
-    // the authored child.id is only unique within the source tree.
-    const iteration = group.children.map(child => reidShape(child, `for-${group.id}-${i}`))
-    // The frame is what children address: same variable, and the path of the
-    // list being iterated ('' at the top level, 'moves' for a nested group).
-    const frame: VariableScopeFrame = {
-      variableId: itemsVariable,
-      path: group.itemPath ?? '',
-      value: items[i],
+  return items.map((item, i) => {
+    // The frame is what the copy addresses: same variable, and the path of the
+    // list being iterated ('' at the top level, 'moves' for a nested repeat).
+    const frame: VariableScopeFrame = { variableId, path: group.repeat?.itemPath ?? '', value: item }
+    // Each copy reforges its ids so the renderer never sees duplicate keys —
+    // the authored ids are only unique within the source tree.
+    const suffix = `rep-${group.id}-${i}`
+    const copy: GroupShape = {
+      ...group,
+      id: `${group.id}::${suffix}`,
+      children: group.children.map(child => reidShape(child, suffix)),
     }
-    out.push(...resolveShapes(
-      translate(iteration, group.x + xOff - bbox.minX, group.y + yOff - bbox.minY),
-      ctx,
-      [...scope, frame],
-    ))
+    return { shape: copy, scope: [...scope, frame] }
+  })
+}
+
+// In a parent without a layout, a repeated group's copies are stacked
+// downwards from where it stands: as a hugging column of them, so that a copy
+// which grows pushes the next one down. The column paints nothing.
+function stackCopies(group: GroupShape, copies: Shape[]): GroupShape {
+  return {
+    type: 'group',
+    id: `${group.id}::copies`,
+    x: group.x,
+    y: group.y,
+    width: group.width,
+    height: group.height,
+    layout: 'vertical',
+    hug: true,
+    children: copies.map(copy => ({ ...copy, x: 0, y: 0 }) as Shape),
+  }
+}
+
+/**
+ * What a list of siblings becomes once the data is applied: hidden shapes and
+ * those whose condition fails are gone — they take no room in a layout — a
+ * repeated group is replaced by its copies, in place, and every value read
+ * from an item is baked in, while the item is still known. A copy's
+ * condition is checked against its own item.
+ *
+ * `freeForm` is the parent having no layout to place copies with.
+ */
+function instantiate(
+  shapes: Shape[],
+  ctx: ResolveContext | undefined,
+  scope: VariableScope,
+  freeForm: boolean,
+): Shape[] {
+  const out: Shape[] = []
+  for (const shape of shapes) {
+    if (shape.hidden) continue
+
+    if (shape.type === 'group' && shape.repeat) {
+      const copies = repeatGroup(shape, ctx, scope)
+        .filter(copy => isConditionMet(copy.shape.visibleWhen, ctx, copy.scope))
+        .map(copy => applyData(copy.shape, ctx, copy.scope))
+      if (freeForm) {
+        if (copies.length > 0) out.push(stackCopies(shape, copies))
+      } else {
+        out.push(...copies)
+      }
+      continue
+    }
+
+    if (isConditionMet(shape.visibleWhen, ctx, scope)) out.push(applyData(shape, ctx, scope))
   }
   return out
+}
+
+function applyData(shape: Shape, ctx: ResolveContext | undefined, scope: VariableScope): Shape {
+  switch (shape.type) {
+    case 'group':
+      return { ...shape, children: instantiate(shape.children, ctx, scope, !shape.layout || shape.layout === 'none') }
+    case 'text':
+      return bakeTextBox(shape, ctx, scope)
+    case 'image':
+      return bakeImage(shape, ctx, scope)
+    default:
+      return shape
+  }
+}
+
+export interface GroupBox {
+  // Painted under the children.
+  background: RectangleShape | null
+  // Stroked over them, as a frame's border is in Figma: centred on the
+  // group's edge, it would otherwise be half hidden by a child that fills the
+  // group up to that edge — a table's header row under the table's border.
+  border: RectangleShape | null
+}
+
+/**
+ * A group's own background and border, as rectangles both renderers already
+ * draw, at the group's position. Each is null when there is nothing to paint.
+ */
+export function getGroupBox(group: GroupShape): GroupBox {
+  const hasFill = group.fill !== undefined && group.fill !== 'none' && group.fill !== 'transparent'
+  const hasStroke = group.stroke !== undefined && getBorderOverhang(group) > 0
+  const base = {
+    type: 'rectangle' as const,
+    x: group.x,
+    y: group.y,
+    width: group.width,
+    height: group.height,
+    cornerRadius: group.cornerRadius,
+  }
+
+  return {
+    background: hasFill && group.fill !== undefined
+      ? { ...base, id: `${group.id}::fill`, fill: group.fill }
+      : null,
+    border: hasStroke
+      ? {
+          ...base,
+          id: `${group.id}::border`,
+          fill: 'none',
+          stroke: group.stroke,
+          strokeWidth: group.strokeWidth,
+          strokeWidths: group.strokeWidths,
+          strokeStyle: group.strokeStyle,
+        }
+      : null,
+  }
 }
 
 // An item-scoped run commits to its text here, while the scope stack is still
@@ -162,7 +204,7 @@ function bakeTextBox(
 ): TextBoxShape {
   // A box with no item-scoped run is handed back untouched — the common case,
   // and what makes the scan worth it. Note the test is not `scope.length === 0`:
-  // a run carrying an `itemPath` outside any for-group must still be baked, to
+  // a run carrying an `itemPath` outside any repeat must still be baked, to
   // the empty string it resolves to. Left alone it would reach the renderer,
   // which resolves by `variableId` only and would print the variable's whole
   // value instead.
@@ -199,37 +241,35 @@ function bakeImage(shape: ImageShape, ctx: ResolveContext | undefined, scope: Va
   }
 }
 
+// Into page space, as leaves: each group's box around its children — its
+// background under them, its border over them.
+function flatten(shapes: Shape[], dx: number, dy: number): Shape[] {
+  const out: Shape[] = []
+  for (const shape of shapes) {
+    const placed = translate(shape, dx, dy)
+    if (placed.type !== 'group') {
+      out.push(placed)
+      continue
+    }
+    const { background, border } = getGroupBox(placed)
+    if (background) out.push(background)
+    out.push(...flatten(placed.children, placed.x, placed.y))
+    if (border) out.push(border)
+  }
+  return out
+}
+
 /**
- * Flatten a shape tree into absolute-positioned leaves: containers are expanded
- * (conditions evaluated, iterations materialised), hidden shapes are dropped.
+ * Flatten a shape tree into absolute-positioned leaves, in three passes: the
+ * data (hidden shapes and failed conditions dropped, repeated groups copied,
+ * item values baked), then the layout of what that left (`layoutTree`: hugging
+ * groups sized, children placed), then page space, with each group's box
+ * emitted as rectangles.
  */
 export function resolveShapes(
   shapes: Shape[],
   ctx?: ResolveContext,
   scope: VariableScope = [],
 ): Shape[] {
-  const out: Shape[] = []
-  for (const shape of shapes) {
-    if (shape.hidden) continue
-    switch (shape.type) {
-      case 'group':
-        out.push(...expandGroup(shape, ctx, scope))
-        break
-      case 'if-group':
-        out.push(...expandIfGroup(shape, ctx, scope))
-        break
-      case 'for-group':
-        out.push(...expandForGroup(shape, ctx, scope))
-        break
-      case 'text':
-        out.push(bakeTextBox(shape, ctx, scope))
-        break
-      case 'image':
-        out.push(bakeImage(shape, ctx, scope))
-        break
-      default:
-        out.push(shape)
-    }
-  }
-  return out
+  return flatten(layoutTree(instantiate(shapes, ctx, scope, true)), 0, 0)
 }

@@ -13,7 +13,7 @@ data or resolution, not `@react-pdf/renderer`.
 
 ```
 1. validateVariables   required + empty → 400 before anything renders
-2. resolveShapes       hidden · if-group condition · for-group items · layout
+2. resolveShapes       hidden · visibleWhen · repeat copies · layout · group boxes
 3. page-edge filter   s.y < pageSize.height && s.x < pageSize.width
 4. fetchImageData      missing image → red placeholder, logged not thrown
 5. renderShape         per type; containers never arrive here
@@ -42,9 +42,9 @@ speculating down the pipeline.
 
 | Symptom | First suspect |
 |---|---|
-| Section missing entirely | `if-group` condition not strictly `true`, or unknown variable `_id` → `resolveVariable` returns `undefined` silently |
-| Repeat renders once or zero times | `itemsVariable` is not a non-empty array |
-| Content off-page | `expandForGroup` bbox origin, or the stage-3 filter |
+| Section missing entirely | `visibleWhen` value not strictly `true` (`false` with `negate`), or unknown variable `_id` → `resolveVariable` returns `undefined` silently |
+| Repeat renders once or zero times | the `repeat` variable is not a non-empty array |
+| Content off-page | repeat copies overflowing a fixed-size parent, or the stage-3 filter |
 | Colour flat, shape invisible | `parseColor` — alpha must be split out |
 | Wrong font, no bold | family not in the catalog (`BUILTIN_FONTS`, the instance's imported fonts) / no file for that face |
 | Text wraps differently | expected: browser vs react-pdf metrics |
