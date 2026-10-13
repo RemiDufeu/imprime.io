@@ -142,6 +142,10 @@ Add a layout rule inside `layoutTree` and both sides have it.
   out as it does in the editor.
 - **Hyphenation.** react-pdf hyphenates long words by default; the browser
   does not. Line breaks differ on long text even with identical metrics.
+- **A word wider than its box.** react-pdf keeps it whole on one line, running
+  past the edge. Slate's `Editable` defaults to `word-wrap: break-word`, which
+  splits it instead (a narrow "03" read "0 / 3"): `TextBoxEditor` overrides
+  it with `wordWrap: 'normal'`. Keep the override.
 - **List markers are drawn, not typed.** None of the bundled PDF fonts has ◦
   or ▪ (only • and –), and the browser would silently borrow the glyph from
   another font. Bullets are boxes (`getBulletBox`); numbers are text, since

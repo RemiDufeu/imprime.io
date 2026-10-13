@@ -87,6 +87,11 @@ export const TextBoxEditor = ({ initialContent, editor, readonly, fillHeight = t
             width: '100%',
             height: fillHeight ? '100%' : 'auto',
             outline: 'none',
+            // Slate's default is 'break-word', which splits a word too wide
+            // for its box across lines; react-pdf never does and lets it run
+            // past the edge on one line. A narrow label then read "0 / 3" in
+            // the editor and "03" in the PDF.
+            wordWrap: 'normal',
             // Read by `.text-box-paragraph`; the constant is shared with the PDF export.
             ['--paragraph-spacing' as string]: `${PARAGRAPH_SPACING}px`,
           }}
