@@ -10,7 +10,9 @@ import {
   PlusOutlined,
 } from '@ant-design/icons'
 import type { VariableItem, VariableItemField, VariableItemValue, VariableType } from '@imprime/sdk'
+import { getVariableMaxLength } from '@imprime/sdk'
 import { ImageValueInput } from '../ImageValueInput/ImageValueInput'
+import { maxLengthCount } from '../../../utils/maxLengthCount'
 
 // A Record, so the next VariableType member fails to compile here.
 const TYPE_HINT: Record<VariableType, string> = {
@@ -101,6 +103,7 @@ export function ItemListEditor({ items, fields, onChange, disabled, vectorSize }
             size="small"
             value={typeof value === 'string' ? value : ''}
             disabled={disabled}
+            count={maxLengthCount(getVariableMaxLength(field))}
             onChange={e => replaceAt(index, withField(item, field.name, e.target.value))}
           />
         )
@@ -151,6 +154,11 @@ export function ItemListEditor({ items, fields, onChange, disabled, vectorSize }
                 {fields.map(field => (
                   <th key={field.name}>
                     {field.name}
+                    {field.required === true && (
+                      <Tooltip title="Required: every item needs a value">
+                        <span className="item-list-required">*</span>
+                      </Tooltip>
+                    )}
                     <span className="item-list-type">{TYPE_HINT[field.type]}</span>
                   </th>
                 ))}

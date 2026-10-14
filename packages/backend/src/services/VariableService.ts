@@ -8,8 +8,8 @@ import {
   variableToDTO,
   variableUpdateToModel,
 } from '../models/mappers.js'
-import type { VariableDTO, VariableData, VariableType, VariableValueType } from '@imprime/common'
-import { collectVariableIds } from '@imprime/common'
+import type { VariableDTO, VariableData, VariableItemField, VariableType, VariableValueType } from '@imprime/common'
+import { collectVariableIds, exceedsMaxLength, findItemFieldIssue } from '@imprime/common'
 import { touchTemplate } from './TemplateService.js'
 import { readImageDataUrl } from './ImageService.js'
 import { NotFoundError, ConflictError, ValidationError } from './errors.js'
@@ -36,6 +36,47 @@ function assertDrawableDefault(type: VariableType, value: VariableValueType | nu
   }
 }
 
+// A limit is a positive whole number of characters. Checked as sent, before
+// the model casts it: Mongoose would turn "12" into 12.
+function assertMaxLengthValue(value: unknown): void {
+  if (value !== undefined && !(Number.isInteger(value) && Number(value) > 0)) {
+    throw new ValidationError(
+      'A max length must be a positive whole number',
+      'INVALID_VARIABLE_MAX_LENGTH',
+    )
+  }
+}
+
+// The limits of a list's item fields, nested lists included, checked as sent
+// like the variable's own.
+function assertItemFieldLimits(fields: VariableItemField[] | undefined): void {
+  for (const field of fields ?? []) {
+    assertMaxLengthValue(field.maxLength)
+    assertItemFieldLimits(field.itemFields)
+  }
+}
+
+// A default is drawn whenever an export gives no value, so it must keep to the
+// declaration: no longer than the limit and, for a list, no item leaving a
+// required field empty or a field's text longer than its limit.
+function assertDefaultFits(variable: Pick<VariableData, 'type' | 'maxLength' | 'default' | 'itemFields'>): void {
+  if (exceedsMaxLength(variable, variable.default)) {
+    throw new ValidationError(
+      `The default is longer than the max length of ${variable.maxLength} characters`,
+      'INVALID_VARIABLE_DEFAULT',
+    )
+  }
+  if (variable.type !== 'object-list') return
+  const issue = findItemFieldIssue(variable.default, variable.itemFields, 'default')
+  if (!issue) return
+  throw new ValidationError(
+    issue.problem === 'missing'
+      ? `The default leaves the required field "${issue.path}" empty`
+      : `The default's "${issue.path}" is longer than its max length of ${issue.field.maxLength} characters`,
+    'INVALID_VARIABLE_DEFAULT',
+  )
+}
+
 export class VariableService {
   public async create(templateId: string, data: VariableDTO.Create): Promise<VariableData[]> {
     const template = await TemplateModel.findById(templateId).select('_id')
@@ -53,6 +94,11 @@ export class VariableService {
     }
 
     assertDrawableDefault(data.type, data.default)
+    assertMaxLengthValue(data.maxLength)
+    assertItemFieldLimits(data.itemFields)
+    const model = variableCreateToModel(template._id, data)
+    if (model.type !== 'string') model.maxLength = undefined
+    assertDefaultFits(model)
 
     const exists = await VariableDataModel.exists({
       templateId: template._id,
@@ -64,7 +110,7 @@ export class VariableService {
 
     try {
       await VariableDataModel.create({
-        ...variableCreateToModel(template._id, data),
+        ...model,
         ...(data._id !== undefined ? { _id: toObjectId(data._id) } : {}),
       })
     } catch (err) {
@@ -99,11 +145,17 @@ export class VariableService {
       }
     }
 
+    if (data.maxLength !== null) assertMaxLengthValue(data.maxLength)
+    assertItemFieldLimits(data.itemFields)
+
     const previousType = variable.type
     Object.assign(variable, variableUpdateToModel(data))
 
     if (variable.type !== 'object-list') {
       variable.itemFields = undefined
+    }
+    if (variable.type !== 'string') {
+      variable.maxLength = undefined
     }
     if (data.type !== undefined && data.type !== previousType && data.default === undefined) {
       variable.default = undefined
@@ -112,6 +164,7 @@ export class VariableService {
       variable.default = undefined
     }
     assertDrawableDefault(variable.type, variable.default)
+    assertDefaultFits(variable)
 
     try {
       await variable.save()

@@ -1,7 +1,8 @@
-import { Alert, Input, Button, Form, Switch, Select } from 'antd'
+import { Alert, Input, InputNumber, Button, Form, Switch, Select } from 'antd'
 import { useState } from 'react'
 import { useEditorStore } from '../../../../../../../store/editor/EditorStore'
 import type { VariableData, VariableItemField, VariableType, VariableValueType } from '@imprime/sdk'
+import { exceedsMaxLength, getVariableMaxLength } from '@imprime/sdk'
 import { ImageValueInput, ItemListInput } from '../../../../../../../components/common'
 import { itemFieldAtPath } from '../../../../../../../utils/variableScope'
 import { selectPageSize } from '../../../../../../../store/editor/selectors'
@@ -12,6 +13,8 @@ import {
   type VariableReference,
 } from '../../../../../../../utils/variableUsage'
 import { parseApiError } from '../../../../../../../utils/apiError'
+import { maxLengthCount } from '../../../../../../../utils/maxLengthCount'
+import { itemFieldsRule } from '../../../../../../../utils/itemFieldsRule'
 import { ItemFieldsEditor, ITEM_FIELD_NAME_PATTERN } from './ItemFieldsEditor'
 
 interface VariableFormData {
@@ -19,6 +22,8 @@ interface VariableFormData {
   type: VariableType
   defaultValue?: VariableValueType
   required?: boolean
+  // antd's InputNumber gives null once cleared.
+  maxLength?: number | null
   itemFields?: VariableItemField[]
 }
 
@@ -99,6 +104,12 @@ export function VariableForm({ variable, onSaved, onCancel, lockedType }: Variab
   // touched, so the fallback only covers that first frame.
   const watchedItemFields = Form.useWatch('itemFields', form)
   const itemFields = watchedItemFields ?? variable?.itemFields
+  // The limit bounds the default's input, so it is read back the same way.
+  const watchedMaxLength = Form.useWatch('maxLength', form)
+  const maxLength = getVariableMaxLength({
+    type: selectedType,
+    maxLength: (watchedMaxLength === undefined ? variable?.maxLength : watchedMaxLength) ?? undefined,
+  })
 
   const createVariable = useEditorStore(state => state.createVariable)
   const updateVariable = useEditorStore(state => state.updateVariable)
@@ -143,13 +154,14 @@ export function VariableForm({ variable, onSaved, onCancel, lockedType }: Variab
       type: values.type,
       itemFields: values.type === 'object-list' ? values.itemFields : undefined,
     }
+    const limit = values.type === 'string' ? values.maxLength ?? undefined : undefined
 
     try {
       const variables = isEdit
         // The form always states the default, so an emptied field has to clear
         // the stored one rather than read as "leave it alone".
-        ? await updateVariable(variable._id, { ...definition, default: values.defaultValue ?? null })
-        : await createVariable({ ...definition, default: values.defaultValue })
+        ? await updateVariable(variable._id, { ...definition, default: values.defaultValue ?? null, maxLength: limit ?? null })
+        : await createVariable({ ...definition, default: values.defaultValue, maxLength: limit })
 
       const saved = isEdit
         ? variables.find(v => v._id === variable._id)
@@ -186,6 +198,10 @@ export function VariableForm({ variable, onSaved, onCancel, lockedType }: Variab
           label="Default Value"
           name="defaultValue"
           tooltip={isRequired ? 'Disabled when variable is required' : 'One row per item, one column per field'}
+          // Drawn when an export gives no list, so it keeps to the fields'
+          // declarations, as the server checks when it is saved.
+          dependencies={['itemFields']}
+          rules={[itemFieldsRule(itemFields, 'default')]}
         >
           <ItemListInput disabled={isRequired} itemFields={itemFields} vectorSize={vectorSize} />
         </Form.Item>
@@ -211,8 +227,19 @@ export function VariableForm({ variable, onSaved, onCancel, lockedType }: Variab
         label="Default Value"
         name="defaultValue"
         tooltip={isRequired ? 'Disabled when variable is required' : undefined}
+        // The input cuts what is typed past the limit; this catches a default
+        // that was already longer when the limit was lowered.
+        dependencies={['maxLength']}
+        rules={[
+          {
+            validator: (_, value: VariableValueType | undefined) =>
+              exceedsMaxLength({ type: 'string', maxLength }, value)
+                ? Promise.reject(new Error(`At most ${maxLength} characters`))
+                : Promise.resolve(),
+          },
+        ]}
       >
-        <Input placeholder="Optional" disabled={isRequired} />
+        <Input placeholder="Optional" disabled={isRequired} count={maxLengthCount(maxLength)} />
       </Form.Item>
     )
   }
@@ -228,6 +255,7 @@ export function VariableForm({ variable, onSaved, onCancel, lockedType }: Variab
           type: lockedType ?? variable?.type ?? 'string',
           defaultValue: variable?.default,
           required: variable?.required ?? false,
+          maxLength: variable?.maxLength,
           itemFields: variable?.itemFields,
         }}
         onValuesChange={validateForm}
@@ -265,6 +293,16 @@ export function VariableForm({ variable, onSaved, onCancel, lockedType }: Variab
             }}
           />
         </Form.Item>
+
+        {selectedType === 'string' && (
+          <Form.Item
+            label="Max Length"
+            name="maxLength"
+            tooltip="Most characters a value may have, so the template can be designed for the longest one. A longer value fails the export."
+          >
+            <InputNumber min={1} precision={0} placeholder="Unlimited" />
+          </Form.Item>
+        )}
 
         {selectedType === 'object-list' && (
           <Form.Item

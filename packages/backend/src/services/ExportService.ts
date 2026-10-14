@@ -27,6 +27,8 @@ import {
   resolveShapes,
   resolveVariable,
   isEmptyVariableValue,
+  exceedsMaxLength,
+  findItemFieldIssue,
   stringifyVariableValue,
   getEllipseGeometry,
   getBoxPaths,
@@ -105,7 +107,9 @@ export class ExportService {
   }
 
   /**
-   * Required variables must have a value, and every image a value holds — an
+   * Required variables, and the required fields of a list's items, must have a
+   * value; a string, no more characters than its variable's or field's max
+   * length; and every image a value holds — an
    * image variable's, or an image field's of a list's items, nested lists
    * included — must be one the export can draw. The error names the value, as
    * the caller wrote it: `photos[2].file`. An empty one is left to the
@@ -122,9 +126,14 @@ export class ExportService {
 
     for (const variable of requiredVariables) {
       if (isEmptyVariableValue(variableValues[variable.name])) {
-        throw new ValidationError(`Required variable "${variable.name}" is missing`)
+        throw new ValidationError(`Required variable "${variable.name}" is missing`, 'REQUIRED_VARIABLE_MISSING')
       }
     }
+
+    const tooLong = (label: string, maxLength: number | undefined) => new ValidationError(
+      `Variable "${label}" is longer than its max length of ${maxLength} characters`,
+      'VARIABLE_TOO_LONG'
+    )
 
     const images = new Map<string, DataUrlImage>()
     const checkImage = (value: unknown, label: string) => {
@@ -152,8 +161,16 @@ export class ExportService {
     }
     for (const variable of template.variableData ?? []) {
       const value = variableValues[variable.name]
+      if (exceedsMaxLength(variable, value)) throw tooLong(variable.name, variable.maxLength)
       if (variable.type === 'image') checkImage(value, variable.name)
-      else if (variable.type === 'object-list') checkItems(value, variable.itemFields, variable.name)
+      else if (variable.type === 'object-list') {
+        const issue = findItemFieldIssue(value, variable.itemFields, variable.name)
+        if (issue?.problem === 'missing') {
+          throw new ValidationError(`Required variable "${issue.path}" is missing`, 'REQUIRED_VARIABLE_MISSING')
+        }
+        if (issue?.problem === 'too-long') throw tooLong(issue.path, issue.field.maxLength)
+        checkItems(value, variable.itemFields, variable.name)
+      }
     }
     return images
   }

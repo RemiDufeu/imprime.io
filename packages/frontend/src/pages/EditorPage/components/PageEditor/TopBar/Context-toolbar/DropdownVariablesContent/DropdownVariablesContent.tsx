@@ -3,6 +3,7 @@ import { PlusOutlined, SearchOutlined, DeleteOutlined, EditOutlined } from '@ant
 import { useState, useMemo } from 'react'
 import { useEditorStore } from '../../../../../../../store/editor/EditorStore'
 import type { VariableData, VariableType } from '@imprime/sdk'
+import { getVariableMaxLength } from '@imprime/sdk'
 import './DropdownVariablesContent.css'
 
 const TYPE_BADGE_LABEL: Record<VariableType, string> = {
@@ -20,6 +21,15 @@ function formatDefault(variable: VariableData): string {
   if (Array.isArray(value)) return `${value.length} item${value.length === 1 ? '' : 's'}`
   if (variable.type === 'image') return 'an image'
   return String(value)
+}
+
+// After the default or "Required" — one of them at most, as a required
+// variable has no default — when the variable has a limit.
+function formatMaxLength(variable: VariableData): string | null {
+  const maxLength = getVariableMaxLength(variable)
+  if (maxLength === undefined) return null
+  const hasDefault = variable.default !== undefined && variable.default !== null && variable.default !== ''
+  return `${hasDefault || variable.required ? ' · ' : ''}Max ${maxLength} characters`
 }
 
 // Template-wide variable management: browse and delete, plus the entry
@@ -80,6 +90,7 @@ export function DropdownVariablesContent() {
                       {variable.required && (
                         <>Required</>
                       )}
+                      {formatMaxLength(variable)}
                     </div>
                   </div>
                   <div className="variable-actions">

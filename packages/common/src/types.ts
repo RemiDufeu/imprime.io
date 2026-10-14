@@ -296,6 +296,11 @@ export interface VariableData {
   name: string
   default?: VariableValueType
   required?: boolean
+  // Most characters a 'string' value may have, so that a template can be
+  // designed for its longest text: a longer value fails the export, and a
+  // longer default is refused when saved. Unset is unlimited. Ignored for the
+  // other types. Read through `getVariableMaxLength`.
+  maxLength?: number
   // Item schema when `type === 'object-list'`. The editor needs it to offer
   // field names in a picker without any runtime data. Ignored for the other
   // types.
@@ -311,6 +316,12 @@ export type VariableType = "string" | "boolean" | "image" | "object-list"
 export interface VariableItemField {
   name: string
   type: VariableType
+  // Every item must give this field a value: an empty one fails the export, and
+  // the variable's default must not leave it empty either. There is no field
+  // default to fall back on.
+  required?: boolean
+  // As `VariableData.maxLength`, for each item's value of a 'string' field.
+  maxLength?: number
   itemFields?: VariableItemField[]
 }
 
@@ -374,6 +385,7 @@ export namespace VariableDTO {
     name: string
     default?: VariableValueType
     required?: boolean
+    maxLength?: number
     itemFields?: VariableItemField[]
   }
 
@@ -382,6 +394,8 @@ export namespace VariableDTO {
     name?: string
     default?: VariableValueType | null
     required?: boolean
+    // null removes the limit.
+    maxLength?: number | null
     itemFields?: VariableItemField[]
   }
 

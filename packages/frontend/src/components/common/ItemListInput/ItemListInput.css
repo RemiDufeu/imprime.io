@@ -35,6 +35,11 @@
   min-width: 120px;
 }
 
+.item-list-required {
+  margin-left: var(--space-xs);
+  color: var(--ant-color-error);
+}
+
 .item-list-type {
   margin-left: var(--space-xs);
   color: var(--ant-color-text-tertiary);

@@ -36,7 +36,7 @@ const inputSchema = {
   variableValues: variableValuesSchema
     .optional()
     .describe(
-      'Optional map of variable name → value for substitution. Accepts string, boolean, or a list of objects whose properties are strings, booleans or nested lists. An image variable, or an image property of a list item, takes a PNG or JPEG data URL (data:image/png;base64,…)'
+      'Optional map of variable name → value for substitution. Accepts string, boolean, or a list of objects whose properties are strings, booleans or nested lists. An image variable, or an image property of a list item, takes a PNG or JPEG data URL (data:image/png;base64,…). A string variable, or a string property of a list item, may set a max length: a value with more characters fails the export, as an empty required list property does.'
     ),
 }
 

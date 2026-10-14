@@ -4,9 +4,13 @@ import { useState, useEffect } from "react";
 import { templatesAPI } from "../../api/api";
 import { Button, Input, message, Modal, Form, Switch, Dropdown, Space, Tooltip } from "antd";
 import type { VariableValueType } from "@imprime/sdk";
+import { getVariableMaxLength } from "@imprime/sdk";
 import "./EditorHeader.css";
 import { useEditorStore } from "../../store/editor/EditorStore";
 import { MOD_LABEL } from "../../utils/hotkeys";
+import { maxLengthCount } from "../../utils/maxLengthCount";
+import { itemFieldsRule } from "../../utils/itemFieldsRule";
+import { parseApiError } from "../../utils/apiError";
 import { selectCanRedo, selectCanUndo } from "../../store/editor/selectors";
 import { ImageValueInput, ItemListInput } from "../../components/common";
 import { DropdownVariablesContent } from "../EditorPage/components/PageEditor/TopBar/Context-toolbar/DropdownVariablesContent/DropdownVariablesContent";
@@ -97,8 +101,11 @@ export default function EditorHeader() {
             form.resetFields();
         } catch (error) {
             console.error('Export error:', error);
-            if (error instanceof Error && error.message.includes('Required variable')) {
-                message.error(error.message);
+            // The values the author can fix; the form checks them too, but the
+            // server is the one that decides.
+            const apiError = parseApiError(error);
+            if (apiError.code === 'REQUIRED_VARIABLE_MISSING' || apiError.code === 'VARIABLE_TOO_LONG') {
+                message.error(apiError.message);
             } else {
                 message.error('Failed to export PDF. Please try again.');
             }
@@ -206,7 +213,12 @@ export default function EditorHeader() {
                 } else if (variable.type === 'object-list') {
                     input = <ItemListInput itemFields={variable.itemFields} vectorSize={vectorSize} />;
                 } else {
-                    input = <Input placeholder={typeof variable.default === 'string' ? variable.default : `Enter ${variable.name}`} />;
+                    input = (
+                        <Input
+                            placeholder={typeof variable.default === 'string' ? variable.default : `Enter ${variable.name}`}
+                            count={maxLengthCount(getVariableMaxLength(variable))}
+                        />
+                    );
                 }
 
                 return (
@@ -219,7 +231,8 @@ export default function EditorHeader() {
                             {
                                 required: variable.required,
                                 message: `${variable.name} is required`
-                            }
+                            },
+                            ...(variable.type === 'object-list' ? [itemFieldsRule(variable.itemFields, variable.name)] : []),
                         ]}
                         tooltip={variable.required ? 'Required' : defaultHint}
                     >

@@ -1,4 +1,4 @@
-import { Button, Input, Select } from 'antd'
+import { Button, Checkbox, Input, InputNumber, Select, Tooltip } from 'antd'
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons'
 import type { VariableItemField, VariableType } from '@imprime/sdk'
 import './ItemFieldsEditor.css'
@@ -51,11 +51,36 @@ export function ItemFieldsEditor({ value, onChange, depth = 0 }: ItemFieldsEdito
               value={field.type}
               options={FIELD_TYPE_OPTIONS}
               onChange={type =>
-                // Dropping itemFields on a type change keeps the declaration
-                // honest: only a list has item fields.
-                replaceAt(index, { name: field.name, type })
+                // Dropping itemFields and maxLength on a type change keeps the
+                // declaration honest: only a list has item fields, only a
+                // string a limit.
+                replaceAt(index, { name: field.name, type, required: field.required })
               }
             />
+            {field.type === 'string' ? (
+              <Tooltip title="Max length: most characters a value may have. A longer one fails the export.">
+                <InputNumber
+                  size="small"
+                  className="item-field-max-length"
+                  min={1}
+                  precision={0}
+                  placeholder="Max length"
+                  value={field.maxLength}
+                  onChange={maxLength => replaceAt(index, { ...field, maxLength: maxLength ?? undefined })}
+                />
+              </Tooltip>
+            ) : (
+              // Keeps the Required boxes in a column.
+              <span className="item-field-max-length" />
+            )}
+            <Tooltip title="Every item must give it a value: an empty one fails the export.">
+              <Checkbox
+                checked={field.required === true}
+                onChange={e => replaceAt(index, { ...field, required: e.target.checked || undefined })}
+              >
+                Required
+              </Checkbox>
+            </Tooltip>
             <Button
               size="small"
               type="text"

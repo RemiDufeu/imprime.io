@@ -482,6 +482,21 @@ Limits worth handling:
   the variable's default. The request body, images included, is capped at
   10 MB. An image variable's `default` is checked when it is saved:
   `400 INVALID_VARIABLE_DEFAULT`.
+- **A string variable can set a `maxLength`**, in characters (an emoji counts
+  as one). An export fails with `400 VARIABLE_TOO_LONG` when a value has more;
+  an empty value falls back to the default, which is checked against the limit
+  when saved: `400 INVALID_VARIABLE_DEFAULT`. A limit that is not a positive
+  whole number fails with `400 INVALID_VARIABLE_MAX_LENGTH`; `maxLength: null`
+  in an update removes it.
+- **A list's item fields can be `required`, and a string one can set a
+  `maxLength`**, in its `itemFields` entry:
+  `{ name: 'title', type: 'string', required: true, maxLength: 40 }`. An export
+  fails, naming the value (`albums[0].tracks[2].title`), with
+  `400 REQUIRED_VARIABLE_MISSING` when an item leaves a required field empty,
+  and with `400 VARIABLE_TOO_LONG` when a value has more characters than its
+  field allows. A required variable left empty fails with the same
+  `REQUIRED_VARIABLE_MISSING`. Item fields have no default, but the list's
+  own default must keep to them when saved: `400 INVALID_VARIABLE_DEFAULT`.
 
 ## TypeScript Support
 

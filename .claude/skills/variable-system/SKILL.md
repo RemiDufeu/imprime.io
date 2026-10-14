@@ -11,7 +11,7 @@ A variable is what turns a document into a template. Definitions live on the
 template; values arrive at export time.
 
 ```ts
-VariableData  { _id, type, name, default?, required?, itemFields? }
+VariableData  { _id, type, name, default?, required?, maxLength?, itemFields? }
 VariableType  'string' | 'boolean' | 'image' | 'object-list'
 VariableValueType  string | boolean | VariableItem[]
 ```
@@ -78,8 +78,28 @@ to `false` must not fall back to its `default`.
 
 `ExportService.validateVariables` runs before any rendering: every variable with
 `required: true` whose value is empty (by `isEmptyVariableValue`, so `default`
-is **not** consulted) throws `ValidationError`. A required variable with only a
+is **not** consulted) throws `ValidationError('REQUIRED_VARIABLE_MISSING')`. A required variable with only a
 `default` still fails — that is intentional.
+
+A `string` variable's `maxLength` is checked in the same pass: a value with
+more characters fails with `VARIABLE_TOO_LONG`. `exceedsMaxLength` is the one
+definition — it counts code points (`countCharacters`: an emoji is one, not
+two UTF-16 units), skips an empty value (the default stands in for it) and
+reads the limit through `getVariableMaxLength`, which ignores it on any other
+type. `VariableService` refuses a limit that is not a positive integer
+(`INVALID_VARIABLE_MAX_LENGTH`) and a default longer than it
+(`INVALID_VARIABLE_DEFAULT`). The editor's inputs count the same way
+(`utils/maxLengthCount.ts`, antd's `count.strategy`) — not antd's `maxLength`,
+which counts UTF-16 units.
+
+A list's item fields take `required` and (string ones) `maxLength` too.
+`findItemFieldIssue` (common `variables.ts`) is the one walk over a list's
+items that checks them, nested lists included, and names the first value that
+breaks its field as the caller wrote it (`albums[0].tracks[2].title`). Three
+callers: the export (`REQUIRED_VARIABLE_MISSING` / `VARIABLE_TOO_LONG`),
+`VariableService` on a list's default (`INVALID_VARIABLE_DEFAULT` — an item
+field has no default of its own, so the list's must already comply), and the
+editor's list inputs (`utils/itemFieldsRule.ts`).
 
 ## Editor display
 

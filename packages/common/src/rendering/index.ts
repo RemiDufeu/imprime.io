@@ -57,10 +57,14 @@ export {
   isConditionMet,
   isEmptyVariableValue,
   stringifyVariableValue,
+  getVariableMaxLength,
+  countCharacters,
+  exceedsMaxLength,
+  findItemFieldIssue,
   joinItemPath,
   ITEM_PATH_SEPARATOR,
 } from './variables.js'
-export type { ResolveContext, VariableScope, VariableScopeFrame } from './variables.js'
+export type { ResolveContext, VariableScope, VariableScopeFrame, ItemFieldIssue } from './variables.js'
 export {
   getPageContentWrapperStyles,
   getParagraphStyle,
