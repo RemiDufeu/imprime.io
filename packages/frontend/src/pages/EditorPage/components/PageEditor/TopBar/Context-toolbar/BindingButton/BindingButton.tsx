@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react'
-import { Button, Dropdown, type MenuProps } from 'antd'
+import { Button, Dropdown, Tooltip, type MenuProps } from 'antd'
 import './BindingButton.css'
 
 interface BindingButtonProps {
   icon: ReactNode
-  // What the binding does: 'Show', 'Repeat'.
+  // What the binding does: 'Show', 'Repeat'. Shown once bound; until then the
+  // icon alone stands for it, and `title` says what it does.
   label: string
   // What it is bound to, shown after the label. Unset while unbound.
   binding?: string
@@ -33,9 +34,18 @@ export function BindingButton({
         style: { maxHeight: 320, overflowY: 'auto' },
       }}
     >
-      <Button color={broken ? 'danger' : 'primary'} variant="filled" size="small" icon={icon} title={title}>
-        <span className="binding-button-label">{binding === undefined ? label : `${label}: ${binding}`}</span>
-      </Button>
+      <Tooltip title={title}>
+        <Button
+          color={broken ? 'danger' : 'primary'}
+          variant="filled"
+          size="small"
+          icon={icon}
+          // Unbound, the icon alone shows: the label still names the button.
+          aria-label={binding === undefined ? label : undefined}
+        >
+          {binding !== undefined && <span className="binding-button-label">{`${label}: ${binding}`}</span>}
+        </Button>
+      </Tooltip>
     </Dropdown>
   )
 }

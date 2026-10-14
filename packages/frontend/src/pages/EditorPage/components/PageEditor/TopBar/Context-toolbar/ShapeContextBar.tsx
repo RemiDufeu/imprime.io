@@ -1,4 +1,5 @@
-import { InputNumber, Divider } from 'antd'
+import { InputNumber, Divider, Tooltip } from 'antd'
+import { RadiusUpleftOutlined } from '@ant-design/icons'
 import { getBorderWidths } from '@imprime/sdk'
 import { useEditorStore } from '../../../../../../store/editor/EditorStore'
 import { selectSelectedShape } from '../../../../../../store/editor/selectors'
@@ -65,17 +66,18 @@ export function ShapeContextBar() {
               onChange={(cornerRadius) => updateShape(rectangle.id, { cornerRadius })}
             />
           ) : (
-            <div className="toolbar-item">
-              <span className="toolbar-label">Radius</span>
+            <Tooltip title="Corner radius">
               <InputNumber
                 min={0}
                 max={100}
                 value={drawStyle.cornerRadius}
                 onChange={(value: number | null) => setDrawStyle({ cornerRadius: value ?? 0 })}
-                style={{ width: '60px' }}
+                prefix={<RadiusUpleftOutlined />}
+                aria-label="Corner radius"
+                style={{ width: '64px' }}
                 size="small"
               />
-            </div>
+            </Tooltip>
           )}
         </>
       )}

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Button, Dropdown } from 'antd'
+import { Button, Dropdown, Tooltip } from 'antd'
 import { DownOutlined } from '@ant-design/icons'
 
 export interface IconMenuOption<T extends string> {
@@ -36,15 +36,17 @@ export function IconMenuButton<T extends string>({ options, value, title, onChan
       }}
       popupRender={(menu) => <div onMouseDown={(e) => e.preventDefault()}>{menu}</div>}
     >
-      <Button
-        type="text"
-        size="small"
-        icon={active?.icon}
-        title={title}
-        onMouseDown={(e) => e.preventDefault()}
-      >
-        <DownOutlined className="toolbar-caret" />
-      </Button>
+      <Tooltip title={title}>
+        <Button
+          type="text"
+          size="small"
+          icon={active?.icon}
+          aria-label={title}
+          onMouseDown={(e) => e.preventDefault()}
+        >
+          <DownOutlined className="toolbar-caret" />
+        </Button>
+      </Tooltip>
     </Dropdown>
   )
 }

@@ -1,5 +1,5 @@
 import { Fragment, useState } from 'react'
-import { Button, Input, Switch, Typography } from 'antd'
+import { Button, Input, Switch, Tooltip, Typography } from 'antd'
 import {
   ArrowDownOutlined,
   ArrowUpOutlined,
@@ -167,39 +167,47 @@ export function ItemListEditor({ items, fields, onChange, disabled, vectorSize }
                       <td key={field.name}>{renderCell(item, index, field)}</td>
                     ))}
                     <td className="item-list-actions">
-                      <Button
-                        size="small"
-                        type="text"
-                        icon={<ArrowUpOutlined />}
-                        title="Move up"
-                        disabled={disabled || index === 0}
-                        onClick={() => swap(index, index - 1)}
-                      />
-                      <Button
-                        size="small"
-                        type="text"
-                        icon={<ArrowDownOutlined />}
-                        title="Move down"
-                        disabled={disabled || index === items.length - 1}
-                        onClick={() => swap(index, index + 1)}
-                      />
-                      <Button
-                        size="small"
-                        type="text"
-                        icon={<CopyOutlined />}
-                        title="Duplicate"
-                        disabled={disabled}
-                        onClick={() => rearrange(indices.flatMap(i => (i === index ? [i, i] : [i])))}
-                      />
-                      <Button
-                        size="small"
-                        type="text"
-                        danger
-                        icon={<DeleteOutlined />}
-                        title="Remove"
-                        disabled={disabled}
-                        onClick={() => rearrange(indices.filter(i => i !== index))}
-                      />
+                      <Tooltip title="Move up">
+                        <Button
+                          aria-label="Move up"
+                          size="small"
+                          type="text"
+                          icon={<ArrowUpOutlined />}
+                          disabled={disabled || index === 0}
+                          onClick={() => swap(index, index - 1)}
+                        />
+                      </Tooltip>
+                      <Tooltip title="Move down">
+                        <Button
+                          aria-label="Move down"
+                          size="small"
+                          type="text"
+                          icon={<ArrowDownOutlined />}
+                          disabled={disabled || index === items.length - 1}
+                          onClick={() => swap(index, index + 1)}
+                        />
+                      </Tooltip>
+                      <Tooltip title="Duplicate">
+                        <Button
+                          aria-label="Duplicate"
+                          size="small"
+                          type="text"
+                          icon={<CopyOutlined />}
+                          disabled={disabled}
+                          onClick={() => rearrange(indices.flatMap(i => (i === index ? [i, i] : [i])))}
+                        />
+                      </Tooltip>
+                      <Tooltip title="Remove">
+                        <Button
+                          aria-label="Remove"
+                          size="small"
+                          type="text"
+                          danger
+                          icon={<DeleteOutlined />}
+                          disabled={disabled}
+                          onClick={() => rearrange(indices.filter(i => i !== index))}
+                        />
+                      </Tooltip>
                     </td>
                   </tr>
                   {listFields

@@ -1,3 +1,4 @@
+import { Tooltip } from 'antd'
 import './AlignGrid.css'
 
 export type GridPosition = 'start' | 'center' | 'end'
@@ -27,16 +28,17 @@ export function AlignGrid({ horizontal, vertical, disabled = false, label, onCha
           ? 'Center'
           : `${VERTICAL_NAMES[row]} ${HORIZONTAL_NAMES[column]}`
         return (
-          <button
-            key={`${row}-${column}`}
-            type="button"
-            role="radio"
-            aria-checked={active}
-            title={name}
-            disabled={disabled}
-            className={active ? 'align-grid-cell active' : 'align-grid-cell'}
-            onClick={() => onChange(column, row)}
-          />
+          <Tooltip key={`${row}-${column}`} title={name}>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={active}
+              aria-label={name}
+              disabled={disabled}
+              className={active ? 'align-grid-cell active' : 'align-grid-cell'}
+              onClick={() => onChange(column, row)}
+            />
+          </Tooltip>
         )
       }))}
     </div>

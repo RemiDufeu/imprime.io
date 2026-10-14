@@ -20,13 +20,12 @@ interface CornerRadiusInputProps {
 export function CornerRadiusInput({ value, onChange }: CornerRadiusInputProps) {
   return (
     <div className="toolbar-item">
-      <span className="toolbar-label">Radius</span>
       <SidesInput
         value={getCornerRadii(value)}
         fields={CORNERS}
         onChange={(radii) => onChange(areCornersUniform(radii) ? radii.topLeft : radii)}
         icon={<RadiusUpleftOutlined />}
-        title="Each corner"
+        title="Corner radius"
       />
     </div>
   )

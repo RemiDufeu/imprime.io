@@ -1,16 +1,23 @@
-import { InputNumber, Select } from 'antd'
-import { BorderOuterOutlined } from '@ant-design/icons'
+import { InputNumber } from 'antd'
+import { BorderOuterOutlined, DashOutlined, LineOutlined, SmallDashOutlined } from '@ant-design/icons'
 import type { Sides } from '@imprime/sdk'
 import { areSidesUniform } from '@imprime/sdk'
 import type { StrokeStyle } from '../../../../../../store/editor/ToolSlice'
 import { PaletteColorPicker } from './PaletteColorPicker'
 import { SidesInput } from './SidesInput/SidesInput'
+import { IconMenuButton, type IconMenuOption } from './IconMenuButton/IconMenuButton'
 
 const SIDES: { key: keyof Sides; label: string }[] = [
   { key: 'top', label: 'Top' },
   { key: 'right', label: 'Right' },
   { key: 'bottom', label: 'Bottom' },
   { key: 'left', label: 'Left' },
+]
+
+const STROKE_STYLES: IconMenuOption<StrokeStyle>[] = [
+  { value: 'solid', icon: <LineOutlined />, title: 'Solid' },
+  { value: 'dashed', icon: <DashOutlined />, title: 'Dashed' },
+  { value: 'dotted', icon: <SmallDashOutlined />, title: 'Dotted' },
 ]
 
 // Named like the shape's own fields, so a bar hands the patch straight on.
@@ -51,7 +58,7 @@ export function StrokeControls({ value, onChange }: StrokeControlsProps) {
               ? { strokeWidth: widths.top, strokeWidths: undefined }
               : { strokeWidths: widths })}
             icon={<BorderOuterOutlined />}
-            title="Each side"
+            title="Border width"
             max={20}
           />
         ) : (
@@ -65,16 +72,11 @@ export function StrokeControls({ value, onChange }: StrokeControlsProps) {
             placeholder="Width"
           />
         )}
-        <Select
+        <IconMenuButton
+          options={STROKE_STYLES}
           value={value.strokeStyle}
+          title="Border style"
           onChange={(strokeStyle: StrokeStyle) => onChange({ strokeStyle })}
-          style={{ width: '90px' }}
-          size="small"
-          options={[
-            { value: 'solid', label: 'Solid' },
-            { value: 'dashed', label: 'Dashed' },
-            { value: 'dotted', label: 'Dotted' },
-          ]}
         />
       </div>
     </div>

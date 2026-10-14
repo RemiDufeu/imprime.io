@@ -1,12 +1,16 @@
-import { Select, InputNumber, Divider, Checkbox, Tooltip, type MenuProps } from 'antd'
+import { Button, InputNumber, Divider, Tooltip, type MenuProps } from 'antd'
 import {
   ArrowDownOutlined,
   ArrowRightOutlined,
   BlockOutlined,
+  ColumnHeightOutlined,
+  ColumnWidthOutlined,
   DragOutlined,
   InfoCircleOutlined,
   BorderInnerOutlined,
+  PauseOutlined,
   RetweetOutlined,
+  ShrinkOutlined,
 } from '@ant-design/icons'
 import type { GroupJustify, GroupLayoutDirection, GroupShape, Shape, Sides } from '@imprime/sdk'
 import { getBorderWidths, getGrow, getImposedAxes, getPadding } from '@imprime/sdk'
@@ -28,6 +32,7 @@ import { ConditionControl } from './ConditionControl'
 import { FlexControl } from './FlexControl'
 import { BindingButton } from './BindingButton/BindingButton'
 import { IconMenuButton, type IconMenuOption } from './IconMenuButton/IconMenuButton'
+import { DistributionIcon, type Distribution } from './DistributionIcon'
 
 const LAYOUT_OPTIONS: IconMenuOption<GroupLayoutDirection>[] = [
   { value: 'none', icon: <DragOutlined />, title: 'Free: children stay where they are put' },
@@ -36,13 +41,22 @@ const LAYOUT_OPTIONS: IconMenuOption<GroupLayoutDirection>[] = [
   { value: 'stack', icon: <BlockOutlined />, title: 'Stack: children over each other' },
 ]
 
-type Distribution = 'packed' | 'space-between' | 'space-around'
-
-const DISTRIBUTION_OPTIONS: { value: Distribution; label: string }[] = [
-  { value: 'packed', label: 'Packed' },
-  { value: 'space-between', label: 'Space between' },
-  { value: 'space-around', label: 'Space around' },
-]
+// Drawn along the group's own axis.
+function distributionOptions(vertical: boolean): IconMenuOption<Distribution>[] {
+  return [
+    { value: 'packed', icon: <DistributionIcon distribution="packed" vertical={vertical} />, title: 'Packed' },
+    {
+      value: 'space-between',
+      icon: <DistributionIcon distribution="space-between" vertical={vertical} />,
+      title: 'Space between',
+    },
+    {
+      value: 'space-around',
+      icon: <DistributionIcon distribution="space-around" vertical={vertical} />,
+      title: 'Space around',
+    },
+  ]
+}
 
 const PADDING_SIDES: { key: keyof Sides; label: string }[] = [
   { key: 'top', label: 'Top' },
@@ -162,7 +176,8 @@ function RepeatControl({ group }: { group: GroupShape }) {
 
 // How the group places its children. The data keeps `justify` along the main
 // axis and `align` across it; the grid shows them as the places they are on
-// the page, so it reads the same whichever way the group runs.
+// the page, so it reads the same whichever way the group runs. Icons rather
+// than labels keep the bar short; each one's tooltip names it.
 function LayoutControls({ group }: { group: GroupShape }) {
   const updateShape = useEditorStore(state => state.updateShape)
   const currentPage = useCurrentPage()
@@ -203,7 +218,6 @@ function LayoutControls({ group }: { group: GroupShape }) {
 
   return (
     <div className="toolbar-item">
-      <span className="toolbar-label">Layout</span>
       <IconMenuButton
         options={LAYOUT_OPTIONS}
         value={layout}
@@ -220,43 +234,44 @@ function LayoutControls({ group }: { group: GroupShape }) {
             onChange={handleGridChange}
           />
           {!isStack && (
-            <Select
+            <IconMenuButton
+              options={distributionOptions(isColumn)}
               value={isSpread(justify) ? justify : 'packed'}
+              title="Children distribution"
               onChange={(value: Distribution) => updateShape(group.id, {
                 justify: value === 'packed' ? 'start' : value,
               })}
-              size="small"
-              style={{ width: 124 }}
-              options={DISTRIBUTION_OPTIONS}
             />
           )}
+          {/* Across the group's axis: a row's children stretch to its height. */}
           <Tooltip title={isStack ? 'Stretch children to the full height' : 'Stretch children across the group'}>
-            <Checkbox
-              checked={align === 'stretch'}
-              onChange={(e) => updateShape(group.id, { align: e.target.checked ? 'stretch' : 'start' })}
-            >
-              Stretch
-            </Checkbox>
+            <Button
+              aria-label={isStack ? 'Stretch children to the full height' : 'Stretch children across the group'}
+              size="small"
+              type={align === 'stretch' ? 'primary' : 'text'}
+              icon={isColumn ? <ColumnWidthOutlined /> : <ColumnHeightOutlined />}
+              onClick={() => updateShape(group.id, { align: align === 'stretch' ? 'start' : 'stretch' })}
+            />
           </Tooltip>
           {!isStack && (
-            <>
-              <span className="toolbar-label">Gap</span>
+            <Tooltip title="Gap between children">
               <InputNumber
                 min={0}
                 value={group.gap ?? 0}
                 onChange={(value) => updateShape(group.id, { gap: value ?? 0 })}
+                prefix={<PauseOutlined rotate={isColumn ? 90 : undefined} />}
+                aria-label="Gap between children"
                 size="small"
-                style={{ width: 60 }}
+                style={{ width: 64 }}
               />
-            </>
+            </Tooltip>
           )}
-          <span className="toolbar-label">Padding</span>
           <SidesInput
             value={getPadding(group.padding)}
             fields={PADDING_SIDES}
             onChange={(padding) => updateShape(group.id, { padding })}
             icon={<BorderInnerOutlined />}
-            title="Each side"
+            title="Padding"
           />
           {!isStack && <HugControl group={group} shapes={currentPage?.shapes ?? []} />}
         </>
@@ -281,21 +296,23 @@ function HugControl({ group, shapes }: { group: GroupShape; shapes: Shape[] }) {
   const growsAlong = parentMain === axis && getGrow(group) > 0
   const stretched = parent?.type === 'group' && getImposedAxes(parent, group)[axis] && !growsAlong
 
-  let title = `The ${what} follows its children: it grows with its copies and closes up over hidden ones.`
-  if (stretched) title = `Its parent stretches it: its ${axis} is the parent's.`
+  const hugging = group.hug === true && !stretched
+  let title = `Hug: the ${what} follows its children — it grows with its copies and closes up over hidden ones.`
+  if (stretched) title = `Hug: off, its parent stretches it — its ${axis} is the parent's.`
   else if (growsAlong) title += ' Replaces its Flex.'
 
   return (
     <Tooltip title={title}>
-      <Checkbox
-        checked={group.hug === true && !stretched}
+      <Button
+        aria-label={title}
+        size="small"
+        type={hugging ? 'primary' : 'text'}
+        icon={<ShrinkOutlined />}
         disabled={stretched}
-        onChange={(e) => updateShape(group.id, e.target.checked
-          ? { hug: true, ...(growsAlong ? { grow: undefined } : {}) }
-          : { hug: false })}
-      >
-        Hug
-      </Checkbox>
+        onClick={() => updateShape(group.id, hugging
+          ? { hug: false }
+          : { hug: true, ...(growsAlong ? { grow: undefined } : {}) })}
+      />
     </Tooltip>
   )
 }

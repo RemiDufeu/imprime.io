@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Select, Button } from 'antd'
+import { Select, Button, Tooltip } from 'antd'
 import type { SelectProps } from 'antd'
 import {
   BoldOutlined,
@@ -117,99 +117,115 @@ export function TextContextBar() {
     <>
       <div className="toolbar-container context-toolbar">
         <div className="toolbar-item">
-          <div title="Font" onMouseDown={(e) => e.preventDefault()}>
-            <Select
-              value={format.fontFamily}
-              onChange={(fontFamily: string) => applyTextFormat({ fontFamily })}
-              size="small"
-              style={{ width: '140px' }}
-              popupMatchSelectWidth={false}
-              listHeight={320}
-              options={fontOptions(fontCatalog)}
-              // The editor loads only the fonts its text uses; the picker
-              // previews every one, including those imported since.
-              onOpenChange={(open) => { if (open) void loadAllFonts() }}
-            />
-          </div>
-          <div title="Font size" onMouseDown={(e) => e.preventDefault()}>
-            <Select
-              value={format.fontSize}
-              onChange={(fontSize: number) => applyTextFormat({ fontSize })}
-              size="small"
-              style={{ width: '64px' }}
-              options={FONT_SIZES.map(size => ({ value: size, label: size.toString() }))}
-            />
-          </div>
-          <div title="Text color" onMouseDown={(e) => e.preventDefault()}>
-            <PaletteColorPicker
-              value={format.color}
-              onChange={(color: string) => applyTextFormat({ color })}
-              onClear={() => applyTextFormat({ color: null })}
-            />
-          </div>
+          <Tooltip title="Font">
+            <div onMouseDown={(e) => e.preventDefault()}>
+              <Select
+                value={format.fontFamily}
+                onChange={(fontFamily: string) => applyTextFormat({ fontFamily })}
+                size="small"
+                style={{ width: '140px' }}
+                popupMatchSelectWidth={false}
+                listHeight={320}
+                options={fontOptions(fontCatalog)}
+                // The editor loads only the fonts its text uses; the picker
+                // previews every one, including those imported since.
+                onOpenChange={(open) => { if (open) void loadAllFonts() }}
+              />
+            </div>
+          </Tooltip>
+          <Tooltip title="Font size">
+            <div onMouseDown={(e) => e.preventDefault()}>
+              <Select
+                value={format.fontSize}
+                onChange={(fontSize: number) => applyTextFormat({ fontSize })}
+                size="small"
+                style={{ width: '64px' }}
+                options={FONT_SIZES.map(size => ({ value: size, label: size.toString() }))}
+              />
+            </div>
+          </Tooltip>
+          <Tooltip title="Text color">
+            <div onMouseDown={(e) => e.preventDefault()}>
+              <PaletteColorPicker
+                value={format.color}
+                onChange={(color: string) => applyTextFormat({ color })}
+                onClear={() => applyTextFormat({ color: null })}
+              />
+            </div>
+          </Tooltip>
         </div>
 
         <div className="toolbar-divider" />
 
         <div className="toolbar-item">
-          <Button
-            type={format.bold ? 'primary' : 'text'}
-            size="small"
-            icon={<BoldOutlined />}
-            title={boldAvailable || format.bold ? 'Bold' : 'Bold (not available in this font)'}
-            disabled={!boldAvailable && !format.bold}
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={(e) => {
-              e.preventDefault()
-              applyTextFormat({ bold: !format.bold })
-            }}
-          />
-          <Button
-            type={format.italic ? 'primary' : 'text'}
-            size="small"
-            icon={<ItalicOutlined />}
-            title={italicAvailable || format.italic ? 'Italic' : 'Italic (not available in this font)'}
-            disabled={!italicAvailable && !format.italic}
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={(e) => {
-              e.preventDefault()
-              applyTextFormat({ italic: !format.italic })
-            }}
-          />
-          <Button
-            type={format.underline ? 'primary' : 'text'}
-            size="small"
-            icon={<UnderlineOutlined />}
-            title="Underline"
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={(e) => {
-              e.preventDefault()
-              applyTextFormat({ underline: !format.underline })
-            }}
-          />
-          <Button
-            type={format.strikethrough ? 'primary' : 'text'}
-            size="small"
-            icon={<StrikethroughOutlined />}
-            title="Strikethrough"
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={(e) => {
-              e.preventDefault()
-              applyTextFormat({ strikethrough: !format.strikethrough })
-            }}
-          />
-          <Button
-            type={format.uppercase ? 'primary' : 'text'}
-            size="small"
-            title="Uppercase"
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={(e) => {
-              e.preventDefault()
-              applyTextFormat({ uppercase: !format.uppercase })
-            }}
-          >
-            AA
-          </Button>
+          <Tooltip title={boldAvailable || format.bold ? 'Bold' : 'Bold (not available in this font)'}>
+            <Button
+              aria-label={boldAvailable || format.bold ? 'Bold' : 'Bold (not available in this font)'}
+              type={format.bold ? 'primary' : 'text'}
+              size="small"
+              icon={<BoldOutlined />}
+              disabled={!boldAvailable && !format.bold}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={(e) => {
+                e.preventDefault()
+                applyTextFormat({ bold: !format.bold })
+              }}
+            />
+          </Tooltip>
+          <Tooltip title={italicAvailable || format.italic ? 'Italic' : 'Italic (not available in this font)'}>
+            <Button
+              aria-label={italicAvailable || format.italic ? 'Italic' : 'Italic (not available in this font)'}
+              type={format.italic ? 'primary' : 'text'}
+              size="small"
+              icon={<ItalicOutlined />}
+              disabled={!italicAvailable && !format.italic}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={(e) => {
+                e.preventDefault()
+                applyTextFormat({ italic: !format.italic })
+              }}
+            />
+          </Tooltip>
+          <Tooltip title="Underline">
+            <Button
+              aria-label="Underline"
+              type={format.underline ? 'primary' : 'text'}
+              size="small"
+              icon={<UnderlineOutlined />}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={(e) => {
+                e.preventDefault()
+                applyTextFormat({ underline: !format.underline })
+              }}
+            />
+          </Tooltip>
+          <Tooltip title="Strikethrough">
+            <Button
+              aria-label="Strikethrough"
+              type={format.strikethrough ? 'primary' : 'text'}
+              size="small"
+              icon={<StrikethroughOutlined />}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={(e) => {
+                e.preventDefault()
+                applyTextFormat({ strikethrough: !format.strikethrough })
+              }}
+            />
+          </Tooltip>
+          <Tooltip title="Uppercase">
+            <Button
+              type={format.uppercase ? 'primary' : 'text'}
+              size="small"
+              aria-label="Uppercase"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={(e) => {
+                e.preventDefault()
+                applyTextFormat({ uppercase: !format.uppercase })
+              }}
+            >
+              AA
+            </Button>
+          </Tooltip>
         </div>
 
         <div className="toolbar-divider" />
@@ -227,49 +243,53 @@ export function TextContextBar() {
             title="Vertical alignment"
             onChange={handleVerticalAlignChange}
           />
-          <div title="Line height" onMouseDown={(e) => e.preventDefault()}>
-            <Select
-              value={format.lineHeight}
-              onChange={(lineHeight: number) => applyTextFormat({ lineHeight })}
-              size="small"
-              style={{ width: '80px' }}
-              prefix={<LineHeightOutlined />}
-              options={LINE_HEIGHTS.map(lineHeight => ({ value: lineHeight, label: lineHeight.toString() }))}
-            />
-          </div>
+          <Tooltip title="Line height">
+            <div onMouseDown={(e) => e.preventDefault()}>
+              <Select
+                value={format.lineHeight}
+                onChange={(lineHeight: number) => applyTextFormat({ lineHeight })}
+                size="small"
+                style={{ width: '80px' }}
+                prefix={<LineHeightOutlined />}
+                options={LINE_HEIGHTS.map(lineHeight => ({ value: lineHeight, label: lineHeight.toString() }))}
+              />
+            </div>
+          </Tooltip>
         </div>
 
         <div className="toolbar-divider" />
 
         <div className="toolbar-item">
           {LIST_TYPES.map(({ value, icon, title }) => (
-            <Button
-              key={value}
-              type={format.listType === value ? 'primary' : 'text'}
-              size="small"
-              icon={icon}
-              title={title}
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={(e) => {
-                e.preventDefault()
-                applyTextFormat({ listType: format.listType === value ? 'none' : value })
-              }}
-            />
+            <Tooltip key={value} title={title}>
+              <Button
+                aria-label={title}
+                type={format.listType === value ? 'primary' : 'text'}
+                size="small"
+                icon={icon}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={(e) => {
+                  e.preventDefault()
+                  applyTextFormat({ listType: format.listType === value ? 'none' : value })
+                }}
+              />
+            </Tooltip>
           ))}
           {LIST_INDENTS.map(({ delta, icon, title }) => (
-            <Button
-              key={delta}
-              type="text"
-              size="small"
-              icon={icon}
-              title={title}
-              disabled={format.listType === 'none'}
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={(e) => {
-                e.preventDefault()
-                changeListIndent(delta)
-              }}
-            />
+            <Tooltip key={delta} title={title}>
+              <Button
+                aria-label={title}
+                type="text"
+                size="small"
+                icon={icon}
+                disabled={format.listType === 'none'}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={(e) => {
+                  e.preventDefault()
+                  changeListIndent(delta)
+                }}
+              />
+            </Tooltip>
           ))}
         </div>
 
