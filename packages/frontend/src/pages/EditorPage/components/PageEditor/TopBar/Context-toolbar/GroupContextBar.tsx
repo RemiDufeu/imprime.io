@@ -19,7 +19,7 @@ import {
   itemFieldsInScope,
   variableReferenceLabel,
 } from '../../../../../../utils/variableScope'
-import { DebouncedColorPicker } from '../../../../../../components/common'
+import { PaletteColorPicker } from './PaletteColorPicker'
 import { AlignGrid, type GridPosition } from './AlignGrid/AlignGrid'
 import { SidesInput } from './SidesInput/SidesInput'
 import { StrokeControls, type StrokeValue } from './StrokeControls'
@@ -317,12 +317,10 @@ function BoxControls({ group }: { group: GroupShape }) {
     <>
       <div className="toolbar-item">
         <span className="toolbar-label">Fill</span>
-        <DebouncedColorPicker
+        <PaletteColorPicker
           value={group.fill}
           onChange={(fill: string) => updateShape(group.id, { fill })}
           onClear={() => updateShape(group.id, { fill: undefined })}
-          size="small"
-          showText={false}
         />
       </div>
 

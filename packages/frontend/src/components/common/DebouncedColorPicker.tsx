@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { ColorPicker } from 'antd'
+import type { ColorPickerProps } from 'antd'
 import type { Color } from 'antd/es/color-picker'
 
 interface DebouncedColorPickerProps {
@@ -11,6 +12,8 @@ interface DebouncedColorPickerProps {
   showText?: boolean
   size?: 'small' | 'middle' | 'large',
   onOpenChange?: (open: boolean) => void
+  // Sections of swatches under the picker; a click picks one.
+  presets?: ColorPickerProps['presets']
 }
 
 /**
@@ -24,6 +27,7 @@ export function DebouncedColorPicker({
   size = 'small',
   onOpenChange,
   onClear,
+  presets,
 }: DebouncedColorPickerProps) {
   const [previewColor, setPreviewColor] = useState<string | null>(null)
 
@@ -51,6 +55,10 @@ export function DebouncedColorPicker({
       size={size}
       allowClear
       onClear={onClear}
+      presets={presets}
+      // A preset section opens or not when the panel mounts: mounted again on
+      // every open, one that appeared since is shown open, as the others are.
+      destroyOnHidden
     />
   )
 }

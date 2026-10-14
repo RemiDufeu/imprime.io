@@ -3,7 +3,7 @@ import { getBorderWidths } from '@imprime/sdk'
 import { useEditorStore } from '../../../../../../store/editor/EditorStore'
 import { selectSelectedShape } from '../../../../../../store/editor/selectors'
 import type { DrawStyle } from '../../../../../../store/editor/ToolSlice'
-import { DebouncedColorPicker } from '../../../../../../components/common'
+import { PaletteColorPicker } from './PaletteColorPicker'
 import { StrokeControls, type StrokeValue } from './StrokeControls'
 import { CornerRadiusInput } from './CornerRadiusInput'
 import { ConditionControl } from './ConditionControl'
@@ -43,12 +43,10 @@ export function ShapeContextBar() {
       {/* Fill Section */}
       <div className="toolbar-item">
         <span className="toolbar-label">Fill</span>
-        <DebouncedColorPicker
+        <PaletteColorPicker
           value={style.fill}
           onChange={(fill: string) => apply({ fill })}
           onClear={() => apply({ fill: undefined })}
-          size="small"
-          showText={false}
         />
       </div>
 

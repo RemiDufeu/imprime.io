@@ -3,7 +3,7 @@ import { BorderOuterOutlined } from '@ant-design/icons'
 import type { Sides } from '@imprime/sdk'
 import { areSidesUniform } from '@imprime/sdk'
 import type { StrokeStyle } from '../../../../../../store/editor/ToolSlice'
-import { DebouncedColorPicker } from '../../../../../../components/common'
+import { PaletteColorPicker } from './PaletteColorPicker'
 import { SidesInput } from './SidesInput/SidesInput'
 
 const SIDES: { key: keyof Sides; label: string }[] = [
@@ -36,12 +36,10 @@ export function StrokeControls({ value, onChange }: StrokeControlsProps) {
     <div className="toolbar-item">
       <span className="toolbar-label">Stroke</span>
       <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-        <DebouncedColorPicker
+        <PaletteColorPicker
           value={value.stroke}
           onChange={(stroke: string) => onChange({ stroke })}
           onClear={() => onChange({ stroke: undefined })}
-          size="small"
-          showText={false}
         />
         {value.strokeWidths ? (
           <SidesInput

@@ -56,6 +56,8 @@ export const useEditorStore = create<BaseEditorStore>()(
                     zoom: state.zoom,
                     pagesPanelOpen: state.pagesPanelOpen,
                     layersPanelOpen: state.layersPanelOpen,
+                    // The user's, not a template's: offered in every template.
+                    recentColors: state.recentColors,
                 }),
             }
         ),

@@ -23,7 +23,7 @@ import type { FontCatalog, FontCatalogEntry, FontCategory, ListType, TextAlign, 
 import { DEFAULT_FONT, resolveFontVariant } from '@imprime/sdk'
 import { useEditorStore } from '../../../../../../store/editor/EditorStore'
 import { selectSelectedShape } from '../../../../../../store/editor/selectors'
-import { DebouncedColorPicker } from '../../../../../../components/common'
+import { PaletteColorPicker } from './PaletteColorPicker'
 import { InsertVariableButton } from './InsertVariableButton/InsertVariableButton'
 import { IconMenuButton, type IconMenuOption } from './IconMenuButton/IconMenuButton'
 import { ConditionControl } from './ConditionControl'
@@ -141,12 +141,10 @@ export function TextContextBar() {
             />
           </div>
           <div title="Text color" onMouseDown={(e) => e.preventDefault()}>
-            <DebouncedColorPicker
+            <PaletteColorPicker
               value={format.color}
               onChange={(color: string) => applyTextFormat({ color })}
               onClear={() => applyTextFormat({ color: null })}
-              size="small"
-              showText={false}
             />
           </div>
         </div>
