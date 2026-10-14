@@ -53,9 +53,17 @@ shapes paint over each other's layers and break z-order against `View`/`Text`
 elements. A layer that computes to zero width or height renders an empty `View`
 instead — the library errors on a zero-sized `Svg`.
 
-**Text needs `fixed`.** `renderTextBox` sets `fixed: true` on the wrapper `View`
-and on every `Text`, which stops react-pdf from trying to reflow the absolutely
-positioned box across pages. Pages are fixed-size pages; there is no flow.
+**Every positioned element needs `fixed`.** The text box's `View` and every
+`Text`, the image's `View` and `Image`, and each `Svg` layer set `fixed: true`,
+which stops react-pdf from trying to reflow an absolutely positioned box across
+pages. Pages are fixed-size pages; there is no flow. Leaving it off is not
+cosmetic: react-pdf moves a non-fixed element that cannot split (an `Svg`, an
+`Image`) to the next page as soon as `top + height` exceeds the page height —
+and Yoga lays out in float32, so a layer clamped *exactly* to the page bottom
+from a fractional `top` can exceed it by 1e-4. On the next page its absolute
+`top` puts it past the bottom again, and the pagination loops forever,
+synchronously: the event loop is blocked, so the 30s timeout never fires and
+the whole server hangs.
 
 **Positioning is absolute, from the top-left.** Every shape carries
 `position: 'absolute', left: shape.x, top: shape.y`. A text box sets `width` but

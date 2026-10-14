@@ -65,8 +65,6 @@ const PADDING_SIDES: { key: keyof Sides; label: string }[] = [
   { key: 'left', label: 'Left' },
 ]
 
-const DEFAULT_GAP = 8
-
 function isSpread(justify: GroupJustify): justify is 'space-between' | 'space-around' {
   return justify === 'space-between' || justify === 'space-around'
 }
@@ -193,8 +191,9 @@ function LayoutControls({ group }: { group: GroupShape }) {
       updateShape(group.id, { layout: value })
       return
     }
+    // No gap is written: unset is 0, and one the group had before is kept.
     if (layout === 'none') {
-      updateShape(group.id, { layout: value, justify, align, gap: group.gap ?? DEFAULT_GAP })
+      updateShape(group.id, { layout: value, justify, align })
       return
     }
     // Turning between a row and a column keeps the children where they sit

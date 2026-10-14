@@ -264,8 +264,13 @@ export class ExportService {
       return React.createElement(View, { key: shape.id })
     }
 
+    // `fixed`, as a text box's: a layer clamped to the page bottom can end a
+    // hair past it in react-pdf's float32 layout, and a non-fixed Svg that
+    // does not fit is moved to a next page — where its absolute position puts
+    // it past the bottom again, forever, blocking the event loop.
     return React.createElement(Svg, {
       key: shape.id,
+      fixed: true,
       style: { position: 'absolute', left, top, width, height }
     }, draw({ left, top }))
   }
