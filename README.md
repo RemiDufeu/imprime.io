@@ -79,6 +79,9 @@ Imprime is currently under active development. Here are the main planned updates
 ## Block enhancements
 - condition on page (if and for)
 
+## Improve shape
+- Add arrow
+
 ## Document format
 - Add default style (font and bg color)
 - Add pagination
