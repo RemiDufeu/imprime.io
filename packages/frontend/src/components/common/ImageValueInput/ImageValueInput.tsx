@@ -85,15 +85,17 @@ export function ImageValueInput({
           </>
         )}
         {value && (
-          <Button
-            size="small"
-            type="text"
-            danger
-            icon={<DeleteOutlined />}
-            title="Remove image"
-            disabled={disabled}
-            onClick={() => onChange?.(undefined)}
-          />
+          <Tooltip title="Remove image">
+            <Button
+              aria-label="Remove image"
+              size="small"
+              type="text"
+              danger
+              icon={<DeleteOutlined />}
+              disabled={disabled}
+              onClick={() => onChange?.(undefined)}
+            />
+          </Tooltip>
         )}
         <input
           ref={inputRef}

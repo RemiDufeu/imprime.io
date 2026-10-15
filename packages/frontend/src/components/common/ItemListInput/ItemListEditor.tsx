@@ -1,5 +1,5 @@
 import { Fragment, useState } from 'react'
-import { Button, Input, Switch, Typography } from 'antd'
+import { Button, Input, Switch, Tooltip, Typography } from 'antd'
 import {
   ArrowDownOutlined,
   ArrowUpOutlined,
@@ -10,7 +10,9 @@ import {
   PlusOutlined,
 } from '@ant-design/icons'
 import type { VariableItem, VariableItemField, VariableItemValue, VariableType } from '@imprime/sdk'
+import { getVariableMaxItems, getVariableMaxLength } from '@imprime/sdk'
 import { ImageValueInput } from '../ImageValueInput/ImageValueInput'
+import { maxLengthCount } from '../../../utils/maxLengthCount'
 
 // A Record, so the next VariableType member fails to compile here.
 const TYPE_HINT: Record<VariableType, string> = {
@@ -45,6 +47,8 @@ function withField(item: VariableItem, name: string, value: VariableItemValue | 
 interface ItemListEditorProps {
   items: VariableItem[]
   fields: VariableItemField[]
+  // Most items the list may have; no more can be added or duplicated.
+  maxItems?: number
   onChange: (items: VariableItem[]) => void
   disabled?: boolean
   // How large a vector image picked for an image field is redrawn.
@@ -56,9 +60,10 @@ interface ItemListEditorProps {
  * field, edited by its type. A list field opens, under its row, as a table of
  * its own — the same editor, one level down.
  */
-export function ItemListEditor({ items, fields, onChange, disabled, vectorSize }: ItemListEditorProps) {
+export function ItemListEditor({ items, fields, maxItems, onChange, disabled, vectorSize }: ItemListEditorProps) {
   // The list fields shown open, as `${itemIndex}:${fieldName}`.
   const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set())
+  const isFull = maxItems !== undefined && items.length >= maxItems
 
   if (fields.length === 0) {
     return (
@@ -101,6 +106,7 @@ export function ItemListEditor({ items, fields, onChange, disabled, vectorSize }
             size="small"
             value={typeof value === 'string' ? value : ''}
             disabled={disabled}
+            count={maxLengthCount(getVariableMaxLength(field))}
             onChange={e => replaceAt(index, withField(item, field.name, e.target.value))}
           />
         )
@@ -151,6 +157,11 @@ export function ItemListEditor({ items, fields, onChange, disabled, vectorSize }
                 {fields.map(field => (
                   <th key={field.name}>
                     {field.name}
+                    {field.required === true && (
+                      <Tooltip title="Required: every item needs a value">
+                        <span className="item-list-required">*</span>
+                      </Tooltip>
+                    )}
                     <span className="item-list-type">{TYPE_HINT[field.type]}</span>
                   </th>
                 ))}
@@ -167,39 +178,47 @@ export function ItemListEditor({ items, fields, onChange, disabled, vectorSize }
                       <td key={field.name}>{renderCell(item, index, field)}</td>
                     ))}
                     <td className="item-list-actions">
-                      <Button
-                        size="small"
-                        type="text"
-                        icon={<ArrowUpOutlined />}
-                        title="Move up"
-                        disabled={disabled || index === 0}
-                        onClick={() => swap(index, index - 1)}
-                      />
-                      <Button
-                        size="small"
-                        type="text"
-                        icon={<ArrowDownOutlined />}
-                        title="Move down"
-                        disabled={disabled || index === items.length - 1}
-                        onClick={() => swap(index, index + 1)}
-                      />
-                      <Button
-                        size="small"
-                        type="text"
-                        icon={<CopyOutlined />}
-                        title="Duplicate"
-                        disabled={disabled}
-                        onClick={() => rearrange(indices.flatMap(i => (i === index ? [i, i] : [i])))}
-                      />
-                      <Button
-                        size="small"
-                        type="text"
-                        danger
-                        icon={<DeleteOutlined />}
-                        title="Remove"
-                        disabled={disabled}
-                        onClick={() => rearrange(indices.filter(i => i !== index))}
-                      />
+                      <Tooltip title="Move up">
+                        <Button
+                          aria-label="Move up"
+                          size="small"
+                          type="text"
+                          icon={<ArrowUpOutlined />}
+                          disabled={disabled || index === 0}
+                          onClick={() => swap(index, index - 1)}
+                        />
+                      </Tooltip>
+                      <Tooltip title="Move down">
+                        <Button
+                          aria-label="Move down"
+                          size="small"
+                          type="text"
+                          icon={<ArrowDownOutlined />}
+                          disabled={disabled || index === items.length - 1}
+                          onClick={() => swap(index, index + 1)}
+                        />
+                      </Tooltip>
+                      <Tooltip title="Duplicate">
+                        <Button
+                          aria-label="Duplicate"
+                          size="small"
+                          type="text"
+                          icon={<CopyOutlined />}
+                          disabled={disabled || isFull}
+                          onClick={() => rearrange(indices.flatMap(i => (i === index ? [i, i] : [i])))}
+                        />
+                      </Tooltip>
+                      <Tooltip title="Remove">
+                        <Button
+                          aria-label="Remove"
+                          size="small"
+                          type="text"
+                          danger
+                          icon={<DeleteOutlined />}
+                          disabled={disabled}
+                          onClick={() => rearrange(indices.filter(i => i !== index))}
+                        />
+                      </Tooltip>
                     </td>
                   </tr>
                   {listFields
@@ -214,6 +233,7 @@ export function ItemListEditor({ items, fields, onChange, disabled, vectorSize }
                             <ItemListEditor
                               items={Array.isArray(nested) ? nested : []}
                               fields={field.itemFields ?? []}
+                              maxItems={getVariableMaxItems(field)}
                               disabled={disabled}
                               vectorSize={vectorSize}
                               onChange={next => replaceAt(index, withField(item, field.name, next))}
@@ -233,10 +253,11 @@ export function ItemListEditor({ items, fields, onChange, disabled, vectorSize }
         type="dashed"
         icon={<PlusOutlined />}
         block
-        disabled={disabled}
+        disabled={disabled || isFull}
         onClick={() => onChange([...items, emptyItem(fields)])}
       >
-        Add item
+        {/* Counted as a limited text input counts its characters. */}
+        Add item{maxItems !== undefined && ` (${items.length}/${maxItems})`}
       </Button>
     </div>
   )

@@ -117,7 +117,6 @@ change. That is the sanctioned use; do not use `getState()` in render.
 | File | Contents |
 |---|---|
 | `shapeTree.ts` | immutable shape-tree traversal and manipulation |
-| `groupLayout.ts` | `reflowGroups` over the authored tree |
 | `transform.ts` | resize maths (`resizeRect`, `ResizeHandle`) |
 
 Nothing here imports React or the store; they take data and return data, which

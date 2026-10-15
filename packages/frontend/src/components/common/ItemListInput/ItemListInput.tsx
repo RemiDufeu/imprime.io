@@ -10,6 +10,8 @@ interface ItemListInputProps {
   // kept as it is, not shown — the fields a template declares and the data an
   // integration sends drift on their own schedules.
   itemFields?: VariableItemField[]
+  // The list's max items: no more can be added.
+  maxItems?: number
   disabled?: boolean
   // How large a vector image picked for an image field is redrawn.
   vectorSize?: number
@@ -19,12 +21,13 @@ interface ItemListInputProps {
  * A list variable's value — its default, or the one an export is given — as
  * a table of its items, nested lists included.
  */
-export function ItemListInput({ value, onChange, itemFields, disabled, vectorSize }: ItemListInputProps) {
+export function ItemListInput({ value, onChange, itemFields, maxItems, disabled, vectorSize }: ItemListInputProps) {
   return (
     <div className="item-list-input">
       <ItemListEditor
         items={value ?? []}
         fields={itemFields ?? []}
+        maxItems={maxItems}
         disabled={disabled}
         vectorSize={vectorSize}
         // An emptied list is no value, as a cleared field is: the default then

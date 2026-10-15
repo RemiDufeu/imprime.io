@@ -14,7 +14,7 @@ export function SVGEllipse({ shape }: SVGEllipseProps) {
             cy={cy}
             rx={rx}
             ry={ry}
-            fill={shape.fill}
+            fill={shape.fill ?? 'none'}
             stroke={shape.stroke}
             strokeWidth={shape.strokeWidth}
             strokeDasharray={getDashArray(shape.strokeStyle)}

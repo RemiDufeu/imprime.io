@@ -1,6 +1,6 @@
 ---
 name: variable-system
-description: How Imprime variables work — the three variable types, the id-versus-name indirection, resolution and default-fallback rules, required-variable validation at export, and the lifecycle constraints (unique names, in-use deletion guard). Use when touching variables, if-group conditions, for-group iteration, text variable runs, or the export payload contract.
+description: How Imprime variables work — the three variable types, the id-versus-name indirection, resolution and default-fallback rules, required-variable validation at export, and the lifecycle constraints (unique names, in-use deletion guard). Use when touching variables, visibleWhen conditions, group repeats, text variable runs, or the export payload contract.
 metadata:
   origin: adapted from ECC (github.com/affaan-m/ECC)
 ---
@@ -11,7 +11,7 @@ A variable is what turns a document into a template. Definitions live on the
 template; values arrive at export time.
 
 ```ts
-VariableData  { _id, type, name, default?, required?, itemFields? }
+VariableData  { _id, type, name, default?, required?, maxLength?, maxItems?, itemFields? }
 VariableType  'string' | 'boolean' | 'image' | 'object-list'
 VariableValueType  string | boolean | VariableItem[]
 ```
@@ -27,8 +27,9 @@ rendering (`ExportService.validateVariables` → `INVALID_IMAGE_VALUE`, naming
 
 **Shapes reference variables by `_id`; runtime values are keyed by `name`.**
 
-- `VariableElement.variableId`, `IfGroupShape.conditionVariable`,
-  `ForGroupShape.itemsVariable` all hold a Mongo `_id`.
+- `VariableElement.variableId`, `visibleWhen.variableId` (any shape),
+  `GroupShape.repeat.variableId` and `ImageShape.imageVariable` all hold a
+  Mongo `_id`.
 - The export payload, the MCP tool argument and the UI all speak names:
   `{ "customerName": "Acme" }`.
 
@@ -38,9 +39,9 @@ it looks the definition up by `_id` in `template.variableData`, then reads
 break a template, and why `ResolveContext` carries the whole template and
 not just the value map.
 
-Never resolve a variable any other way. One definition means the condition of an
-`if-group`, the items of a `for-group` and the text of a variable run agree on
-what "this variable is empty" means.
+Never resolve a variable any other way. One definition means a shape's
+condition, a group's repeat and the text of a variable run agree on what "this
+variable is empty" means.
 
 ## Resolution rules
 
@@ -68,21 +69,46 @@ to `false` must not fall back to its `default`.
 
 | Site | Rule |
 |---|---|
-| `if-group` | `resolveVariable(...) !== true` → children dropped. **Strict identity**, no coercion: `"true"` renders nothing, a non-empty list renders nothing. The editor's picker filters to boolean variables for the same reason. |
-| `for-group` | value must be `Array.isArray` and non-empty, otherwise children are dropped. One iteration per item. |
+| `visibleWhen` | `isConditionMet`: shown only when the value is exactly `true`, or exactly `false` with `negate`. **Strict identity**, no coercion: `"true"` shows nothing, a non-empty list shows nothing, and a missing value hides the shape *both ways* — a boolean that may be absent needs a `default`. The editor's picker filters to boolean variables for the same reason. |
+| `repeat` | value must be `Array.isArray`; one copy of the group per item, none for an empty list. Each copy pushes a `VariableScopeFrame` its subtree (and its own `visibleWhen`) reads `itemPath`s from. |
 | text run | `stringifyVariableValue`: string as-is, boolean → `"true"`/`"false"`, array → `join(', ')`, absent → `""`. |
 
-Note what a `for-group` does *not* do today: the iteration's item value is not
-bound to anything the children can read. Children are duplicated verbatim. If
-you add per-item binding, it goes in `expandForGroup` and `ResolveContext`, and
-both renderers must learn it together.
 
 ## Export-time validation
 
 `ExportService.validateVariables` runs before any rendering: every variable with
 `required: true` whose value is empty (by `isEmptyVariableValue`, so `default`
-is **not** consulted) throws `ValidationError`. A required variable with only a
+is **not** consulted) throws `ValidationError('REQUIRED_VARIABLE_MISSING')`. A required variable with only a
 `default` still fails — that is intentional.
+
+A `string` variable's `maxLength` is checked in the same pass: a value with
+more characters fails with `VARIABLE_TOO_LONG`. `exceedsMaxLength` is the one
+definition — it counts code points (`countCharacters`: an emoji is one, not
+two UTF-16 units), skips an empty value (the default stands in for it) and
+reads the limit through `getVariableMaxLength`, which ignores it on any other
+type. `VariableService` refuses a limit that is not a positive integer
+(`INVALID_VARIABLE_MAX_LENGTH`) and a default longer than it
+(`INVALID_VARIABLE_DEFAULT`). The editor's inputs count the same way
+(`utils/maxLengthCount.ts`, antd's `count.strategy`) — not antd's `maxLength`,
+which counts UTF-16 units.
+
+An `object-list` variable's `maxItems` is the same thing for a list's length:
+`exceedsMaxItems` (through `getVariableMaxItems`, which ignores it on any other
+type) fails the export with `VARIABLE_TOO_MANY_ITEMS`; `VariableService`
+refuses a limit that is not a positive integer (`INVALID_VARIABLE_MAX_ITEMS`)
+and a default with more items (`INVALID_VARIABLE_DEFAULT`). The editor's list
+input stops adding and duplicating items at the limit.
+
+A list's item fields take `required`, (string ones) `maxLength` and (list ones)
+`maxItems` too. `findItemFieldIssue` (common `variables.ts`) is the one walk
+over a list's items that checks them, nested lists included, and names the
+first value that breaks its field as the caller wrote it
+(`albums[0].tracks[2].title`, `albums[0].tracks`). Three callers: the export
+(`REQUIRED_VARIABLE_MISSING` / `VARIABLE_TOO_LONG` / `VARIABLE_TOO_MANY_ITEMS`),
+`VariableService` on a list's default (`INVALID_VARIABLE_DEFAULT` — an item
+field has no default of its own, so the list's must already comply), and the
+editor's list inputs (`utils/listValueRule.ts`, which checks the list's own
+`maxItems` first).
 
 ## Editor display
 
@@ -114,8 +140,8 @@ Enforced in `packages/backend/src/services/VariableService.ts`:
 ### References
 
 A tree points at a variable in four places: a text run, an image box's
-`imageVariable`, an `if-group`'s `conditionVariable`, a `for-group`'s
-`itemsVariable`. `collectVariableIds` and
+`imageVariable`, any shape's `visibleWhen`, a group's `repeat`.
+`collectVariableIds` and
 `rebindVariables` (common `variableReferences.ts`) are the only walks over them —
 the in-use guard reads the first, the editor's paste the second. A fifth kind
 of reference is added there, once.
@@ -124,12 +150,13 @@ of reference is added there, once.
 
 Check it still holds before relying on it:
 
-**A dangling reference degrades silently.** `resolveVariable` returns
-`undefined` for an unknown `_id`, so the `if-group` disappears, the `for-group`
-disappears and the text run renders empty — no error anywhere. The server
-validates text-run ids on every page save, but not `conditionVariable` or
-`itemsVariable`: a client can still store an unknown one. Validating them would
-make pages that already hold one unsavable, so it needs a cleanup first.
+**A dangling reference degrades silently at export.** `resolveVariable`
+returns `undefined` for an unknown `_id`, so a conditional shape disappears, a
+repeat draws nothing and a text run renders empty — no error anywhere. The
+server rejects unknown ids whenever a page is created or its shapes saved
+(`PageService.assertVariableReferences`: text runs, `imageVariable`,
+`visibleWhen`, `repeat`), and the in-use guard stops a referenced variable
+being deleted — so the remaining way in is data written around the API.
 
 ## Related
 

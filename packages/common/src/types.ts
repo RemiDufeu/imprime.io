@@ -17,17 +17,66 @@ export interface BaseShape {
   // the data so the user can re-enable it.
   hidden?: boolean
   name?: string
+  // Shown in the export only when this condition holds. Unset is always shown.
+  visibleWhen?: VisibilityCondition
+  // CSS's flex-grow, for a child of a 'horizontal' or 'vertical' group: the
+  // share of the free space along that axis this shape takes, its own size on
+  // that axis then ignored (`flex: 1` is `grow: 1`). Unset or 0 keeps its size.
+  // Ignored by any other parent. Read through `getGrow`.
+  grow?: number
 }
 
-export interface RectangleShape extends BaseShape {
+// A data-driven condition on a shape: a boolean variable — or a boolean field of
+// the item an enclosing repeat iterates — must hold exactly `true` (`false`
+// with `negate`). Nothing is coerced, so `"true"`, a non-empty list, a missing
+// value or an unset variable all hide the shape. Read through `isConditionMet`.
+export interface VisibilityCondition {
+  // Reference to a boolean variable (VariableData._id). Unset only once a paste
+  // has dropped a reference it could not rebind: the shape then never shows.
+  variableId?: string
+  // Dotted path to a boolean field of the item iterated by an enclosing repeat
+  // bound to `variableId` — same addressing as `VariableElement.itemPath`.
+  // Unset evaluates the variable itself.
+  itemPath?: string
+  negate?: boolean
+}
+
+// Four lengths, one per side of a box: a group's padding, a box's border widths.
+export interface Sides {
+  top: number
+  right: number
+  bottom: number
+  left: number
+}
+
+// One radius per corner, for a box whose corners differ.
+export interface CornerRadii {
+  topLeft: number
+  topRight: number
+  bottomRight: number
+  bottomLeft: number
+}
+
+// The paint of a box — a rectangle, or a group's own background. The border
+// takes the shape's `stroke` and `strokeStyle`, and is `strokeWidth` wide on
+// every side, or `strokeWidths` side by side when set: a side of width 0 is not
+// drawn. Drawn through `getBoxPaths`, which both renderers share.
+export interface BoxStyle {
+  strokeWidths?: Sides
+  // One radius for every corner, or one per corner. Unset is square.
+  cornerRadius?: number | CornerRadii
+}
+
+export interface RectangleShape extends BaseShape, BoxStyle {
   type: 'rectangle'
-  fill: string
-  cornerRadius?: number
+  // Unset is transparent.
+  fill?: string
 }
 
 export interface EllipseShape extends BaseShape {
   type: 'ellipse'
-  fill: string
+  // Unset is transparent.
+  fill?: string
 }
 
 // Inline formatting carried by every leaf of a paragraph, literal or variable.
@@ -57,10 +106,10 @@ export type VariableElement = TextFormatting & {
   type: 'variable';
   variableId: string; // Reference to VariableData._id
   // Dotted path, from the referenced variable's root, to a field of the item
-  // being iterated by an enclosing for-group: 'name', or 'moves.name' when the
-  // run sits inside a for-group nested on the `moves` field. Unset means the
+  // being iterated by an enclosing repeat: 'name', or 'moves.name' when the
+  // run sits inside a repeat nested on the `moves` field. Unset means the
   // variable resolves at template scope, which is the only behaviour a run
-  // outside any for-group can have.
+  // outside any repeat can have.
   itemPath?: string;
   children: [{ text: '' }]; // Required by Slate for inline elements
 };
@@ -123,7 +172,7 @@ export interface ImageShape extends BaseShape {
   // Reference to an image variable (VariableData._id), resolved at export.
   imageVariable?: string
   // Dotted path to an image field of the item iterated by an enclosing
-  // for-group bound to `imageVariable` — same addressing as
+  // repeat bound to `imageVariable` — same addressing as
   // `VariableElement.itemPath`. Unset evaluates the variable itself.
   itemPath?: string
   // What `imageVariable` resolved to: a data URL. Written by `resolveShapes`
@@ -141,11 +190,27 @@ export interface ImageShape extends BaseShape {
   cornerRadius?: number
 }
 
-export type GroupLayoutDirection = 'none' | 'horizontal' | 'vertical'
+// 'none' leaves children where they were put. 'horizontal' and 'vertical' line
+// them up along that axis; 'stack' lays them over each other, each aligned in
+// the group on its own — its main axis is horizontal, so `justify` places a
+// child across and `align` down.
+export type GroupLayoutDirection = 'none' | 'horizontal' | 'vertical' | 'stack'
 export type GroupJustify = 'start' | 'center' | 'end' | 'space-between' | 'space-around'
 export type GroupAlign = 'start' | 'center' | 'end' | 'stretch'
 
-export interface GroupShape extends BaseShape {
+// What a repeated group iterates: a list variable, or a list field of the item
+// an enclosing repeat iterates.
+export interface RepeatBinding {
+  // Reference to an `object-list` variable (VariableData._id). Unset while the
+  // author has not picked a list yet: the group then renders no copy.
+  variableId?: string
+  // Dotted path to an `object-list` field of the item iterated by an enclosing
+  // repeat bound to the same `variableId`, which is what this group then
+  // iterates. Unset iterates the variable's own value.
+  itemPath?: string
+}
+
+export interface GroupShape extends BaseShape, BoxStyle {
   type: 'group'
   children: Shape[]
   // Flexbox-like auto-layout for children. Defaults to 'none' (free-form
@@ -154,46 +219,30 @@ export interface GroupShape extends BaseShape {
   justify?: GroupJustify
   align?: GroupAlign
   gap?: number
+  // Space between the group's edge and its laid-out children. Ignored by
+  // 'none', whose children keep their own x/y.
+  padding?: Sides
+  // Along its layout axis — a row's width, a column's height — the group is
+  // as large as its children, gaps and padding, rather than its own size: it
+  // grows with its copies and shrinks with its hidden children. Ignored by
+  // 'none' and 'stack'. A size the parent imposes (`grow`, 'stretch') wins
+  // over it, and its children's `grow` is ignored: it has no free space to
+  // share. Read through `getHugAxis`.
+  hug?: boolean
+  // The group's own background, under its children. Unset is transparent.
+  fill?: string
+  // Set, the group is drawn once per item of the list, each copy a sibling
+  // laid out by the parent's layout — or, in a parent without one, stacked
+  // downwards from the group's own position. The editor shows one copy.
+  repeat?: RepeatBinding
 }
 
-// Conditional container: children only appear in the exported output when
-// the referenced variable holds the boolean `true`. Only a `boolean` variable
-// is accepted — a string or a list is never coerced, so `"true"` or a non-empty
-// list renders nothing. The editor's picker filters to boolean variables for
-// the same reason.
-export interface IfGroupShape extends BaseShape {
-  type: 'if-group'
-  children: Shape[]
-  conditionVariable?: string
-  // Dotted path to a boolean field of the item iterated by an enclosing
-  // for-group bound to `conditionVariable` — same addressing as
-  // `VariableElement.itemPath`. Unset evaluates the variable itself.
-  itemPath?: string
-}
+export type ContainerShape = GroupShape
 
-// Repeat container: children are duplicated once per item in the referenced
-// list variable. Layout params control how iterations are arranged inside the
-// group's own box (same semantics as GroupShape).
-export interface ForGroupShape extends BaseShape {
-  type: 'for-group'
-  children: Shape[]
-  itemsVariable?: string
-  // Dotted path to an `object-list` field of the item iterated by an enclosing
-  // for-group bound to the same `itemsVariable`, which is what this group then
-  // iterates. Unset iterates the variable's own value.
-  itemPath?: string
-  layout?: GroupLayoutDirection
-  justify?: GroupJustify
-  align?: GroupAlign
-  gap?: number
-}
-
-export type ContainerShape = GroupShape | IfGroupShape | ForGroupShape
-
-// Single definition of "is this shape a container?" — the alternative is the
-// three-way `type ===` test rewritten at every recursion site.
+// Single definition of "is this shape a container?", so a recursion site does
+// not spell out the container types itself.
 export function isContainerShape(shape: Shape): shape is ContainerShape {
-  return shape.type === 'group' || shape.type === 'if-group' || shape.type === 'for-group'
+  return shape.type === 'group'
 }
 
 export type Shape =
@@ -202,8 +251,6 @@ export type Shape =
   | TextBoxShape
   | ImageShape
   | GroupShape
-  | IfGroupShape
-  | ForGroupShape
 
 // ============================================
 // Page & Template Types
@@ -249,6 +296,16 @@ export interface VariableData {
   name: string
   default?: VariableValueType
   required?: boolean
+  // Most characters a 'string' value may have, so that a template can be
+  // designed for its longest text: a longer value fails the export, and a
+  // longer default is refused when saved. Unset is unlimited. Ignored for the
+  // other types. Read through `getVariableMaxLength`.
+  maxLength?: number
+  // Most items an 'object-list' value may have, so that a template can be
+  // designed for its longest list: a longer list fails the export, and a
+  // longer default is refused when saved. Unset is unlimited. Ignored for the
+  // other types. Read through `getVariableMaxItems`.
+  maxItems?: number
   // Item schema when `type === 'object-list'`. The editor needs it to offer
   // field names in a picker without any runtime data. Ignored for the other
   // types.
@@ -260,10 +317,18 @@ export type VariableType = "string" | "boolean" | "image" | "object-list"
 
 // One declared property of an `object-list` item. Recursive: a property that is
 // itself an `object-list` declares its own fields, which is what lets a
-// for-group nest on it.
+// repeat nest on it.
 export interface VariableItemField {
   name: string
   type: VariableType
+  // Every item must give this field a value: an empty one fails the export, and
+  // the variable's default must not leave it empty either. There is no field
+  // default to fall back on.
+  required?: boolean
+  // As `VariableData.maxLength`, for each item's value of a 'string' field.
+  maxLength?: number
+  // As `VariableData.maxItems`, for each item's list of an 'object-list' field.
+  maxItems?: number
   itemFields?: VariableItemField[]
 }
 
@@ -327,6 +392,8 @@ export namespace VariableDTO {
     name: string
     default?: VariableValueType
     required?: boolean
+    maxLength?: number
+    maxItems?: number
     itemFields?: VariableItemField[]
   }
 
@@ -335,6 +402,10 @@ export namespace VariableDTO {
     name?: string
     default?: VariableValueType | null
     required?: boolean
+    // null removes the limit.
+    maxLength?: number | null
+    // null removes the limit.
+    maxItems?: number | null
     itemFields?: VariableItemField[]
   }
 
@@ -508,7 +579,25 @@ export namespace ExportDTO {
   export interface PdfRequest {
     variableValues?: Record<string, VariableValueType>
   }
+
+  // Something the caller should know about a PDF that was made: not all of
+  // the content made it in as authored.
+  export interface Warning {
+    // Content starting beyond its page's bottom or right edge — a list grown
+    // longer than the page — which is left out: pages do not overflow onto
+    // new ones.
+    code: 'CONTENT_OFF_PAGE'
+    // 1-based, in page order.
+    page: number
+    // How many drawn shapes were left out.
+    shapes: number
+    message: string
+  }
 }
+
+// The response header an exported PDF's warnings travel in, as a JSON
+// `ExportDTO.Warning[]`. Absent when there are none.
+export const EXPORT_WARNINGS_HEADER = 'X-Export-Warnings'
 
 // ============================================
 // API Response Types

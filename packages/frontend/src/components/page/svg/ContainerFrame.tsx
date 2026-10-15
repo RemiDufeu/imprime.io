@@ -1,8 +1,7 @@
-import type { ContainerShape } from '@imprime/sdk'
 import { theme } from 'antd'
 
-// The dashed frame that makes a container visible on the canvas. Shared by the
-// placed container and the drawing preview, so what you see while dragging is
+// The dashed frame that makes a group visible on the canvas. Shared by the
+// placed group and the drawing preview, so what you see while dragging is
 // exactly what you get once the shape exists.
 
 const DASH = '8 6'
@@ -10,24 +9,27 @@ const RADIUS = 4
 const STROKE_WIDTH = 2
 
 interface ContainerFrameProps {
-    type: ContainerShape['type']
-    // Omitted by callers that already sit in the container's own coordinate
-    // space (SVGGroup translates its <g>).
+    // Omitted by callers that already sit in the group's own coordinate space
+    // (SVGGroup translates its <g>).
     x?: number
     y?: number
     width: number
     height: number
-    // 'all' for a placed container — the frame is its hit area; 'none' for the
-    // preview, which must not swallow the pointer mid-drag.
+    // A repeated group's frame is tinted like its badge.
+    repeat: boolean
+    // A group that paints its own background or border shows that instead:
+    // the frame then drops its tint, or its outline.
+    tinted?: boolean
+    outlined?: boolean
+    // 'all' for a placed group — the frame is its hit area, painted or not;
+    // 'none' for the preview, which must not swallow the pointer mid-drag.
     pointerEvents: 'all' | 'none'
 }
 
-export function ContainerFrame({ type, x, y, width, height, pointerEvents }: ContainerFrameProps) {
+export function ContainerFrame({
+    x, y, width, height, repeat, tinted = true, outlined = true, pointerEvents,
+}: ContainerFrameProps) {
     const { token } = theme.useToken()
-
-    let stroke = token.colorBorder
-    if (type === 'if-group') stroke = token.colorInfo
-    else if (type === 'for-group') stroke = token.colorWarning
 
     return (
         <rect
@@ -35,8 +37,8 @@ export function ContainerFrame({ type, x, y, width, height, pointerEvents }: Con
             y={y}
             width={width}
             height={height}
-            fill={token.colorFillTertiary}
-            stroke={stroke}
+            fill={tinted ? token.colorFillTertiary : 'none'}
+            stroke={outlined ? (repeat ? token.colorWarning : token.colorBorder) : 'none'}
             strokeWidth={STROKE_WIDTH}
             strokeDasharray={DASH}
             rx={RADIUS}

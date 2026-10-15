@@ -10,8 +10,9 @@ metadata:
 One Zustand store, assembled from fourteen slices in
 `packages/frontend/src/store/editor/EditorStore.tsx`, wrapped in
 `subscribeWithSelector(persist(...))`. **`partialize` persists only
-`zoom`, `pagesPanelOpen`, `layersPanelOpen`** — document data is never written
-to localStorage. Adding a field to `partialize` means that field survives a
+`zoom`, `pagesPanelOpen`, `layersPanelOpen`, `recentColors`** — the user's
+preferences, offered in every template; document data is never written to
+localStorage. Adding a field to `partialize` means that field survives a
 reload on a different template; almost always wrong.
 
 ## Slice decomposition
@@ -35,7 +36,7 @@ operation*. That is the organising idea worth preserving.
 | `ImportSlice` | shapes made from outside content: an image file (picked or pasted), pasted text | drawing |
 | `VariableSlice` | variable CRUD against the API, the variables panel and form | how variables render |
 | `FontSlice` | the imported fonts the editor has loaded, and the catalog runs resolve against | registering built-in fonts (`fonts.ts`) |
-| `PreferencesSlice` | zoom and panel open/closed — the only persisted state | anything document-related |
+| `PreferencesSlice` | zoom, panel open/closed, the colours picked lately — the only persisted state | anything document-related (the template's own colours are derived, `utils/documentColors.ts`) |
 
 Splits worth noticing because they are not obvious:
 
@@ -164,9 +165,10 @@ which reads the page (the one on screen unless `options.pageId` says
 otherwise), applies a pure `transform` that returns the new tree or null to do
 nothing, and writes. `updatePageShapes` does four things in order:
 
-1. **reflow** — `reflowGroups(shapes)` re-applies `layoutGroupChildren` to every
-   auto-layout group in the tree, so downstream consumers (rendering,
-   hit-testing, selection) read final positions, not pre-layout ones;
+1. **reflow** — `layoutTree(shapes)` (common, the export's own) sizes every
+   hugging group and re-lays-out every auto-layout group in the tree, so
+   downstream consumers (rendering, hit-testing, selection) read final sizes
+   and positions, not pre-layout ones;
 2. **record** — `_recordHistory` pushes the previous tree onto the undo stack
    and clears redo. `hint.mergeKey` folds writes closer than 500 ms into one
    step (`updateShape` keys on shape id + updated fields, so a dragged colour

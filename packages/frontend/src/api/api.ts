@@ -1,5 +1,5 @@
 import { ImprimeClient } from '@imprime/sdk'
-import type { Template, TemplateSummary, PageSize, Shape, Page, PageDTO, ImageDTO, FontDTO, FontVariant, VariableDTO, VariableValueType, EmailSettingsDTO, SsoSettingsDTO, SsoProvider, AccessSettingsDTO } from '@imprime/sdk'
+import type { Template, TemplateSummary, PageSize, Shape, Page, PageDTO, ImageDTO, FontDTO, FontVariant, VariableDTO, VariableValueType, ExportDTO, EmailSettingsDTO, SsoSettingsDTO, SsoProvider, AccessSettingsDTO } from '@imprime/sdk'
 import { API_BASE } from '../config'
 
 // Create a single SDK client instance
@@ -50,7 +50,11 @@ export const templatesAPI = {
     return client.exportToPDF(templateId, variableValues)
   },
 
-  async downloadPDF(templateId: string, filename?: string, variableValues?: Record<string, VariableValueType>): Promise<void> {
+  async downloadPDF(
+    templateId: string,
+    filename?: string,
+    variableValues?: Record<string, VariableValueType>
+  ): Promise<ExportDTO.Warning[]> {
     return client.downloadPDF(templateId, filename, variableValues)
   },
 }

@@ -1,5 +1,6 @@
 import { useRef } from 'react'
 import LayeringToolbar from '../LayeringToolbar/LayeringToolbar'
+import SelectionSize from '../SelectionSize/SelectionSize'
 import { CanvasArea } from './CanvasArea/CanvasArea'
 import { TopBar } from './TopBar/TopBar'
 import { FloatingPanels } from './FloatingPanels/FloatingPanels'
@@ -43,6 +44,7 @@ export default function PageEditor() {
       </div>
 
       <LayeringToolbar />
+      <SelectionSize />
     </div>
   )
 }

@@ -15,7 +15,7 @@ already gone; do not guess at react-pdf.
 
 ```
 1. validateVariables    required + empty → ValidationError (400) before anything renders
-2. resolveShapes        hidden dropped · if-group condition · for-group items · layout
+2. resolveShapes        hidden dropped · visibleWhen · repeat copies · layout · group boxes
 3. page-edge filter    s.y < pageSize.height && s.x < pageSize.width
 4. fetchImageData       missing image → red placeholder box, logged, not thrown
 5. renderShape          per type; containers never arrive here
@@ -26,9 +26,9 @@ already gone; do not guess at react-pdf.
 
 | Symptom | Look at |
 |---|---|
-| Whole section missing | stage 2 — `if-group` condition is not strictly `true`, or `for-group` items is not a non-empty array. Check `resolveVariable`: unknown `_id` returns `undefined` **silently**. |
-| Repeated block appears once, or not at all | stage 2 — `itemsVariable` resolves to a string, not `string[]` |
-| Content off-page or clipped | stage 3, or `expandForGroup`'s bbox-origin subtraction, or `renderInSvgLayer` clamping |
+| Whole section missing | stage 2 — a `visibleWhen` value is not strictly `true` (`false` with `negate`), or a `repeat` list is not a non-empty array. Check `resolveVariable`: unknown `_id` returns `undefined` **silently**. |
+| Repeated block appears once, or not at all | stage 2 — the `repeat` variable resolves to something other than an item list |
+| Content off-page or clipped | stage 3 — repeat copies overflow their parent's fixed box, or stack down a free-form parent — or `renderInSvgLayer` clamping |
 | Colour flat / opacity lost / shape invisible | `parseColor` — 8-digit hex and `rgba()` must be split into colour + opacity |
 | Wrong or fallback font | family not in the catalog: absent from `BUILTIN_FONTS`, or an imported font since deleted or renamed — see `ExportService.loadFonts`; or the fonts directory probe (two depths, dev vs bundled) |
 | Bold or italic ignored | the family has no file for that face; `resolveFontVariant` falls back to the closest one by design, and the editor shows the same |

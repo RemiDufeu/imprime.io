@@ -24,6 +24,9 @@ function collectFromParagraphs(paragraphs: Paragraph[] | undefined, variableId: 
 
 function collectFromShapes(shapes: Shape[], variableId: string, out: VariableReference[]) {
   for (const shape of shapes) {
+    if (shape.visibleWhen?.variableId === variableId) {
+      out.push({ kind: 'condition', itemPath: shape.visibleWhen.itemPath ?? '' })
+    }
     if (shape.type === 'text') {
       collectFromParagraphs(shape.paragraphes, variableId, out)
       continue
@@ -32,13 +35,10 @@ function collectFromShapes(shapes: Shape[], variableId: string, out: VariableRef
       if (shape.imageVariable === variableId) out.push({ kind: 'image', itemPath: shape.itemPath ?? '' })
       continue
     }
-    if (shape.type === 'if-group' && shape.conditionVariable === variableId) {
-      out.push({ kind: 'condition', itemPath: shape.itemPath ?? '' })
-    }
-    if (shape.type === 'for-group' && shape.itemsVariable === variableId) {
-      out.push({ kind: 'items', itemPath: shape.itemPath ?? '' })
-    }
     if (isContainerShape(shape)) {
+      if (shape.repeat?.variableId === variableId) {
+        out.push({ kind: 'items', itemPath: shape.repeat.itemPath ?? '' })
+      }
       collectFromShapes(shape.children, variableId, out)
     }
   }
@@ -46,8 +46,7 @@ function collectFromShapes(shapes: Shape[], variableId: string, out: VariableRef
 
 /**
  * Every place in the template that points at a variable — text runs, image
- * boxes, if-group conditions and for-group sources — including the ones nested
- * inside containers.
+ * boxes, conditions and repeats — including the ones nested inside groups.
  *
  * This is the editor's own view, used to tell the author what an edit is about
  * to break. It is not the backend's deletion guard, which is narrower.

@@ -202,8 +202,8 @@ A border is set like any shape's, with `updateShape` (`stroke`, `strokeWidth`,
 
 Instead of `imageId`, a box can show an **image variable**, resolved at
 export: `imageVariable` is the variable's `_id`, and `itemPath` a field of the
-item an enclosing for-group iterates (`'photo'`, or `'photos.file'` in a nested
-one). The variable's value — and its `default`, used when an export gives
+item an enclosing repeated group iterates (`'photo'`, or `'photos.file'` in a
+nested one). The variable's value — and its `default`, used when an export gives
 none — is a PNG or JPEG data URL; an `object-list` declares image fields with
 `{ name: 'photo', type: 'image' }` in its `itemFields`.
 
@@ -215,6 +215,54 @@ await client.addImage('674abc123def456', 'page-123', {
 
 await client.exportToPDF('674abc123def456', {
   logo: 'data:image/png;base64,iVBORw0KGgo…',
+})
+```
+
+`exportPDF` returns the PDF with its `warnings`: one per page whose content
+starts beyond the page's edge and is left out — typically a repeated list
+longer than the page, since pages never overflow onto new ones. `downloadPDF`
+returns them too.
+
+```typescript
+const { pdf, warnings } = await client.exportPDF('674abc123def456', { orders })
+for (const warning of warnings) console.warn(warning.message)
+```
+
+#### Groups, conditions and repeats
+
+A `group` holds `children`, positioned relative to the group. With a `layout`
+(`'horizontal'`, `'vertical'` or `'stack'`, where children sit over each
+other), the group places them itself, inside its `padding`, using `justify`,
+`align` and `gap`. A group can paint its own box: `fill`, a border (`stroke`,
+`strokeStyle`, and `strokeWidth` or one width per side in `strokeWidths`) and
+`cornerRadius` — one number, or one per corner. Rectangles take the same
+`strokeWidths` and `cornerRadius`. In a `'horizontal'` or `'vertical'` group,
+a child with `grow` (CSS's flex-grow: `grow: 1` is `flex: 1`) takes a share of
+the free space along that axis instead of keeping its own size, so fixed and
+relative children can share one row. With `hug: true`, a row's width — a
+column's height — is its children's, gaps and padding included: a column of
+repeated rows grows with them and pushes down what follows it in its own
+parent column.
+
+Any shape can be made conditional with `visibleWhen`: it is drawn only when the
+boolean variable `variableId` is exactly `true` (`false` with `negate: true`).
+A group with `repeat` is drawn once per item of the `object-list` variable
+`variableId`; its copies are laid out by the parent group's layout, or stacked
+downwards outside one. Inside a repeated group, `itemPath` reads a field of the
+current item — in a text run, an image box, a condition or a nested repeat.
+
+```typescript
+await client.addShape('674abc123def456', 'page-123', {
+  id: 'rows', type: 'group', x: 40, y: 200, width: 515, height: 200,
+  layout: 'vertical', gap: 0,
+  children: [{
+    id: 'row', type: 'group', x: 0, y: 0, width: 515, height: 28,
+    layout: 'horizontal', align: 'center', padding: { top: 0, right: 8, bottom: 0, left: 8 },
+    stroke: '#d9d9d9', strokeWidths: { top: 0, right: 0, bottom: 1, left: 0 },
+    repeat: { variableId: productsVariable._id },
+    visibleWhen: { variableId: productsVariable._id, itemPath: 'inStock' },
+    children: [/* text boxes reading itemPath 'name', 'price'… */],
+  }],
 })
 ```
 
@@ -434,6 +482,28 @@ Limits worth handling:
   the variable's default. The request body, images included, is capped at
   10 MB. An image variable's `default` is checked when it is saved:
   `400 INVALID_VARIABLE_DEFAULT`.
+- **A string variable can set a `maxLength`**, in characters (an emoji counts
+  as one). An export fails with `400 VARIABLE_TOO_LONG` when a value has more;
+  an empty value falls back to the default, which is checked against the limit
+  when saved: `400 INVALID_VARIABLE_DEFAULT`. A limit that is not a positive
+  whole number fails with `400 INVALID_VARIABLE_MAX_LENGTH`; `maxLength: null`
+  in an update removes it.
+- **A list's item fields can be `required`, and a string one can set a
+  `maxLength`**, in its `itemFields` entry:
+  `{ name: 'title', type: 'string', required: true, maxLength: 40 }`. An export
+  fails, naming the value (`albums[0].tracks[2].title`), with
+  `400 REQUIRED_VARIABLE_MISSING` when an item leaves a required field empty,
+  and with `400 VARIABLE_TOO_LONG` when a value has more characters than its
+  field allows. A required variable left empty fails with the same
+  `REQUIRED_VARIABLE_MISSING`. Item fields have no default, but the list's
+  own default must keep to them when saved: `400 INVALID_VARIABLE_DEFAULT`.
+- **A list variable can set a `maxItems`**, and so can a list field of its
+  items (`{ name: 'tracks', type: 'object-list', maxItems: 12, itemFields: […] }`).
+  An export fails with `400 VARIABLE_TOO_MANY_ITEMS` when a list has more
+  items, naming it (`albums[0].tracks`); the list's default is checked against
+  the limits when saved: `400 INVALID_VARIABLE_DEFAULT`. A limit that is not a
+  positive whole number fails with `400 INVALID_VARIABLE_MAX_ITEMS`;
+  `maxItems: null` in an update removes it.
 
 ## TypeScript Support
 

@@ -1,4 +1,4 @@
-import type { RectangleShape, EllipseShape } from '../types.js'
+import type { EllipseShape } from '../types.js'
 
 // Pure geometry — same formulas frontend SVGEllipse.tsx and backend
 // ExportService both need. Kept here so the two can't drift apart the way
@@ -18,10 +18,4 @@ export function getEllipseGeometry(shape: EllipseShape): EllipseGeometry {
     rx: shape.width / 2,
     ry: shape.height / 2,
   }
-}
-
-// Trivial today (just the cornerRadius fallback) but kept alongside
-// getEllipseGeometry so both shape geometries live in one place.
-export function getRectangleCornerRadius(shape: RectangleShape): number {
-  return shape.cornerRadius ?? 0
 }

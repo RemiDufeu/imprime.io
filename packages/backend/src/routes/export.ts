@@ -1,5 +1,6 @@
 import { Router, type Response } from 'express'
 import type { ExportDTO } from '@imprime/common'
+import { EXPORT_WARNINGS_HEADER } from '@imprime/common'
 import { templateService, exportService } from '../services/index.js'
 import { takePdf } from '../services/pdfDownloadStore.js'
 import { requireOwnsTemplate } from '../middleware/requireOwnsTemplate.js'
@@ -22,13 +23,16 @@ router.post('/:id/pdf', requireOwnsTemplate, async (req, res) => {
   const payload: ExportDTO.PdfRequest = { variableValues: req.body || {} }
 
   const startTime = Date.now()
-  const pdfBuffer = await exportService.exportToPDF(template, req.user!.id, payload)
+  const { pdf, warnings } = await exportService.exportToPDF(template, req.user!.id, payload)
   const duration = Date.now() - startTime
 
-  setPdfDownloadHeaders(res, pdfBuffer, `${template.title || 'template'}.pdf`)
+  setPdfDownloadHeaders(res, pdf, `${template.title || 'template'}.pdf`)
   res.setHeader('X-Generation-Time', duration.toString())
+  // The PDF is the body, so what the caller should know about it rides in a
+  // header — ASCII JSON, read by the SDK's `exportPDF`.
+  if (warnings.length > 0) res.setHeader(EXPORT_WARNINGS_HEADER, JSON.stringify(warnings))
 
-  res.send(pdfBuffer)
+  res.send(pdf)
 })
 
 router.get('/download/:token', (req, res) => {

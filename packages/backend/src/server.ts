@@ -12,6 +12,7 @@ import { connectAuthDb, closeAuthDb } from './config/authDb.js'
 import { authService, settingsService } from './services/index.js'
 import { CLIENT_IP_HEADER } from './services/AuthService.js'
 import { requireAuth } from './middleware/requireAuth.js'
+import { EXPORT_WARNINGS_HEADER } from '@imprime/common'
 import templatesRouter from './routes/templates.js'
 import pageRouter from './routes/pages.js'
 import variablesRouter from './routes/variables.js'
@@ -92,9 +93,12 @@ app.use(
   }),
 )
 
+// A cross-origin page reads a response header only when it is exposed: the
+// export's warnings are one an API client must see.
+const exposedHeaders = [EXPORT_WARNINGS_HEADER]
 const expressMiddleware = CORS_ORIGIN === '*'
-  ? cors({ origin: '*', credentials: false })
-  : cors({ origin: CORS_ORIGIN.split(',').map((o) => o.trim()), credentials: true })
+  ? cors({ origin: '*', credentials: false, exposedHeaders })
+  : cors({ origin: CORS_ORIGIN.split(',').map((o) => o.trim()), credentials: true, exposedHeaders })
 
 // CORS First
 app.use(expressMiddleware)

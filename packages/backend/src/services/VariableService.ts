@@ -8,8 +8,15 @@ import {
   variableToDTO,
   variableUpdateToModel,
 } from '../models/mappers.js'
-import type { VariableDTO, VariableData, VariableType, VariableValueType } from '@imprime/common'
-import { collectVariableIds } from '@imprime/common'
+import type {
+  ItemFieldIssue,
+  VariableDTO,
+  VariableData,
+  VariableItemField,
+  VariableType,
+  VariableValueType,
+} from '@imprime/common'
+import { collectVariableIds, exceedsMaxItems, exceedsMaxLength, findItemFieldIssue } from '@imprime/common'
 import { touchTemplate } from './TemplateService.js'
 import { readImageDataUrl } from './ImageService.js'
 import { NotFoundError, ConflictError, ValidationError } from './errors.js'
@@ -36,6 +43,69 @@ function assertDrawableDefault(type: VariableType, value: VariableValueType | nu
   }
 }
 
+// A limit is a positive whole number — of characters, or of items. Checked as
+// sent, before the model casts it: Mongoose would turn "12" into 12.
+function assertLimitValue(value: unknown, message: string, code: string): void {
+  if (value !== undefined && !(Number.isInteger(value) && Number(value) > 0)) {
+    throw new ValidationError(message, code)
+  }
+}
+
+function assertMaxLengthValue(value: unknown): void {
+  assertLimitValue(value, 'A max length must be a positive whole number', 'INVALID_VARIABLE_MAX_LENGTH')
+}
+
+function assertMaxItemsValue(value: unknown): void {
+  assertLimitValue(value, 'A max number of items must be a positive whole number', 'INVALID_VARIABLE_MAX_ITEMS')
+}
+
+// The limits of a list's item fields, nested lists included, checked as sent
+// like the variable's own.
+function assertItemFieldLimits(fields: VariableItemField[] | undefined): void {
+  for (const field of fields ?? []) {
+    assertMaxLengthValue(field.maxLength)
+    assertMaxItemsValue(field.maxItems)
+    assertItemFieldLimits(field.itemFields)
+  }
+}
+
+// What an item field's issue in a default says, after "The default".
+function describeDefaultIssue(issue: ItemFieldIssue): string {
+  switch (issue.problem) {
+    case 'missing':
+      return ` leaves the required field "${issue.path}" empty`
+    case 'too-long':
+      return `'s "${issue.path}" is longer than its max length of ${issue.field.maxLength} characters`
+    case 'too-many':
+      return `'s "${issue.path}" has more than its max of ${issue.field.maxItems} items`
+  }
+}
+
+// A default is drawn whenever an export gives no value, so it must keep to the
+// declaration: no longer than the limit and, for a list, no more items than
+// its limit, and no item leaving a required field empty or a field's value
+// longer than its limit.
+function assertDefaultFits(
+  variable: Pick<VariableData, 'type' | 'maxLength' | 'maxItems' | 'default' | 'itemFields'>,
+): void {
+  if (exceedsMaxLength(variable, variable.default)) {
+    throw new ValidationError(
+      `The default is longer than the max length of ${variable.maxLength} characters`,
+      'INVALID_VARIABLE_DEFAULT',
+    )
+  }
+  if (exceedsMaxItems(variable, variable.default)) {
+    throw new ValidationError(
+      `The default has more than the max of ${variable.maxItems} items`,
+      'INVALID_VARIABLE_DEFAULT',
+    )
+  }
+  if (variable.type !== 'object-list') return
+  const issue = findItemFieldIssue(variable.default, variable.itemFields, 'default')
+  if (!issue) return
+  throw new ValidationError(`The default${describeDefaultIssue(issue)}`, 'INVALID_VARIABLE_DEFAULT')
+}
+
 export class VariableService {
   public async create(templateId: string, data: VariableDTO.Create): Promise<VariableData[]> {
     const template = await TemplateModel.findById(templateId).select('_id')
@@ -53,6 +123,13 @@ export class VariableService {
     }
 
     assertDrawableDefault(data.type, data.default)
+    assertMaxLengthValue(data.maxLength)
+    assertMaxItemsValue(data.maxItems)
+    assertItemFieldLimits(data.itemFields)
+    const model = variableCreateToModel(template._id, data)
+    if (model.type !== 'string') model.maxLength = undefined
+    if (model.type !== 'object-list') model.maxItems = undefined
+    assertDefaultFits(model)
 
     const exists = await VariableDataModel.exists({
       templateId: template._id,
@@ -64,7 +141,7 @@ export class VariableService {
 
     try {
       await VariableDataModel.create({
-        ...variableCreateToModel(template._id, data),
+        ...model,
         ...(data._id !== undefined ? { _id: toObjectId(data._id) } : {}),
       })
     } catch (err) {
@@ -99,11 +176,19 @@ export class VariableService {
       }
     }
 
+    if (data.maxLength !== null) assertMaxLengthValue(data.maxLength)
+    if (data.maxItems !== null) assertMaxItemsValue(data.maxItems)
+    assertItemFieldLimits(data.itemFields)
+
     const previousType = variable.type
     Object.assign(variable, variableUpdateToModel(data))
 
     if (variable.type !== 'object-list') {
       variable.itemFields = undefined
+      variable.maxItems = undefined
+    }
+    if (variable.type !== 'string') {
+      variable.maxLength = undefined
     }
     if (data.type !== undefined && data.type !== previousType && data.default === undefined) {
       variable.default = undefined
@@ -112,6 +197,7 @@ export class VariableService {
       variable.default = undefined
     }
     assertDrawableDefault(variable.type, variable.default)
+    assertDefaultFits(variable)
 
     try {
       await variable.save()
@@ -153,8 +239,8 @@ export class VariableService {
     return variables.map(variableToDTO)
   }
 
-  // Anywhere in the trees: text runs inside containers, if-group conditions
-  // and for-group lists all point at the variable by id.
+  // Anywhere in the trees: text runs inside groups, image boxes, conditions
+  // and repeats all point at the variable by id.
   private async isVariableInUse(templateId: string, variableId: string): Promise<boolean> {
     const pages = await PageModel.find({
       templateId: toObjectId(templateId),

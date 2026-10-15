@@ -4,9 +4,13 @@ import { useState, useEffect } from "react";
 import { templatesAPI } from "../../api/api";
 import { Button, Input, message, Modal, Form, Switch, Dropdown, Space, Tooltip } from "antd";
 import type { VariableValueType } from "@imprime/sdk";
+import { getVariableMaxItems, getVariableMaxLength } from "@imprime/sdk";
 import "./EditorHeader.css";
 import { useEditorStore } from "../../store/editor/EditorStore";
 import { MOD_LABEL } from "../../utils/hotkeys";
+import { maxLengthCount } from "../../utils/maxLengthCount";
+import { listValueRule } from "../../utils/listValueRule";
+import { parseApiError } from "../../utils/apiError";
 import { selectCanRedo, selectCanUndo } from "../../store/editor/selectors";
 import { ImageValueInput, ItemListInput } from "../../components/common";
 import { DropdownVariablesContent } from "../EditorPage/components/PageEditor/TopBar/Context-toolbar/DropdownVariablesContent/DropdownVariablesContent";
@@ -78,18 +82,34 @@ export default function EditorHeader() {
 
         setIsExporting(true);
         try {
-            await templatesAPI.downloadPDF(
+            const warnings = await templatesAPI.downloadPDF(
                 template._id,
                 `${template.title || 'template'}.pdf`,
                 variableValues
             );
-            message.success('PDF exported successfully!');
+            // The PDF is made, but not all of it: content that grew past its
+            // page with these values was left out.
+            if (warnings.length > 0) {
+                message.warning({
+                    content: `PDF exported, but some content does not fit. ${warnings.map(warning => warning.message).join(' ')}`,
+                    duration: 8,
+                });
+            } else {
+                message.success('PDF exported successfully!');
+            }
             setIsVariableModalOpen(false);
             form.resetFields();
         } catch (error) {
             console.error('Export error:', error);
-            if (error instanceof Error && error.message.includes('Required variable')) {
-                message.error(error.message);
+            // The values the author can fix; the form checks them too, but the
+            // server is the one that decides.
+            const apiError = parseApiError(error);
+            if (
+                apiError.code === 'REQUIRED_VARIABLE_MISSING'
+                || apiError.code === 'VARIABLE_TOO_LONG'
+                || apiError.code === 'VARIABLE_TOO_MANY_ITEMS'
+            ) {
+                message.error(apiError.message);
             } else {
                 message.error('Failed to export PDF. Please try again.');
             }
@@ -195,9 +215,20 @@ export default function EditorHeader() {
                 } else if (variable.type === 'image') {
                     input = <ImageValueInput vectorSize={vectorSize} />;
                 } else if (variable.type === 'object-list') {
-                    input = <ItemListInput itemFields={variable.itemFields} vectorSize={vectorSize} />;
+                    input = (
+                        <ItemListInput
+                            itemFields={variable.itemFields}
+                            maxItems={getVariableMaxItems(variable)}
+                            vectorSize={vectorSize}
+                        />
+                    );
                 } else {
-                    input = <Input placeholder={typeof variable.default === 'string' ? variable.default : `Enter ${variable.name}`} />;
+                    input = (
+                        <Input
+                            placeholder={typeof variable.default === 'string' ? variable.default : `Enter ${variable.name}`}
+                            count={maxLengthCount(getVariableMaxLength(variable))}
+                        />
+                    );
                 }
 
                 return (
@@ -210,7 +241,8 @@ export default function EditorHeader() {
                             {
                                 required: variable.required,
                                 message: `${variable.name} is required`
-                            }
+                            },
+                            ...(variable.type === 'object-list' ? [listValueRule(variable, variable.name)] : []),
                         ]}
                         tooltip={variable.required ? 'Required' : defaultHint}
                     >

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Button, Form, Input, Modal, Typography, Upload, message } from 'antd'
+import { Button, Form, Input, Modal, Tooltip, Typography, Upload, message } from 'antd'
 import { CloseOutlined, UploadOutlined } from '@ant-design/icons'
 import { FONT_VARIANTS } from '@imprime/sdk'
 import type { FontDTO, FontVariant } from '@imprime/sdk'
@@ -114,12 +114,14 @@ export default function ImportFontModal({ open, onClose, onChanged }: ImportFont
                 <Button icon={<UploadOutlined />}>{file ? file.name : 'Choose file'}</Button>
               </Upload>
               {file && variant !== 'regular' && (
-                <Button
-                  type="text"
-                  icon={<CloseOutlined />}
-                  title="Remove file"
-                  onClick={() => clearFile(variant)}
-                />
+                <Tooltip title="Remove file">
+                  <Button
+                    aria-label="Remove file"
+                    type="text"
+                    icon={<CloseOutlined />}
+                    onClick={() => clearFile(variant)}
+                  />
+                </Tooltip>
               )}
             </Form.Item>
           )

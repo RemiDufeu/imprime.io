@@ -42,6 +42,12 @@ The default for every piece of UI that is not the canvas. Before hand-rolling a
 control, check antd has none — `Dropdown`, `Tooltip`, `ColorPicker`, `Segmented`,
 `InputNumber`, `Popconfirm` are all already in use.
 
+**Every hover hint is an antd `<Tooltip>`, never a native `title` attribute** —
+on a `Button`, a wrapper `div`, an `<input>`, anything. Inside a `Dropdown` or
+`Popover` it nests as `Dropdown > Tooltip > Button` (`BindingButton`,
+`IconMenuButton`, `SidesInput`); a mapped element's `key` moves to the
+`Tooltip`. Where the hint was the control's only name, keep an `aria-label`.
+
 Three configuration facts that are easy to break:
 
 1. **`@ant-design/v5-patch-for-react-19` must stay the first import in

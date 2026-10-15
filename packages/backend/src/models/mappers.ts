@@ -39,6 +39,8 @@ export function variableToDTO(doc: VariableDataDocument): VariableData {
     name: doc.name,
     default: doc.default,
     required: doc.required,
+    maxLength: doc.maxLength,
+    maxItems: doc.maxItems,
     itemFields: doc.itemFields,
   }
 }
@@ -103,25 +105,29 @@ export function pagesReorderToOrderUpdates(
 export function variableCreateToModel(
   templateId: Types.ObjectId,
   dto: VariableDTO.Create
-): Pick<IVariableData, 'templateId' | 'type' | 'name' | 'default' | 'required' | 'itemFields'> {
+): Pick<IVariableData, 'templateId' | 'type' | 'name' | 'default' | 'required' | 'maxLength' | 'maxItems' | 'itemFields'> {
   return {
     templateId,
     type: dto.type,
     name: dto.name,
     default: dto.default,
     required: dto.required ?? false,
+    maxLength: dto.maxLength,
+    maxItems: dto.maxItems,
     itemFields: dto.itemFields,
   }
 }
 
 export function variableUpdateToModel(
   dto: VariableDTO.Update
-): Partial<Pick<IVariableData, 'type' | 'name' | 'default' | 'required' | 'itemFields'>> {
-  const update: Partial<Pick<IVariableData, 'type' | 'name' | 'default' | 'required' | 'itemFields'>> = {}
+): Partial<Pick<IVariableData, 'type' | 'name' | 'default' | 'required' | 'maxLength' | 'maxItems' | 'itemFields'>> {
+  const update: Partial<Pick<IVariableData, 'type' | 'name' | 'default' | 'required' | 'maxLength' | 'maxItems' | 'itemFields'>> = {}
   if (dto.type !== undefined) update.type = dto.type
   if (dto.name !== undefined) update.name = dto.name
   if (dto.default !== undefined) update.default = dto.default ?? undefined
   if (dto.required !== undefined) update.required = dto.required
+  if (dto.maxLength !== undefined) update.maxLength = dto.maxLength ?? undefined
+  if (dto.maxItems !== undefined) update.maxItems = dto.maxItems ?? undefined
   if (dto.itemFields !== undefined) update.itemFields = dto.itemFields
   return update
 }

@@ -13,7 +13,7 @@ export {
 } from './pageSize.js'
 export type { PageFormat, PageFormatId } from './pageSize.js'
 export { getDashArray } from './strokeUtils.js'
-export { getEllipseGeometry, getRectangleCornerRadius } from './svgRenderers.js'
+export { getEllipseGeometry } from './svgRenderers.js'
 export type { EllipseGeometry } from './svgRenderers.js'
 export {
   getImageLayout,
@@ -25,11 +25,48 @@ export {
   FULL_IMAGE_CROP,
 } from './imageLayout.js'
 export type { ImageRect } from './imageLayout.js'
-export { layoutGroupChildren, distributeMainAxis, crossAxisOffset } from './groupLayout.js'
-export { resolveShapes, childrenBBox } from './shapeResolver.js'
-export type { ChildrenBBox } from './shapeResolver.js'
-export { resolveVariable, isEmptyVariableValue, stringifyVariableValue, joinItemPath, ITEM_PATH_SEPARATOR } from './variables.js'
-export type { ResolveContext, VariableScope, VariableScopeFrame } from './variables.js'
+export {
+  layoutTree,
+  layoutGroupChildren,
+  hugGroup,
+  distributeMainAxis,
+  crossAxisOffset,
+  growMainSizes,
+  getGrow,
+  getHugAxis,
+  getImposedAxes,
+} from './groupLayout.js'
+export type { SizeAxis } from './groupLayout.js'
+export {
+  getBoxPaths,
+  getBorderOverhang,
+  getBorderWidths,
+  getCornerRadii,
+  getPadding,
+  areSidesUniform,
+  areCornersUniform,
+  uniformSides,
+  uniformCornerRadii,
+  ZERO_SIDES,
+} from './boxGeometry.js'
+export type { BoxPaths, BoxStroke, BoxRect } from './boxGeometry.js'
+export { resolveShapes, getGroupBox } from './shapeResolver.js'
+export type { GroupBox } from './shapeResolver.js'
+export {
+  resolveVariable,
+  isConditionMet,
+  isEmptyVariableValue,
+  stringifyVariableValue,
+  getVariableMaxLength,
+  countCharacters,
+  exceedsMaxLength,
+  getVariableMaxItems,
+  exceedsMaxItems,
+  findItemFieldIssue,
+  joinItemPath,
+  ITEM_PATH_SEPARATOR,
+} from './variables.js'
+export type { ResolveContext, VariableScope, VariableScopeFrame, ItemFieldIssue } from './variables.js'
 export {
   getPageContentWrapperStyles,
   getParagraphStyle,

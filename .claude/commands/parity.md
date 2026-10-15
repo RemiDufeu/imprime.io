@@ -15,7 +15,7 @@ different pictures, so this is the one class of bug the gate cannot see.
 - **`full`** — audit every pair, regardless of the diff. Use before a release or
   after a refactor of `packages/common/src/rendering/`.
 - **`<shape type>`** — audit one type end to end (`rectangle`, `ellipse`, `text`,
-  `image`, `group`, `if-group`, `for-group`).
+  `image`, `group`).
 
 ## The pairs
 
@@ -25,8 +25,8 @@ different pictures, so this is the one class of bug the gate cannot see.
 | `svg/SVGEllipse.tsx` | `ExportService.renderEllipse` |
 | `svg/SVGText.tsx`, `TextEditor/` | `renderTextBox` + `inlineTextStyle` |
 | `svg/SVGImage.tsx` | `renderImage` |
-| `svg/SVGGroup.tsx` | `resolveShapes` / `expandGroup` |
-| `utils/groupLayout.ts` `reflowGroups` | `common/rendering/groupLayout.ts` |
+| `svg/SVGGroup.tsx` | `resolveShapes` / `flatten` + `getGroupBox` |
+| `DocumentWriteSlice` `layoutTree` (authored tree) | `resolveShapes` `layoutTree` (instantiated tree) |
 
 Shared logic lives in `packages/common/src/rendering/`. The recurring question
 for every finding is: *would the other renderer need the same formula to match?*

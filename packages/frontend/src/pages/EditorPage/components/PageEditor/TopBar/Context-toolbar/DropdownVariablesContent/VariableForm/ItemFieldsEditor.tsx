@@ -1,4 +1,4 @@
-import { Button, Input, Select } from 'antd'
+import { Button, Checkbox, Input, InputNumber, Select, Tooltip } from 'antd'
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons'
 import type { VariableItemField, VariableType } from '@imprime/sdk'
 import './ItemFieldsEditor.css'
@@ -19,7 +19,7 @@ interface ItemFieldsEditorProps {
   value?: VariableItemField[]
   onChange?: (value: VariableItemField[]) => void
   // Nesting depth, used only to indent. A `List` field declares its own item
-  // fields, which is what lets a for-group nest on it.
+  // fields, which is what lets a repeat nest on it.
   depth?: number
 }
 
@@ -51,11 +51,48 @@ export function ItemFieldsEditor({ value, onChange, depth = 0 }: ItemFieldsEdito
               value={field.type}
               options={FIELD_TYPE_OPTIONS}
               onChange={type =>
-                // Dropping itemFields on a type change keeps the declaration
-                // honest: only a list has item fields.
-                replaceAt(index, { name: field.name, type })
+                // Dropping itemFields and the limits on a type change keeps the
+                // declaration honest: only a list has item fields and a max
+                // items, only a string a max length.
+                replaceAt(index, { name: field.name, type, required: field.required })
               }
             />
+            {field.type === 'string' ? (
+              <Tooltip title="Max length: most characters a value may have. A longer one fails the export.">
+                <InputNumber
+                  size="small"
+                  className="item-field-limit"
+                  min={1}
+                  precision={0}
+                  placeholder="Max length"
+                  value={field.maxLength}
+                  onChange={maxLength => replaceAt(index, { ...field, maxLength: maxLength ?? undefined })}
+                />
+              </Tooltip>
+            ) : field.type === 'object-list' ? (
+              <Tooltip title="Max items: most items the list may have. A longer one fails the export.">
+                <InputNumber
+                  size="small"
+                  className="item-field-limit"
+                  min={1}
+                  precision={0}
+                  placeholder="Max items"
+                  value={field.maxItems}
+                  onChange={maxItems => replaceAt(index, { ...field, maxItems: maxItems ?? undefined })}
+                />
+              </Tooltip>
+            ) : (
+              // Keeps the Required boxes in a column.
+              <span className="item-field-limit" />
+            )}
+            <Tooltip title="Every item must give it a value: an empty one fails the export.">
+              <Checkbox
+                checked={field.required === true}
+                onChange={e => replaceAt(index, { ...field, required: e.target.checked || undefined })}
+              >
+                Required
+              </Checkbox>
+            </Tooltip>
             <Button
               size="small"
               type="text"

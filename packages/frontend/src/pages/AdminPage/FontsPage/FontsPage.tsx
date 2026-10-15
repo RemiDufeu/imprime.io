@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Button, Card, List, Popconfirm, Typography, Upload, message } from 'antd'
+import { Button, Card, List, Popconfirm, Tooltip, Typography, Upload, message } from 'antd'
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons'
 import { DEFAULT_FONT, FONT_VARIANTS, importedFontFamilyName } from '@imprime/sdk'
 import type { FontDTO, FontVariant } from '@imprime/sdk'
@@ -114,7 +114,9 @@ export default function FontsPage() {
                   okButtonProps={{ danger: true }}
                   cancelText="Cancel"
                 >
-                  <Button danger type="text" icon={<DeleteOutlined />} title="Delete font" />
+                  <Tooltip title="Delete font">
+                    <Button danger type="text" icon={<DeleteOutlined />} aria-label="Delete font" />
+                  </Tooltip>
                 </Popconfirm>,
               ]}
             >

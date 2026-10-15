@@ -82,7 +82,8 @@ export interface TextEditorSlice {
     setIsFocused: (isFocused: boolean) => void
     // What the active editor reports on every change.
     syncFromEditor: () => void
-    applyTextFormat: (format: Partial<TextFormat>) => void
+    // `color: null` takes the colour off: the text is the default colour again.
+    applyTextFormat: (format: Partial<Omit<TextFormat, 'color'>> & { color?: string | null }) => void
     insertVariable: (variableId: string, itemPath?: string) => void
     // A command rather than a format: the level is relative, and each
     // selected item moves from its own.
@@ -187,7 +188,8 @@ export const createTextEditorSlice: StateCreator<
             const { editor } = get()
             if (!editor || !editor.selection) {
                 // Nothing to format yet: the bar still shows the choice.
-                set({ textFormat: { ...get().textFormat, ...format } })
+                const textFormat = { ...get().textFormat, ...format }
+                set({ textFormat: { ...textFormat, color: textFormat.color ?? DEFAULT_TEXT_FORMAT.color } })
                 return
             }
 

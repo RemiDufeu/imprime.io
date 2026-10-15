@@ -36,8 +36,8 @@ to `api-surface-reviewer`.
 | `frontend/src/components/page/svg/SVGEllipse.tsx` | `ExportService.renderEllipse` |
 | `frontend/src/components/page/svg/SVGText.tsx` + `TextEditor/` | `ExportService.renderTextBox` + `inlineTextStyle` |
 | `frontend/src/components/page/svg/SVGImage.tsx` | `ExportService.renderImage` |
-| `frontend/src/components/page/svg/SVGGroup.tsx` | `resolveShapes` / `expandGroup` |
-| `frontend/src/utils/groupLayout.ts` (`reflowGroups`) | `common/rendering/groupLayout.ts` (`layoutGroupChildren`) |
+| `frontend/src/components/page/svg/SVGGroup.tsx` | `resolveShapes` / `flatten` + `getGroupBox` |
+| `DocumentWriteSlice.updatePageShapes` (`layoutTree` on the authored tree) | `resolveShapes` (`layoutTree` on the instantiated tree) |
 
 ## Findings to look for
 
@@ -63,10 +63,10 @@ to `api-surface-reviewer`.
 - A geometry change that ignores the export's page clipping
   (`renderInSvgLayer` clamps to the template's `pageSize`; the editor does not)
   or the page-edge filter in `exportToPDF`.
-- A layout rule changed in `layoutGroupChildren` without checking `reflowGroups`
-  still produces the editor-side equivalent.
-- A container change that does not keep `expandForGroup`'s bbox-origin
-  subtraction or `reidShape`'s id re-forging intact.
+- A layout rule added outside `layoutTree` (`groupLayout.ts`): both sides call it,
+  so a rule anywhere else reaches one renderer only.
+- A group change that breaks `reidShape`'s id re-forging of repeat copies, or
+  the order of `flatten` (background, children, border) on one side only.
 - Text spacing changed on one side only (`LINE_HEIGHT`, `PARAGRAPH_SPACING`,
   `DEFAULT_FONT_SIZE` vs the editor's CSS).
 

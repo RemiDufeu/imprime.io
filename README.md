@@ -79,17 +79,10 @@ Imprime is currently under active development. Here are the main planned updates
 ## Block enhancements
 - condition on page (if and for)
 
-## Layout
-- Margin
-- Improve flex systeme (child flex 1)
-- rethink the layout part
-- guide lines
-
-## Editor usability
-- Multiple block selection and grouped operations
+## Improve shape
+- Add arrow
 
 ## Document format
-- Add a flowing text document format, in addition to the current fixed-size pages
 - Add default style (font and bg color)
 - Add pagination
 

@@ -8,15 +8,17 @@ import type { SelectionSlice } from './SelectionSlice'
 import { findInnermostGroupAt, insertShape, nextShapeName } from '../../utils/shapeTree'
 import { selectCurrentPage } from './selectors'
 
-export type ToolType = 'move' | 'rectangle' | 'ellipse' | 'text' | 'image' | 'group' | 'if-group' | 'for-group'
+// A repeat has no tool of its own: a group becomes one from the group bar.
+export type ToolType = 'move' | 'rectangle' | 'ellipse' | 'text' | 'image' | 'group'
 
 export type StrokeStyle = 'solid' | 'dashed' | 'dotted'
 
 // The style a new rectangle or ellipse is drawn with. Named like the shape's
 // own fields, so the shape bar hands the same patch to either.
 export interface DrawStyle {
-    fill: string
-    stroke: string
+    // Unset, as on the shape: no paint.
+    fill?: string
+    stroke?: string
     strokeWidth: number
     strokeStyle: StrokeStyle
     cornerRadius: number
@@ -69,9 +71,7 @@ export const createToolSlice: StateCreator<
             case 'image':
                 return { ...base, type: 'image', fit: DEFAULT_IMAGE_FIT, align: DEFAULT_IMAGE_ALIGN }
             case 'group':
-            case 'if-group':
-            case 'for-group':
-                return { ...base, type: tool, children: [] }
+                return { ...base, type: 'group', children: [] }
             case 'ellipse':
                 return { ...base, type: 'ellipse', fill, stroke, strokeWidth, strokeStyle }
             case 'rectangle':

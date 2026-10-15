@@ -1,4 +1,4 @@
-import { Button, Dropdown, type MenuProps } from 'antd'
+import { Button, Dropdown, Tooltip, type MenuProps } from 'antd'
 import { ThunderboltFilled } from '@ant-design/icons'
 import { useCurrentPage, useEditorStore } from '../../../../../../../store/editor/EditorStore'
 import {
@@ -18,7 +18,7 @@ export function InsertVariableButton() {
     const currentPage = useCurrentPage()
 
     // Only strings can be inlined into text: a template-wide string
-    // variable, or a string field of an item an enclosing for-group iterates.
+    // variable, or a string field of an item an enclosing repeat iterates.
     const textVariables = (variables ?? [])
         .filter(v => v.type === 'string')
         .map(v => ({ key: encodeItemFieldValue(v._id, ''), label: v.name }))
@@ -51,16 +51,17 @@ export function InsertVariableButton() {
                 style: { maxHeight: 320, overflowY: 'auto' },
             }}
         >
-            <Button
-                color="primary"
-                variant="filled"
-                size="small"
-                icon={<ThunderboltFilled />}
-                title="Insert a variable at the caret"
-                onMouseDown={(e) => e.preventDefault()}
-            >
-                Variable
-            </Button>
+            <Tooltip title="Insert a variable at the caret">
+                <Button
+                    color="primary"
+                    variant="filled"
+                    size="small"
+                    icon={<ThunderboltFilled />}
+                    onMouseDown={(e) => e.preventDefault()}
+                >
+                    Variable
+                </Button>
+            </Tooltip>
         </Dropdown>
     )
 }

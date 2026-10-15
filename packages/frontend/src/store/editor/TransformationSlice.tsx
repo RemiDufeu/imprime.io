@@ -1,13 +1,14 @@
 import type { StateCreator } from 'zustand'
-import type { Shape } from '@imprime/sdk'
+import type { PageSize, Shape } from '@imprime/sdk'
+import { getHugAxis } from '@imprime/sdk'
 import type { ShapeSlice } from './ShapeSlice'
 import type { TemplateSlice } from './TemplateSlice'
 import type { PageSlice } from './PageSlice'
 import type { DocumentWriteSlice } from './DocumentWriteSlice'
 import type { SelectionSlice } from './SelectionSlice'
 import { findShapeById, findInnermostGroupAt, extractShapeById, insertShape } from '../../utils/shapeTree'
-import { resizeRect, type Rect, type ResizeHandle } from '../../utils/transform'
-import { selectCurrentPage, selectSelectedShape } from './selectors'
+import { resizeRect, unionRect, type Rect, type ResizeHandle } from '../../utils/transform'
+import { selectCurrentPage, selectPageSize, selectSelectedShape } from './selectors'
 
 export type { ResizeHandle }
 
@@ -38,6 +39,10 @@ export type DragState =
     | (DragBase & {
         kind: 'resize'
         handle: ResizeHandle
+        // What the dragged edges may not cross, in the shape's coord space:
+        // the page, widened to the shape if it already overflows, so that
+        // grabbing a handle never makes it jump back inside.
+        bounds: Rect
     })
     | (DragBase & {
         kind: 'translate'
@@ -62,6 +67,9 @@ export interface TransformationSlice {
     startResize: (svgElement: SVGSVGElement, handle: ResizeHandle, clientX: number, clientY: number) => void
     onMouseMove: (clientX: number, clientY: number) => void
     onMouseUp: () => void
+    // Size a shape of the current page by its values, as dragging its
+    // bottom-right handle would: the same page edge, minimum and hug release.
+    resizeShape: (id: string, size: Partial<Pick<Rect, 'width' | 'height'>>) => void
 }
 
 const clientToSVG = (svgElement: SVGSVGElement, clientX: number, clientY: number) => {
@@ -85,6 +93,24 @@ const baseDragState = (
     originalWidth: shape.width,
     originalHeight: shape.height,
 })
+
+// What a resize of `shape` may not cross, in its own coord space: the page,
+// widened to the shape if it already overflows, so that resizing never makes
+// it jump back inside.
+const resizeBounds = (shapes: Shape[], shape: Shape, pageSize: PageSize): Rect => {
+    const loc = findShapeById(shapes, shape.id)
+    const parentAbsX = (loc?.absX ?? shape.x) - shape.x
+    const parentAbsY = (loc?.absY ?? shape.y) - shape.y
+    return unionRect({ x: -parentAbsX, y: -parentAbsY, ...pageSize }, shape)
+}
+
+// Sizing a hugging group by hand along the axis it hugs gives it that size:
+// it stops hugging, as in Figma. Otherwise the layout would put its content
+// size back.
+const releasingHug = (shape: Shape, rect: Rect): Partial<Shape> => {
+    const hugAxis = shape.type === 'group' ? getHugAxis(shape) : null
+    return hugAxis !== null && rect[hugAxis] !== shape[hugAxis] ? { ...rect, hug: false } : rect
+}
 
 export const createTransformationSlice: StateCreator<
     TransformationSlice & ShapeSlice & TemplateSlice & PageSlice & DocumentWriteSlice & SelectionSlice,
@@ -133,11 +159,15 @@ export const createTransformationSlice: StateCreator<
             const selectedShape = selectSelectedShape(get())
             if (!selectedShape) return
 
+            const page = selectCurrentPage(get())
+            if (!page) return
+
             set({
                 dragData: {
                     ...baseDragState(selectedShape, svgElement, clientX, clientY),
                     kind: 'resize',
                     handle,
+                    bounds: resizeBounds(page.shapes, selectedShape, selectPageSize(get())),
                 },
             })
         },
@@ -159,7 +189,7 @@ export const createTransformationSlice: StateCreator<
             }
 
             if (dragData.kind === 'resize') {
-                set({ transformationData: resizeRect(dragData.handle, original, deltaX, deltaY) })
+                set({ transformationData: resizeRect(dragData.handle, original, deltaX, deltaY, dragData.bounds) })
                 return
             }
 
@@ -202,11 +232,25 @@ export const createTransformationSlice: StateCreator<
                 ) {
                     reparent(dragData, transformationData, selectedShapeId)
                 } else {
-                    get().updateShape(selectedShapeId, transformationData)
+                    const shape = selectSelectedShape(get())
+                    get().updateShape(selectedShapeId, dragData.kind === 'resize' && shape
+                        ? releasingHug(shape, transformationData)
+                        : transformationData)
                 }
             }
 
             set({ dragData: null, transformationData: null })
+        },
+
+        resizeShape: (id, size) => {
+            const page = selectCurrentPage(get())
+            const shape = page ? findShapeById(page.shapes, id)?.shape : undefined
+            if (!page || !shape) return
+
+            const bounds = resizeBounds(page.shapes, shape, selectPageSize(get()))
+            const deltaX = (size.width ?? shape.width) - shape.width
+            const deltaY = (size.height ?? shape.height) - shape.height
+            get().updateShape(id, releasingHug(shape, resizeRect('se', shape, deltaX, deltaY, bounds)))
         },
     }
 }

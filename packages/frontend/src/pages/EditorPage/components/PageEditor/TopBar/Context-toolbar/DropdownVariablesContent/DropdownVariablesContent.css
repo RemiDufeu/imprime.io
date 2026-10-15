@@ -110,61 +110,6 @@
   background: var(--ant-color-text-secondary);
 }
 
-/* Hosted in a modal, so it grows with its content instead of filling the
-   fixed-height dropdown the form used to live in. A deep item schema still has
-   to stop somewhere short of the viewport. */
-.variable-form-panel {
-  display: flex;
-  flex-direction: column;
-}
-
-.variable-form {
-  display: flex;
-  flex-direction: column;
-  max-height: 60vh;
-  overflow-y: auto;
-}
-
-.variable-form-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--ant-padding-xs);
-  margin-top: var(--ant-margin);
-}
-
-.variable-form .ant-form-item {
-  margin-bottom: var(--ant-margin-xs);
-}
-
-.variable-form .ant-form-item:last-child {
-  margin-bottom: 0;
-  margin-top: var(--ant-margin-sm);
-}
-
-.variable-form .ant-form-item-label {
-  padding-bottom: 2px;
-}
-
-.variable-form .ant-form-item-label > label {
-  font-size: 12px;
-  height: auto;
-}
-
-
-.variable-impact-warning {
-  margin-bottom: var(--ant-margin-xs);
-}
-
-.variable-impact-warning .ant-alert-message {
-  font-size: 12px;
-}
-
-.variable-impact-list {
-  margin: 0;
-  padding-left: var(--ant-padding);
-  font-size: 11px;
-}
-
 .variable-actions {
   display: flex;
   align-items: center;

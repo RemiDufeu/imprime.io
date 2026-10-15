@@ -4,7 +4,6 @@ import { getDashArray, getImageCornerRadius, getImageLayout, getImageOpacity } f
 import { useEditorStore } from '../../../store/editor/EditorStore'
 import { variableReferenceLabel } from '../../../utils/variableScope'
 import { ImagePlaceholder } from './ImagePlaceholder'
-import { ImageVariableBadge } from './ImageVariableBadge'
 import { readDataUrlImage, useImageData } from './useImageData'
 
 interface SVGImageProps {
@@ -15,9 +14,9 @@ interface SVGImageProps {
 // getImageLayout's rect, clipped to the box, the border on top.
 //
 // A box bound to a variable has no image of its own until the export: it shows
-// the variable's default, labelled with the variable, or a placeholder naming
-// it. An item field has no default to show — the editor never resolves a
-// for-group's items.
+// the variable's default, or a placeholder naming it. An item field has no
+// default to show — the editor never resolves a repeat's items. ShapeBadges
+// names the variable over the box either way.
 export function SVGImage({ shape }: SVGImageProps) {
     // useId's characters are not all valid in `url(#…)`.
     const clipId = `image-clip-${useId().replace(/[^\w-]/g, '')}`
@@ -88,9 +87,6 @@ export function SVGImage({ shape }: SVGImageProps) {
                     strokeDasharray={getDashArray(shape.strokeStyle)}
                 />
             ) : null}
-            {image && label !== undefined && (
-                <ImageVariableBadge x={x} y={y} width={width} height={height} label={label} />
-            )}
         </g>
     )
 }
