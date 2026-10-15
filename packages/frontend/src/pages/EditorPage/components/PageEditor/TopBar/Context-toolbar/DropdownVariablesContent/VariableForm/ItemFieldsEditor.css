@@ -33,7 +33,7 @@
   min-width: 96px;
 }
 
-.item-field-row .item-field-max-length {
+.item-field-row .item-field-limit {
   flex: none;
   width: 96px;
 }

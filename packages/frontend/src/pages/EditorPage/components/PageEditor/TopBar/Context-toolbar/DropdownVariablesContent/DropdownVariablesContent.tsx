@@ -3,7 +3,7 @@ import { PlusOutlined, SearchOutlined, DeleteOutlined, EditOutlined } from '@ant
 import { useState, useMemo } from 'react'
 import { useEditorStore } from '../../../../../../../store/editor/EditorStore'
 import type { VariableData, VariableType } from '@imprime/sdk'
-import { getVariableMaxLength } from '@imprime/sdk'
+import { getVariableMaxItems, getVariableMaxLength } from '@imprime/sdk'
 import './DropdownVariablesContent.css'
 
 const TYPE_BADGE_LABEL: Record<VariableType, string> = {
@@ -24,12 +24,17 @@ function formatDefault(variable: VariableData): string {
 }
 
 // After the default or "Required" — one of them at most, as a required
-// variable has no default — when the variable has a limit.
-function formatMaxLength(variable: VariableData): string | null {
+// variable has no default — when the variable has a limit: a string's
+// characters, or a list's items.
+function formatLimit(variable: VariableData): string | null {
   const maxLength = getVariableMaxLength(variable)
-  if (maxLength === undefined) return null
+  const maxItems = getVariableMaxItems(variable)
+  const limit = maxLength !== undefined ? `${maxLength} characters`
+    : maxItems !== undefined ? `${maxItems} item${maxItems === 1 ? '' : 's'}`
+    : null
+  if (limit === null) return null
   const hasDefault = variable.default !== undefined && variable.default !== null && variable.default !== ''
-  return `${hasDefault || variable.required ? ' · ' : ''}Max ${maxLength} characters`
+  return `${hasDefault || variable.required ? ' · ' : ''}Max ${limit}`
 }
 
 // Template-wide variable management: browse and delete, plus the entry
@@ -90,7 +95,7 @@ export function DropdownVariablesContent() {
                       {variable.required && (
                         <>Required</>
                       )}
-                      {formatMaxLength(variable)}
+                      {formatLimit(variable)}
                     </div>
                   </div>
                   <div className="variable-actions">

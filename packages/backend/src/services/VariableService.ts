@@ -8,8 +8,15 @@ import {
   variableToDTO,
   variableUpdateToModel,
 } from '../models/mappers.js'
-import type { VariableDTO, VariableData, VariableItemField, VariableType, VariableValueType } from '@imprime/common'
-import { collectVariableIds, exceedsMaxLength, findItemFieldIssue } from '@imprime/common'
+import type {
+  ItemFieldIssue,
+  VariableDTO,
+  VariableData,
+  VariableItemField,
+  VariableType,
+  VariableValueType,
+} from '@imprime/common'
+import { collectVariableIds, exceedsMaxItems, exceedsMaxLength, findItemFieldIssue } from '@imprime/common'
 import { touchTemplate } from './TemplateService.js'
 import { readImageDataUrl } from './ImageService.js'
 import { NotFoundError, ConflictError, ValidationError } from './errors.js'
@@ -36,15 +43,20 @@ function assertDrawableDefault(type: VariableType, value: VariableValueType | nu
   }
 }
 
-// A limit is a positive whole number of characters. Checked as sent, before
-// the model casts it: Mongoose would turn "12" into 12.
-function assertMaxLengthValue(value: unknown): void {
+// A limit is a positive whole number — of characters, or of items. Checked as
+// sent, before the model casts it: Mongoose would turn "12" into 12.
+function assertLimitValue(value: unknown, message: string, code: string): void {
   if (value !== undefined && !(Number.isInteger(value) && Number(value) > 0)) {
-    throw new ValidationError(
-      'A max length must be a positive whole number',
-      'INVALID_VARIABLE_MAX_LENGTH',
-    )
+    throw new ValidationError(message, code)
   }
+}
+
+function assertMaxLengthValue(value: unknown): void {
+  assertLimitValue(value, 'A max length must be a positive whole number', 'INVALID_VARIABLE_MAX_LENGTH')
+}
+
+function assertMaxItemsValue(value: unknown): void {
+  assertLimitValue(value, 'A max number of items must be a positive whole number', 'INVALID_VARIABLE_MAX_ITEMS')
 }
 
 // The limits of a list's item fields, nested lists included, checked as sent
@@ -52,29 +64,46 @@ function assertMaxLengthValue(value: unknown): void {
 function assertItemFieldLimits(fields: VariableItemField[] | undefined): void {
   for (const field of fields ?? []) {
     assertMaxLengthValue(field.maxLength)
+    assertMaxItemsValue(field.maxItems)
     assertItemFieldLimits(field.itemFields)
   }
 }
 
+// What an item field's issue in a default says, after "The default".
+function describeDefaultIssue(issue: ItemFieldIssue): string {
+  switch (issue.problem) {
+    case 'missing':
+      return ` leaves the required field "${issue.path}" empty`
+    case 'too-long':
+      return `'s "${issue.path}" is longer than its max length of ${issue.field.maxLength} characters`
+    case 'too-many':
+      return `'s "${issue.path}" has more than its max of ${issue.field.maxItems} items`
+  }
+}
+
 // A default is drawn whenever an export gives no value, so it must keep to the
-// declaration: no longer than the limit and, for a list, no item leaving a
-// required field empty or a field's text longer than its limit.
-function assertDefaultFits(variable: Pick<VariableData, 'type' | 'maxLength' | 'default' | 'itemFields'>): void {
+// declaration: no longer than the limit and, for a list, no more items than
+// its limit, and no item leaving a required field empty or a field's value
+// longer than its limit.
+function assertDefaultFits(
+  variable: Pick<VariableData, 'type' | 'maxLength' | 'maxItems' | 'default' | 'itemFields'>,
+): void {
   if (exceedsMaxLength(variable, variable.default)) {
     throw new ValidationError(
       `The default is longer than the max length of ${variable.maxLength} characters`,
       'INVALID_VARIABLE_DEFAULT',
     )
   }
+  if (exceedsMaxItems(variable, variable.default)) {
+    throw new ValidationError(
+      `The default has more than the max of ${variable.maxItems} items`,
+      'INVALID_VARIABLE_DEFAULT',
+    )
+  }
   if (variable.type !== 'object-list') return
   const issue = findItemFieldIssue(variable.default, variable.itemFields, 'default')
   if (!issue) return
-  throw new ValidationError(
-    issue.problem === 'missing'
-      ? `The default leaves the required field "${issue.path}" empty`
-      : `The default's "${issue.path}" is longer than its max length of ${issue.field.maxLength} characters`,
-    'INVALID_VARIABLE_DEFAULT',
-  )
+  throw new ValidationError(`The default${describeDefaultIssue(issue)}`, 'INVALID_VARIABLE_DEFAULT')
 }
 
 export class VariableService {
@@ -95,9 +124,11 @@ export class VariableService {
 
     assertDrawableDefault(data.type, data.default)
     assertMaxLengthValue(data.maxLength)
+    assertMaxItemsValue(data.maxItems)
     assertItemFieldLimits(data.itemFields)
     const model = variableCreateToModel(template._id, data)
     if (model.type !== 'string') model.maxLength = undefined
+    if (model.type !== 'object-list') model.maxItems = undefined
     assertDefaultFits(model)
 
     const exists = await VariableDataModel.exists({
@@ -146,6 +177,7 @@ export class VariableService {
     }
 
     if (data.maxLength !== null) assertMaxLengthValue(data.maxLength)
+    if (data.maxItems !== null) assertMaxItemsValue(data.maxItems)
     assertItemFieldLimits(data.itemFields)
 
     const previousType = variable.type
@@ -153,6 +185,7 @@ export class VariableService {
 
     if (variable.type !== 'object-list') {
       variable.itemFields = undefined
+      variable.maxItems = undefined
     }
     if (variable.type !== 'string') {
       variable.maxLength = undefined

@@ -11,7 +11,7 @@ A variable is what turns a document into a template. Definitions live on the
 template; values arrive at export time.
 
 ```ts
-VariableData  { _id, type, name, default?, required?, maxLength?, itemFields? }
+VariableData  { _id, type, name, default?, required?, maxLength?, maxItems?, itemFields? }
 VariableType  'string' | 'boolean' | 'image' | 'object-list'
 VariableValueType  string | boolean | VariableItem[]
 ```
@@ -92,14 +92,23 @@ type. `VariableService` refuses a limit that is not a positive integer
 (`utils/maxLengthCount.ts`, antd's `count.strategy`) — not antd's `maxLength`,
 which counts UTF-16 units.
 
-A list's item fields take `required` and (string ones) `maxLength` too.
-`findItemFieldIssue` (common `variables.ts`) is the one walk over a list's
-items that checks them, nested lists included, and names the first value that
-breaks its field as the caller wrote it (`albums[0].tracks[2].title`). Three
-callers: the export (`REQUIRED_VARIABLE_MISSING` / `VARIABLE_TOO_LONG`),
+An `object-list` variable's `maxItems` is the same thing for a list's length:
+`exceedsMaxItems` (through `getVariableMaxItems`, which ignores it on any other
+type) fails the export with `VARIABLE_TOO_MANY_ITEMS`; `VariableService`
+refuses a limit that is not a positive integer (`INVALID_VARIABLE_MAX_ITEMS`)
+and a default with more items (`INVALID_VARIABLE_DEFAULT`). The editor's list
+input stops adding and duplicating items at the limit.
+
+A list's item fields take `required`, (string ones) `maxLength` and (list ones)
+`maxItems` too. `findItemFieldIssue` (common `variables.ts`) is the one walk
+over a list's items that checks them, nested lists included, and names the
+first value that breaks its field as the caller wrote it
+(`albums[0].tracks[2].title`, `albums[0].tracks`). Three callers: the export
+(`REQUIRED_VARIABLE_MISSING` / `VARIABLE_TOO_LONG` / `VARIABLE_TOO_MANY_ITEMS`),
 `VariableService` on a list's default (`INVALID_VARIABLE_DEFAULT` — an item
 field has no default of its own, so the list's must already comply), and the
-editor's list inputs (`utils/itemFieldsRule.ts`).
+editor's list inputs (`utils/listValueRule.ts`, which checks the list's own
+`maxItems` first).
 
 ## Editor display
 

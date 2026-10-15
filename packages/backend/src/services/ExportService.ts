@@ -28,6 +28,7 @@ import {
   resolveVariable,
   isEmptyVariableValue,
   exceedsMaxLength,
+  exceedsMaxItems,
   findItemFieldIssue,
   stringifyVariableValue,
   getEllipseGeometry,
@@ -109,7 +110,8 @@ export class ExportService {
   /**
    * Required variables, and the required fields of a list's items, must have a
    * value; a string, no more characters than its variable's or field's max
-   * length; and every image a value holds — an
+   * length; a list, no more items than its variable's or field's max items;
+   * and every image a value holds — an
    * image variable's, or an image field's of a list's items, nested lists
    * included — must be one the export can draw. The error names the value, as
    * the caller wrote it: `photos[2].file`. An empty one is left to the
@@ -133,6 +135,10 @@ export class ExportService {
     const tooLong = (label: string, maxLength: number | undefined) => new ValidationError(
       `Variable "${label}" is longer than its max length of ${maxLength} characters`,
       'VARIABLE_TOO_LONG'
+    )
+    const tooMany = (label: string, maxItems: number | undefined) => new ValidationError(
+      `Variable "${label}" has more than its max of ${maxItems} items`,
+      'VARIABLE_TOO_MANY_ITEMS'
     )
 
     const images = new Map<string, DataUrlImage>()
@@ -162,6 +168,7 @@ export class ExportService {
     for (const variable of template.variableData ?? []) {
       const value = variableValues[variable.name]
       if (exceedsMaxLength(variable, value)) throw tooLong(variable.name, variable.maxLength)
+      if (exceedsMaxItems(variable, value)) throw tooMany(variable.name, variable.maxItems)
       if (variable.type === 'image') checkImage(value, variable.name)
       else if (variable.type === 'object-list') {
         const issue = findItemFieldIssue(value, variable.itemFields, variable.name)
@@ -169,6 +176,7 @@ export class ExportService {
           throw new ValidationError(`Required variable "${issue.path}" is missing`, 'REQUIRED_VARIABLE_MISSING')
         }
         if (issue?.problem === 'too-long') throw tooLong(issue.path, issue.field.maxLength)
+        if (issue?.problem === 'too-many') throw tooMany(issue.path, issue.field.maxItems)
         checkItems(value, variable.itemFields, variable.name)
       }
     }

@@ -497,6 +497,13 @@ Limits worth handling:
   field allows. A required variable left empty fails with the same
   `REQUIRED_VARIABLE_MISSING`. Item fields have no default, but the list's
   own default must keep to them when saved: `400 INVALID_VARIABLE_DEFAULT`.
+- **A list variable can set a `maxItems`**, and so can a list field of its
+  items (`{ name: 'tracks', type: 'object-list', maxItems: 12, itemFields: […] }`).
+  An export fails with `400 VARIABLE_TOO_MANY_ITEMS` when a list has more
+  items, naming it (`albums[0].tracks`); the list's default is checked against
+  the limits when saved: `400 INVALID_VARIABLE_DEFAULT`. A limit that is not a
+  positive whole number fails with `400 INVALID_VARIABLE_MAX_ITEMS`;
+  `maxItems: null` in an update removes it.
 
 ## TypeScript Support
 

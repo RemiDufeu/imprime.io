@@ -10,7 +10,7 @@ import {
   PlusOutlined,
 } from '@ant-design/icons'
 import type { VariableItem, VariableItemField, VariableItemValue, VariableType } from '@imprime/sdk'
-import { getVariableMaxLength } from '@imprime/sdk'
+import { getVariableMaxItems, getVariableMaxLength } from '@imprime/sdk'
 import { ImageValueInput } from '../ImageValueInput/ImageValueInput'
 import { maxLengthCount } from '../../../utils/maxLengthCount'
 
@@ -47,6 +47,8 @@ function withField(item: VariableItem, name: string, value: VariableItemValue | 
 interface ItemListEditorProps {
   items: VariableItem[]
   fields: VariableItemField[]
+  // Most items the list may have; no more can be added or duplicated.
+  maxItems?: number
   onChange: (items: VariableItem[]) => void
   disabled?: boolean
   // How large a vector image picked for an image field is redrawn.
@@ -58,9 +60,10 @@ interface ItemListEditorProps {
  * field, edited by its type. A list field opens, under its row, as a table of
  * its own — the same editor, one level down.
  */
-export function ItemListEditor({ items, fields, onChange, disabled, vectorSize }: ItemListEditorProps) {
+export function ItemListEditor({ items, fields, maxItems, onChange, disabled, vectorSize }: ItemListEditorProps) {
   // The list fields shown open, as `${itemIndex}:${fieldName}`.
   const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set())
+  const isFull = maxItems !== undefined && items.length >= maxItems
 
   if (fields.length === 0) {
     return (
@@ -201,7 +204,7 @@ export function ItemListEditor({ items, fields, onChange, disabled, vectorSize }
                           size="small"
                           type="text"
                           icon={<CopyOutlined />}
-                          disabled={disabled}
+                          disabled={disabled || isFull}
                           onClick={() => rearrange(indices.flatMap(i => (i === index ? [i, i] : [i])))}
                         />
                       </Tooltip>
@@ -230,6 +233,7 @@ export function ItemListEditor({ items, fields, onChange, disabled, vectorSize }
                             <ItemListEditor
                               items={Array.isArray(nested) ? nested : []}
                               fields={field.itemFields ?? []}
+                              maxItems={getVariableMaxItems(field)}
                               disabled={disabled}
                               vectorSize={vectorSize}
                               onChange={next => replaceAt(index, withField(item, field.name, next))}
@@ -249,10 +253,11 @@ export function ItemListEditor({ items, fields, onChange, disabled, vectorSize }
         type="dashed"
         icon={<PlusOutlined />}
         block
-        disabled={disabled}
+        disabled={disabled || isFull}
         onClick={() => onChange([...items, emptyItem(fields)])}
       >
-        Add item
+        {/* Counted as a limited text input counts its characters. */}
+        Add item{maxItems !== undefined && ` (${items.length}/${maxItems})`}
       </Button>
     </div>
   )

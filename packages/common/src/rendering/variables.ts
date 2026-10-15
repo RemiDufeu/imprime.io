@@ -44,8 +44,15 @@ export function isEmptyVariableValue(value: unknown): boolean {
   return false
 }
 
-// What carries a character limit: a variable, or a list's item field.
+// What carries a limit: a variable, or a list's item field.
 type Limited = Pick<VariableData | VariableItemField, 'type' | 'maxLength'>
+type ItemLimited = Pick<VariableData | VariableItemField, 'type' | 'maxItems'>
+
+// A limit as stored: anything but a positive integer, written through the
+// API, is none.
+function readLimit(limit: unknown): number | undefined {
+  return typeof limit === 'number' && Number.isInteger(limit) && limit > 0 ? limit : undefined
+}
 
 /**
  * The character limit of a variable or an item field, or undefined when it
@@ -53,9 +60,25 @@ type Limited = Pick<VariableData | VariableItemField, 'type' | 'maxLength'>
  * 'string' one.
  */
 export function getVariableMaxLength(limited: Limited): number | undefined {
-  const { type, maxLength } = limited
-  if (type !== 'string') return undefined
-  return typeof maxLength === 'number' && Number.isInteger(maxLength) && maxLength > 0 ? maxLength : undefined
+  return limited.type === 'string' ? readLimit(limited.maxLength) : undefined
+}
+
+/**
+ * The item limit of a list variable or a list field, or undefined when it has
+ * none: unset, not a positive integer (written through the API), or not an
+ * 'object-list' one.
+ */
+export function getVariableMaxItems(limited: ItemLimited): number | undefined {
+  return limited.type === 'object-list' ? readLimit(limited.maxItems) : undefined
+}
+
+/**
+ * The value is a list with more items than the variable or list field allows.
+ * An empty list is under any limit: a variable's default stands in for it.
+ */
+export function exceedsMaxItems(limited: ItemLimited, value: unknown): boolean {
+  const max = getVariableMaxItems(limited)
+  return max !== undefined && Array.isArray(value) && value.length > max
 }
 
 /**
@@ -81,13 +104,14 @@ export interface ItemFieldIssue {
   // Where the value is, as the caller wrote it: `albums[0].tracks[2].title`.
   path: string
   field: VariableItemField
-  problem: 'missing' | 'too-long'
+  problem: 'missing' | 'too-long' | 'too-many'
 }
 
 /**
  * The first value of a list's items, nested lists included, that breaks its
- * field's declaration: a required field left empty, or a string with more
- * characters than its field's max length. `label` is the list's own path.
+ * field's declaration: a required field left empty, a string with more
+ * characters than its field's max length, or a list with more items than its
+ * field's max items. `label` is the list's own path.
  * Anything that is not a list has no items, and an item that is not an object
  * no fields. A field is read from the item's own properties only: one named
  * like an `Object.prototype` member must not read the prototype's.
@@ -106,6 +130,7 @@ export function findItemFieldIssue(
       const path = `${label}[${index}].${field.name}`
       if (field.required === true && isEmptyVariableValue(value)) return { path, field, problem: 'missing' }
       if (exceedsMaxLength(field, value)) return { path, field, problem: 'too-long' }
+      if (exceedsMaxItems(field, value)) return { path, field, problem: 'too-many' }
       if (field.type === 'object-list') {
         const nested = findItemFieldIssue(value, field.itemFields, path)
         if (nested) return nested

@@ -1,6 +1,6 @@
 import { Modal } from 'antd'
 import { useEditorStore } from '../../../../../../../store/editor/EditorStore'
-import { VariableForm } from './VariableForm'
+import { VariableForm } from './VariableForm/VariableForm'
 
 /**
  * Hosts the variable create/edit form.

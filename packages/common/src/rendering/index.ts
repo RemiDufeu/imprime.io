@@ -60,6 +60,8 @@ export {
   getVariableMaxLength,
   countCharacters,
   exceedsMaxLength,
+  getVariableMaxItems,
+  exceedsMaxItems,
   findItemFieldIssue,
   joinItemPath,
   ITEM_PATH_SEPARATOR,

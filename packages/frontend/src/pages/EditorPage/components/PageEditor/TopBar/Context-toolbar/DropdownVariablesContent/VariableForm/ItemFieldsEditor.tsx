@@ -51,9 +51,9 @@ export function ItemFieldsEditor({ value, onChange, depth = 0 }: ItemFieldsEdito
               value={field.type}
               options={FIELD_TYPE_OPTIONS}
               onChange={type =>
-                // Dropping itemFields and maxLength on a type change keeps the
-                // declaration honest: only a list has item fields, only a
-                // string a limit.
+                // Dropping itemFields and the limits on a type change keeps the
+                // declaration honest: only a list has item fields and a max
+                // items, only a string a max length.
                 replaceAt(index, { name: field.name, type, required: field.required })
               }
             />
@@ -61,7 +61,7 @@ export function ItemFieldsEditor({ value, onChange, depth = 0 }: ItemFieldsEdito
               <Tooltip title="Max length: most characters a value may have. A longer one fails the export.">
                 <InputNumber
                   size="small"
-                  className="item-field-max-length"
+                  className="item-field-limit"
                   min={1}
                   precision={0}
                   placeholder="Max length"
@@ -69,9 +69,21 @@ export function ItemFieldsEditor({ value, onChange, depth = 0 }: ItemFieldsEdito
                   onChange={maxLength => replaceAt(index, { ...field, maxLength: maxLength ?? undefined })}
                 />
               </Tooltip>
+            ) : field.type === 'object-list' ? (
+              <Tooltip title="Max items: most items the list may have. A longer one fails the export.">
+                <InputNumber
+                  size="small"
+                  className="item-field-limit"
+                  min={1}
+                  precision={0}
+                  placeholder="Max items"
+                  value={field.maxItems}
+                  onChange={maxItems => replaceAt(index, { ...field, maxItems: maxItems ?? undefined })}
+                />
+              </Tooltip>
             ) : (
               // Keeps the Required boxes in a column.
-              <span className="item-field-max-length" />
+              <span className="item-field-limit" />
             )}
             <Tooltip title="Every item must give it a value: an empty one fails the export.">
               <Checkbox

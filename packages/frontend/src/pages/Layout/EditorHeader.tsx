@@ -4,12 +4,12 @@ import { useState, useEffect } from "react";
 import { templatesAPI } from "../../api/api";
 import { Button, Input, message, Modal, Form, Switch, Dropdown, Space, Tooltip } from "antd";
 import type { VariableValueType } from "@imprime/sdk";
-import { getVariableMaxLength } from "@imprime/sdk";
+import { getVariableMaxItems, getVariableMaxLength } from "@imprime/sdk";
 import "./EditorHeader.css";
 import { useEditorStore } from "../../store/editor/EditorStore";
 import { MOD_LABEL } from "../../utils/hotkeys";
 import { maxLengthCount } from "../../utils/maxLengthCount";
-import { itemFieldsRule } from "../../utils/itemFieldsRule";
+import { listValueRule } from "../../utils/listValueRule";
 import { parseApiError } from "../../utils/apiError";
 import { selectCanRedo, selectCanUndo } from "../../store/editor/selectors";
 import { ImageValueInput, ItemListInput } from "../../components/common";
@@ -104,7 +104,11 @@ export default function EditorHeader() {
             // The values the author can fix; the form checks them too, but the
             // server is the one that decides.
             const apiError = parseApiError(error);
-            if (apiError.code === 'REQUIRED_VARIABLE_MISSING' || apiError.code === 'VARIABLE_TOO_LONG') {
+            if (
+                apiError.code === 'REQUIRED_VARIABLE_MISSING'
+                || apiError.code === 'VARIABLE_TOO_LONG'
+                || apiError.code === 'VARIABLE_TOO_MANY_ITEMS'
+            ) {
                 message.error(apiError.message);
             } else {
                 message.error('Failed to export PDF. Please try again.');
@@ -211,7 +215,13 @@ export default function EditorHeader() {
                 } else if (variable.type === 'image') {
                     input = <ImageValueInput vectorSize={vectorSize} />;
                 } else if (variable.type === 'object-list') {
-                    input = <ItemListInput itemFields={variable.itemFields} vectorSize={vectorSize} />;
+                    input = (
+                        <ItemListInput
+                            itemFields={variable.itemFields}
+                            maxItems={getVariableMaxItems(variable)}
+                            vectorSize={vectorSize}
+                        />
+                    );
                 } else {
                     input = (
                         <Input
@@ -232,7 +242,7 @@ export default function EditorHeader() {
                                 required: variable.required,
                                 message: `${variable.name} is required`
                             },
-                            ...(variable.type === 'object-list' ? [itemFieldsRule(variable.itemFields, variable.name)] : []),
+                            ...(variable.type === 'object-list' ? [listValueRule(variable, variable.name)] : []),
                         ]}
                         tooltip={variable.required ? 'Required' : defaultHint}
                     >

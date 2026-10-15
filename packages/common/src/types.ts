@@ -301,6 +301,11 @@ export interface VariableData {
   // longer default is refused when saved. Unset is unlimited. Ignored for the
   // other types. Read through `getVariableMaxLength`.
   maxLength?: number
+  // Most items an 'object-list' value may have, so that a template can be
+  // designed for its longest list: a longer list fails the export, and a
+  // longer default is refused when saved. Unset is unlimited. Ignored for the
+  // other types. Read through `getVariableMaxItems`.
+  maxItems?: number
   // Item schema when `type === 'object-list'`. The editor needs it to offer
   // field names in a picker without any runtime data. Ignored for the other
   // types.
@@ -322,6 +327,8 @@ export interface VariableItemField {
   required?: boolean
   // As `VariableData.maxLength`, for each item's value of a 'string' field.
   maxLength?: number
+  // As `VariableData.maxItems`, for each item's list of an 'object-list' field.
+  maxItems?: number
   itemFields?: VariableItemField[]
 }
 
@@ -386,6 +393,7 @@ export namespace VariableDTO {
     default?: VariableValueType
     required?: boolean
     maxLength?: number
+    maxItems?: number
     itemFields?: VariableItemField[]
   }
 
@@ -396,6 +404,8 @@ export namespace VariableDTO {
     required?: boolean
     // null removes the limit.
     maxLength?: number | null
+    // null removes the limit.
+    maxItems?: number | null
     itemFields?: VariableItemField[]
   }
 

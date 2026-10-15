@@ -8,6 +8,7 @@ export interface IVariableData {
   default?: VariableValueType
   required?: boolean
   maxLength?: number
+  maxItems?: number
   itemFields?: VariableItemField[]
 }
 
@@ -22,6 +23,7 @@ const VariableItemFieldSchema = new Schema<VariableItemField>(
     type: { type: String, required: true, enum: VARIABLE_TYPES },
     required: { type: Boolean },
     maxLength: { type: Number },
+    maxItems: { type: Number },
   },
   { _id: false }
 )
@@ -41,6 +43,7 @@ const VariableDataSchema = new Schema<IVariableData>({
   default: { type: Schema.Types.Mixed },
   required: { type: Boolean, default: false },
   maxLength: { type: Number },
+  maxItems: { type: Number },
   itemFields: { type: [VariableItemFieldSchema], default: undefined },
 })
 
