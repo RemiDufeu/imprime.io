@@ -13,7 +13,7 @@ interface SVGSelectionWrapperProps {
 }
 
 const HANDLE_SIZE = 12
-const HANDLE_OFFSET = HANDLE_SIZE / 2
+export const HANDLE_OFFSET = HANDLE_SIZE / 2
 const TEXT_BORDER_WIDTH = 12
 // A shape its condition would leave out of an export with the default values
 // is still drawn and edited, faded.

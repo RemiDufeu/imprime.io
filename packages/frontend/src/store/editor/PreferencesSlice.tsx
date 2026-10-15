@@ -1,9 +1,9 @@
 import type { StateCreator } from 'zustand'
 
-export const MIN_ZOOM = 0.25
-export const MAX_ZOOM = 2
+export const MIN_ZOOM = 0.5
+export const MAX_ZOOM = 3
 export const DEFAULT_ZOOM = 1
-export const ZOOM_LEVELS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2]
+export const ZOOM_LEVELS = [0.5, 1, 1.5, 2, 2.5, 3]
 // One row of swatches in the colour picker's panel.
 export const MAX_RECENT_COLORS = 8
 
