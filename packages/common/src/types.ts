@@ -261,10 +261,22 @@ export type Shape =
 // Page & Template Types
 // ============================================
 
+// What a repeated page iterates: a list variable. A page sits inside no
+// repeat, so unlike a group it has no item's list field to iterate.
+export type PageRepeat = Pick<RepeatBinding, 'variableId'>
+
 export interface Page {
   _id: string
   shapes: Shape[]
   order: number
+  // Exported only when this condition holds — checked copy by copy, against
+  // each copy's own item, when the page is repeated. Unset is always exported.
+  // The editor shows the page whatever it says.
+  visibleWhen?: VisibilityCondition
+  // Set, the page is exported once per item of the list, in its place, each
+  // copy's shapes reading that item's fields (`itemPath`). The editor shows
+  // one copy.
+  repeat?: PageRepeat
   createdAt?: Date
   updatedAt?: Date
 }
@@ -373,8 +385,13 @@ export namespace TemplateDTO {
 }
 
 export namespace PageDTO {
+  // Each field present replaces the page's; an absent one is left alone.
   export interface Update {
-    shapes: Shape[]
+    shapes?: Shape[]
+    // null removes the condition.
+    visibleWhen?: VisibilityCondition | null
+    // null makes the page a single one again.
+    repeat?: PageRepeat | null
   }
 
   export interface Create {
@@ -382,6 +399,8 @@ export namespace PageDTO {
     // The pages from there on move down one.
     order?: number
     shapes?: Shape[]
+    visibleWhen?: VisibilityCondition
+    repeat?: PageRepeat
     // Restores a deleted page under its former id, so references to it stay
     // valid (the editor's undo). Rejected with 409 when the id is in use.
     _id?: string
@@ -592,7 +611,8 @@ export namespace ExportDTO {
     // longer than the page — which is left out: pages do not overflow onto
     // new ones.
     code: 'CONTENT_OFF_PAGE'
-    // 1-based, in page order.
+    // 1-based, in the PDF: after repeated pages are copied and pages whose
+    // condition fails are left out.
     page: number
     // How many drawn shapes were left out.
     shapes: number

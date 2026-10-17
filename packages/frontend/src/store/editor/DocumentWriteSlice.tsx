@@ -1,4 +1,4 @@
-import type { Shape } from '@imprime/sdk'
+import type { PageDTO, Shape } from '@imprime/sdk'
 import { layoutTree } from '@imprime/sdk'
 import type { StateCreator } from 'zustand'
 import type { TemplateSlice } from './TemplateSlice'
@@ -19,7 +19,8 @@ export interface HistoryHint {
 /**
  * The single path every shape tree takes to the document: reflow, record for
  * undo, set, save. Shape actions compute a tree and hand it here; none of them
- * touches the API or the template directly.
+ * touches the API or the template directly. A page's condition and repeat
+ * reach the server through the same save queue (`_savePage`).
  */
 export interface DocumentWriteSlice {
     updatePageShapes: (pageId: string, shapes: Shape[], hint?: HistoryHint) => void
@@ -30,8 +31,8 @@ export interface DocumentWriteSlice {
     // Set and save without recording: the path undo and redo replay through.
     _writePageShapes: (pageId: string, shapes: Shape[]) => void
     // Fire-and-forget; saves of one page reach the server one at a time, in
-    // order, and only the latest tree waiting is sent.
-    _savePage: (pageId: string, shapes: Shape[]) => void
+    // order. Updates waiting are merged, each field keeping its latest value.
+    _savePage: (pageId: string, update: PageDTO.Update) => void
 }
 
 const MAX_SAVE_RETRIES = 2
@@ -51,7 +52,7 @@ export const createDocumentWriteSlice: StateCreator<
     // undo at once, and the image is gone on reload. So a page has at most
     // one save out. Present in the map = a save is out; the value is the tree
     // to send once it is back (null: nothing newer yet).
-    const pendingSaves = new Map<string, { templateId: string; shapes: Shape[] } | null>()
+    const pendingSaves = new Map<string, { templateId: string; update: PageDTO.Update } | null>()
 
     // Removed from the open template since (or undone): nothing to save to.
     // A page of a template no longer open is saved all the same.
@@ -60,29 +61,42 @@ export const createDocumentWriteSlice: StateCreator<
         return template?._id === templateId && !template.pages.some(page => page._id === pageId)
     }
 
-    const send = async (pageId: string, templateId: string, shapes: Shape[]) => {
+    const send = async (pageId: string, templateId: string, update: PageDTO.Update) => {
         for (let attempt = 0; !isGone(templateId, pageId); attempt++) {
             try {
-                await templatesAPI.updatePage(templateId, pageId, shapes)
+                await templatesAPI.updatePage(templateId, pageId, update)
                 return
             } catch {
-                // A newer tree is waiting, or arrives during the back-off: it
-                // replaces this one, so no retry.
-                if (pendingSaves.get(pageId)) return
+                // A newer update is waiting, or arrives during the back-off:
+                // it is sent instead, carrying this one's fields, so no retry.
+                if (pendingSaves.get(pageId)) {
+                    mergeFailed(pageId, update)
+                    return
+                }
                 if (attempt >= MAX_SAVE_RETRIES) {
                     set({ error: 'Failed to save changes after multiple attempts' })
                     return
                 }
                 await sleep(SAVE_RETRY_BASE_MS * 2 ** attempt)
-                if (pendingSaves.get(pageId)) return
+                if (pendingSaves.get(pageId)) {
+                    mergeFailed(pageId, update)
+                    return
+                }
             }
         }
+    }
+
+    // A failed update's fields go out with the newer one waiting, under its
+    // own: a failed condition change must not be dropped by a shape save.
+    const mergeFailed = (pageId: string, failed: PageDTO.Update) => {
+        const next = pendingSaves.get(pageId)
+        if (next) pendingSaves.set(pageId, { ...next, update: { ...failed, ...next.update } })
     }
 
     const drain = async (pageId: string) => {
         for (let next = pendingSaves.get(pageId); next; next = pendingSaves.get(pageId)) {
             pendingSaves.set(pageId, null)
-            await send(pageId, next.templateId, next.shapes)
+            await send(pageId, next.templateId, next.update)
         }
         pendingSaves.delete(pageId)
     }
@@ -132,14 +146,18 @@ export const createDocumentWriteSlice: StateCreator<
                 },
             })
 
-            _savePage(pageId, shapes)
+            _savePage(pageId, { shapes })
         },
 
-        _savePage: (pageId: string, shapes: Shape[]) => {
+        _savePage: (pageId: string, update: PageDTO.Update) => {
             const { template } = get()
             if (!template) return
             const sending = pendingSaves.has(pageId)
-            pendingSaves.set(pageId, { templateId: template._id, shapes })
+            const waiting = pendingSaves.get(pageId)
+            pendingSaves.set(pageId, {
+                templateId: template._id,
+                update: waiting ? { ...waiting.update, ...update } : update,
+            })
             if (!sending) void drain(pageId)
         },
     }

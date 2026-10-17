@@ -24,7 +24,7 @@ export function InsertVariableButton() {
         .map(v => ({ key: encodeItemFieldValue(v._id, ''), label: v.name }))
 
     const scopedFields = selectedShapeId
-        ? itemFieldsInScope(currentPage?.shapes ?? [], selectedShapeId, variables ?? [], 'string').map(
+        ? itemFieldsInScope(currentPage, selectedShapeId, variables ?? [], 'string').map(
             option => ({ key: encodeItemFieldValue(option.variableId, option.itemPath), label: option.label })
         )
         : []

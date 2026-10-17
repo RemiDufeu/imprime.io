@@ -1,4 +1,4 @@
-import type { GroupShape, Shape, VariableData, VariableItemField, VariableType } from '@imprime/sdk'
+import type { GroupShape, Page, RepeatBinding, VariableData, VariableItemField, VariableType } from '@imprime/sdk'
 import { ITEM_PATH_SEPARATOR, joinItemPath } from '@imprime/sdk'
 import { findAncestorPath, findShapeById } from './shapeTree'
 
@@ -48,41 +48,50 @@ function fieldsAtPath(variable: VariableData, path: string): VariableItemField[]
 }
 
 /**
- * The repeated groups whose item a shape reads, outermost first: the ones it
- * sits inside, and — with `includeSelf` — the shape itself when it is one. A
- * shape's condition is checked copy by copy, so it reads its own repeat's item;
- * the repeat's own list cannot, and leaves it out.
+ * The repeats whose item a shape reads, outermost first: the page's, when it
+ * is repeated, then those of the groups the shape sits inside, and — with
+ * `includeSelf` — its own when it is a repeated group. A shape's condition is
+ * checked copy by copy, so it reads its own repeat's item; the repeat's own
+ * list cannot, and leaves it out. `shapeId` null stands for the page itself,
+ * whose own repeat is then the only one, under the same `includeSelf` rule.
  */
-export function repeatsInScope(shapes: Shape[], shapeId: string, includeSelf: boolean): GroupShape[] {
-  const ancestors = findAncestorPath(shapes, shapeId)
-  if (!ancestors) return []
-  const self = includeSelf ? findShapeById(shapes, shapeId)?.shape : undefined
-  const chain: GroupShape[] = self?.type === 'group' ? [...ancestors, self] : ancestors
-  return chain.filter(group => group.repeat?.variableId !== undefined)
+export function repeatsInScope(page: Page, shapeId: string | null, includeSelf: boolean): RepeatBinding[] {
+  let groups: GroupShape[] = []
+  if (shapeId !== null) {
+    const ancestors = findAncestorPath(page.shapes, shapeId)
+    if (!ancestors) return []
+    const self = includeSelf ? findShapeById(page.shapes, shapeId)?.shape : undefined
+    groups = self?.type === 'group' ? [...ancestors, self] : ancestors
+  }
+  const pageRepeat = shapeId !== null || includeSelf ? page.repeat : undefined
+  return [pageRepeat, ...groups.map(group => group.repeat)]
+    .filter((repeat): repeat is RepeatBinding => repeat?.variableId !== undefined)
 }
 
 /**
- * The item fields a shape can address, taken from the repeats it sits
- * inside (see `repeatsInScope`). Outermost group first, so a picker lists the
- * enclosing loops in the order they are nested.
+ * The item fields a shape — or, with `shapeId` null, the page itself — can
+ * address, taken from the repeats it sits inside (see `repeatsInScope`).
+ * Outermost first, so a picker lists the enclosing loops in the order they
+ * are nested.
  *
  * `type` filters to what the caller can consume: 'string' for a text run,
  * 'boolean' for a condition, 'image' for an image box, 'object-list' for a
  * nested repeat.
  */
 export function itemFieldsInScope(
-  shapes: Shape[],
-  shapeId: string,
+  page: Page | null,
+  shapeId: string | null,
   variables: VariableData[],
   type: VariableType,
   includeSelf = false,
 ): ItemFieldOption[] {
+  if (!page) return []
   const options: ItemFieldOption[] = []
-  for (const group of repeatsInScope(shapes, shapeId, includeSelf)) {
-    const variable = variables.find(v => v._id === group.repeat?.variableId)
+  for (const repeat of repeatsInScope(page, shapeId, includeSelf)) {
+    const variable = variables.find(v => v._id === repeat.variableId)
     if (!variable) continue
 
-    const basePath = group.repeat?.itemPath ?? ''
+    const basePath = repeat.itemPath ?? ''
     for (const field of fieldsAtPath(variable, basePath)) {
       if (field.type !== type) continue
       const itemPath = joinItemPath(basePath, field.name)

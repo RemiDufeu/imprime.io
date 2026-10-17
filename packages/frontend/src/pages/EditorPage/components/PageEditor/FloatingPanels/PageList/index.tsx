@@ -1,11 +1,13 @@
 import { Button, Tooltip } from "antd";
-import { PlusOutlined, DeleteOutlined } from "@ant-design/icons";
+import { PlusOutlined, DeleteOutlined, CopyOutlined } from "@ant-design/icons";
 import "./PageList.css";
 import { useRef, useState, useLayoutEffect } from "react";
 import { PageCanvas } from "../../../../../../components/page/PageCanvas";
 import { useEditorStore } from "../../../../../../store/editor/EditorStore";
 import { selectPageSize } from "../../../../../../store/editor/selectors";
 import { MOD_LABEL } from "../../../../../../utils/hotkeys";
+import { isPageLeftOut, previewPage } from "../../../../../../utils/conditionPreview";
+import { PageBindingBadges, PageBindingsMenu } from "./PageBindings";
 
 export default function PageList() {
 
@@ -14,6 +16,7 @@ export default function PageList() {
     const selectPage = useEditorStore(state => state.selectPage);
     const addPage = useEditorStore(state => state.addPage);
     const deletePage = useEditorStore(state => state.deletePage);
+    const duplicatePage = useEditorStore(state => state.duplicatePage);
     const reorderPages = useEditorStore(state => state.reorderPages);
     const pageSize = useEditorStore(selectPageSize);
 
@@ -132,6 +135,10 @@ export default function PageList() {
         return null;
     }
 
+    // Each page is shown whatever its condition and repeat say, as a shape
+    // is: badged, and faded when the defaults would leave it out.
+    const previews = template.pages.map(page => previewPage(template, page));
+
     return (
         <div className="page-list-container" ref={containerRef}>
             <div className="page-list-header">
@@ -166,7 +173,7 @@ export default function PageList() {
                         style={{ cursor: draggedIndex !== null ? 'grabbing' : 'grab' }}>
                         <div className="page-thumbnail-number">{index + 1}</div>
                         <div className="page-preview-wrapper" key={`preview-${page._id}-${index}`}>
-                            <div className="page-preview-shadow">
+                            <div className={`page-preview-shadow ${isPageLeftOut(previews[index]) ? "page-preview-excluded" : ""}`}>
                                 <PageCanvas
                                     readonly={true}
                                     page={page}
@@ -175,22 +182,38 @@ export default function PageList() {
                                 />
                             </div>
                         </div>
-                        {/* No confirmation: a deleted page is one undo away. */}
-                        {template.pages.length > 1 && (
-                            <Tooltip title={`Delete page (undo: ${MOD_LABEL}+Z)`} mouseEnterDelay={0.4}>
+                        <PageBindingBadges page={page} preview={previews[index]} />
+                        <div className="page-thumbnail-actions">
+                            <PageBindingsMenu page={page} />
+                            <Tooltip title="Duplicate page" mouseEnterDelay={0.4}>
                                 <Button
                                     type="text"
-                                    danger
-                                    icon={<DeleteOutlined />}
+                                    icon={<CopyOutlined />}
                                     size="small"
-                                    className="page-thumbnail-delete"
+                                    className="page-thumbnail-duplicate"
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        deletePage(page._id);
+                                        duplicatePage(page._id);
                                     }}
                                 />
                             </Tooltip>
-                        )}
+                            {/* No confirmation: a deleted page is one undo away. */}
+                            {template.pages.length > 1 && (
+                                <Tooltip title={`Delete page (undo: ${MOD_LABEL}+Z)`} mouseEnterDelay={0.4}>
+                                    <Button
+                                        type="text"
+                                        danger
+                                        icon={<DeleteOutlined />}
+                                        size="small"
+                                        className="page-thumbnail-delete"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            deletePage(page._id);
+                                        }}
+                                    />
+                                </Tooltip>
+                            )}
+                        </div>
                     </div>
                 </div>))}
                 <PageAddSeparator

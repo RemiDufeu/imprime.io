@@ -37,7 +37,7 @@ export const selectSelectedShape = (s: SelectionState): Shape | null => {
         : null
 }
 
-export type ContextBarType = 'none' | 'shape' | 'text' | 'image' | 'group'
+export type ContextBarType = 'none' | 'shape' | 'text' | 'image' | 'group' | 'page'
 
 function contextBarFor(type: Shape['type'] | ToolType): ContextBarType {
     switch (type) {
@@ -54,11 +54,12 @@ function contextBarFor(type: Shape['type'] | ToolType): ContextBarType {
 }
 
 // Which context bar the top bar shows: the drawing tool's while one is active,
-// otherwise the selected shape's.
+// otherwise the selected shape's — or the page's, when nothing is selected.
 export const selectContextBar = (s: SelectionState & { selectedTool: ToolType }): ContextBarType => {
     if (s.selectedTool !== 'move') return contextBarFor(s.selectedTool)
     const shape = selectSelectedShape(s)
-    return shape ? contextBarFor(shape.type) : 'none'
+    if (shape) return contextBarFor(shape.type)
+    return selectCurrentPage(s) ? 'page' : 'none'
 }
 
 type HistoryAvailabilityState =

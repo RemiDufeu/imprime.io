@@ -48,7 +48,7 @@ export function ImagePickerModal({ shape, onClose }: ImagePickerModalProps) {
     ...(variables ?? [])
       .filter(variable => variable.type === 'image')
       .map(variable => ({ variableId: variable._id, label: variable.name })),
-    ...itemFieldsInScope(currentPage?.shapes ?? [], shape.id, variables ?? [], 'image').map(option => ({
+    ...itemFieldsInScope(currentPage, shape.id, variables ?? [], 'image').map(option => ({
       variableId: option.variableId,
       itemPath: option.itemPath,
       label: option.label,

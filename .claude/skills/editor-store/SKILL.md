@@ -175,12 +175,13 @@ nothing, and writes. `updatePageShapes` does four things in order:
    or a held arrow key undoes at once); `hint.selection` is the shape undo
    selects again;
 3. **set** — optimistic local update of the template;
-4. **save** — fire-and-forget `_savePage`. Saves of one page go out **one at
-   a time**: the server reads, replaces and writes a page with no concurrency
-   check, so two in flight can land in either order and keep the older tree.
-   While one is out, later writes only replace the tree waiting to go next. A
-   failed save retries twice (1s, 2s) unless a newer tree is waiting, then sets
-   `error`.
+4. **save** — fire-and-forget `_savePage(pageId, update)`, a `PageDTO.Update`.
+   Saves of one page go out **one at a time**: the server reads, replaces and
+   writes a page with no concurrency check, so two in flight can land in either
+   order and keep the older value. While one is out, later updates are merged
+   into the one waiting to go next, each field keeping its latest value. A
+   failed save retries twice (1s, 2s) unless a newer update is waiting — its
+   fields then go out with that one — and finally sets `error`.
 
 Steps 3–4 are `_writePageShapes`, the path undo and redo replay through so a
 replay records nothing.
@@ -188,7 +189,9 @@ replay records nothing.
 The other document changes follow the same split: the public action does the
 change through a `_` half and then records what it replaced — `addPage` /
 `deletePage` through `_insertPage` / `_removePage`, `reorderPages` through
-`_applyPageOrder`, the title through `_saveTitle`, variables through
+`_applyPageOrder`, a page's condition and repeat (`updatePageBindings`) through
+`_applyPageBindings` — which saves through the page's `_savePage` queue, in
+order with its shape saves — the title through `_saveTitle`, variables through
 `_restoreVariable`. A history entry stores the state to restore (a page
 snapshot or null, an id order, a title, a variable or null); replaying it
 returns the entry for the state it replaced. A deleted page or variable comes

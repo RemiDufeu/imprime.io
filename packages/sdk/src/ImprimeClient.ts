@@ -217,8 +217,8 @@ export class ImprimeClient {
 
   /**
    * Add a page to a template and return it: blank and last by default,
-   * or at `page.order` with `page.shapes`. `page._id` restores a deleted
-   * page under its former id.
+   * or at `page.order` with `page.shapes`, `page.visibleWhen` and
+   * `page.repeat`. `page._id` restores a deleted page under its former id.
    */
   async addPage(templateId: string, page: PageDTO.Create = {}): Promise<Page> {
     return this.request<Page>(`/templates/${templateId}/pages`, {
@@ -228,13 +228,15 @@ export class ImprimeClient {
   }
 
   /**
-   * Update a page's shapes. Fire-and-forget: the server returns 204 No Content,
+   * Update a page: its shapes, its condition, its repeat — each field given
+   * replaces the page's, `null` removes a condition or a repeat, and the rest
+   * is left alone. Fire-and-forget: the server returns 204 No Content,
    * callers are expected to apply the change optimistically client-side.
    */
-  async updatePage(templateId: string, pageId: string, shapes: Shape[]): Promise<void> {
+  async updatePage(templateId: string, pageId: string, update: PageDTO.Update): Promise<void> {
     return this.request<void>(`/templates/${templateId}/pages/${pageId}`, {
       method: 'PATCH',
-      body: JSON.stringify({ shapes }),
+      body: JSON.stringify(update),
     })
   }
 
@@ -263,7 +265,7 @@ export class ImprimeClient {
     }
 
     const updatedShapes = [...page.shapes, shape]
-    await this.updatePage(templateId, pageId, updatedShapes)
+    await this.updatePage(templateId, pageId, { shapes: updatedShapes })
   }
 
   /**
@@ -391,7 +393,7 @@ export class ImprimeClient {
     const updatedShapes = page.shapes.map(shape =>
       shape.id === shapeId ? { ...shape, ...updates } as Shape : shape
     )
-    await this.updatePage(templateId, pageId, updatedShapes)
+    await this.updatePage(templateId, pageId, { shapes: updatedShapes })
   }
 
   /**
@@ -406,7 +408,7 @@ export class ImprimeClient {
     }
 
     const updatedShapes = page.shapes.filter(s => s.id !== shapeId)
-    await this.updatePage(templateId, pageId, updatedShapes)
+    await this.updatePage(templateId, pageId, { shapes: updatedShapes })
   }
 
   // ============================================

@@ -1,5 +1,5 @@
 import { ImprimeClient } from '@imprime/sdk'
-import type { Template, TemplateSummary, PageSize, Shape, Page, PageDTO, ImageDTO, FontDTO, FontVariant, VariableDTO, VariableValueType, ExportDTO, EmailSettingsDTO, SsoSettingsDTO, SsoProvider, AccessSettingsDTO } from '@imprime/sdk'
+import type { Template, TemplateSummary, PageSize, Page, PageDTO, ImageDTO, FontDTO, FontVariant, VariableDTO, VariableValueType, ExportDTO, EmailSettingsDTO, SsoSettingsDTO, SsoProvider, AccessSettingsDTO } from '@imprime/sdk'
 import { API_BASE } from '../config'
 
 // Create a single SDK client instance
@@ -34,8 +34,8 @@ export const templatesAPI = {
     return client.deleteTemplate(id)
   },
 
-  async updatePage(templateId: string, pageId: string, shapes: Shape[]): Promise<void> {
-    return client.updatePage(templateId, pageId, shapes)
+  async updatePage(templateId: string, pageId: string, update: PageDTO.Update): Promise<void> {
+    return client.updatePage(templateId, pageId, update)
   },
 
   async addPage(templateId: string, page?: PageDTO.Create): Promise<Page> {

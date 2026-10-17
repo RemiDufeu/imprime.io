@@ -97,6 +97,13 @@ A repeat has no drawing tool: a group becomes one from the group bar's Repeat
 control. `shapeKind` reads a repeated group as `'repeat'` for its layers-panel
 icon and fallback name.
 
+A **page** carries the same two bindings: `Page.visibleWhen` and
+`Page.repeat` (`PageRepeat`: a list variable only, no `itemPath` — a page sits
+in no repeat). `resolvePages` copies a repeated page once per item, in place,
+checks the page's condition per copy, and resolves each copy's shapes in that
+item's scope, so they read `itemPath`s exactly as a repeated group's children
+do. Copies get `<pageId>::rep-<i>` ids.
+
 ## `resolveShapes`
 
 `packages/common/src/rendering/shapeResolver.ts`. Flattens an authored tree into

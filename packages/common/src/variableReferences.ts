@@ -4,10 +4,11 @@
  * A tree points at variables by id in four places: a text run bound to a
  * variable, an image box's image, any shape's `visibleWhen` condition, and a
  * group's `repeat` list. Every walk over those references goes through here,
- * so adding a fifth kind is one change.
+ * so adding a fifth kind is one change. A page itself points at variables
+ * through its own `visibleWhen` and `repeat`.
  */
 
-import type { CustomText, Paragraph, RepeatBinding, Shape, VariableElement, VisibilityCondition } from './types.js'
+import type { CustomText, Page, Paragraph, RepeatBinding, Shape, VariableElement, VisibilityCondition } from './types.js'
 import { isContainerShape } from './types.js'
 
 /** Every variable id `shapes` refers to, containers included. */
@@ -31,6 +32,14 @@ export function collectVariableIds(shapes: Shape[]): Set<string> {
     }
   }
   visit(shapes)
+  return ids
+}
+
+/** Every variable id a page refers to: its condition, its repeat and its shapes. */
+export function collectPageVariableIds(page: Pick<Page, 'shapes' | 'visibleWhen' | 'repeat'>): Set<string> {
+  const ids = collectVariableIds(page.shapes ?? [])
+  if (page.visibleWhen?.variableId) ids.add(page.visibleWhen.variableId)
+  if (page.repeat?.variableId) ids.add(page.repeat.variableId)
   return ids
 }
 

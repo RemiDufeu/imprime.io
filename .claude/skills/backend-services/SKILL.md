@@ -30,7 +30,7 @@ Eight services, wired once in `services/index.ts`:
 export class PageService {
   constructor(private imageService: ImageService) { }
 
-  async updateShapes(templateId: string, pageId: string, data: PageDTO.Update): Promise<void> {
+  async update(templateId: string, ownerId: string, pageId: string, data: PageDTO.Update): Promise<void> {
     ...
   }
 
@@ -131,9 +131,10 @@ and not a cross-service singleton import.
 
 ### Validate the tree before writing it
 
-`PageService.updateShapes` loads the template's variable ids and walks the
-incoming shape tree recursively, collecting **every** bad reference before
-throwing one `ValidationError` with all of them in `details`. Two things to keep
+`PageService.update` (and `create`) loads the template's variable ids, checks
+the page's own `visibleWhen` and `repeat`, and walks the incoming shape tree
+recursively, collecting **every** bad reference before throwing one
+`ValidationError` with all of them in `details`. Two things to keep
 if you extend it: collect-then-throw rather than fail-fast, and recurse through
 `isContainerShape` so nested shapes are covered.
 

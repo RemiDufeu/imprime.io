@@ -24,7 +24,7 @@ import type {
 } from '@imprime/common'
 import {
   getDashArray,
-  resolveShapes,
+  resolvePages,
   resolveVariable,
   isEmptyVariableValue,
   exceedsMaxLength,
@@ -690,13 +690,22 @@ export class ExportService {
 
     const ctx: ResolveContext = { variableValues, template }
     const { pageSize } = template
+    // Repeated pages copied, pages whose condition fails left out: what is
+    // left is the PDF's pages, and a PDF needs one.
+    const exported = resolvePages(template.pages, ctx)
+    if (exported.length === 0) {
+      throw new ValidationError(
+        'No page to export: every page is left out by its condition, or repeated for an empty list',
+        'NO_PAGE_TO_EXPORT'
+      )
+    }
     // A shape starting beyond the page is left out — react-pdf would start a
     // new page for it — and the caller told, since content that grew with its
     // data can land there without anyone placing it so. A turned shape starts
     // where its turned box does.
     const warnings: ExportDTO.Warning[] = []
-    const resolvedPages: Page[] = template.pages.map((page, index) => {
-      const shapes = resolveShapes(page.shapes, ctx)
+    const resolvedPages: Page[] = exported.map((page, index) => {
+      const { shapes } = page
       const onPage = shapes.filter(s => {
         const bounds = getRotatedBounds(s)
         return bounds.y < pageSize.height && bounds.x < pageSize.width

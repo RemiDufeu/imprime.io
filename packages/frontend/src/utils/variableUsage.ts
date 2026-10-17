@@ -46,7 +46,8 @@ function collectFromShapes(shapes: Shape[], variableId: string, out: VariableRef
 
 /**
  * Every place in the template that points at a variable — text runs, image
- * boxes, conditions and repeats — including the ones nested inside groups.
+ * boxes, conditions and repeats — including the ones nested inside groups,
+ * and a page's own condition and repeat.
  *
  * This is the editor's own view, used to tell the author what an edit is about
  * to break. It is not the backend's deletion guard, which is narrower.
@@ -54,6 +55,10 @@ function collectFromShapes(shapes: Shape[], variableId: string, out: VariableRef
 export function findVariableReferences(pages: Page[], variableId: string): VariableReference[] {
   const references: VariableReference[] = []
   for (const page of pages) {
+    if (page.visibleWhen?.variableId === variableId) {
+      references.push({ kind: 'condition', itemPath: page.visibleWhen.itemPath ?? '' })
+    }
+    if (page.repeat?.variableId === variableId) references.push({ kind: 'items', itemPath: '' })
     collectFromShapes(page.shapes ?? [], variableId, references)
   }
   return references

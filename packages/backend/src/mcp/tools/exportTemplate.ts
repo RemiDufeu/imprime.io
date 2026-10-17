@@ -56,7 +56,9 @@ export function registerExportTemplate(server: McpServer, ownerId: string): void
     {
       title: 'Export template to PDF',
       description:
-        'Render a template as a PDF and return a single-use download URL valid for 10 minutes.',
+        'Render a template as a PDF and return a single-use download URL valid for 10 minutes. ' +
+        'A page can be left out by its condition, or repeated once per item of a list variable: ' +
+        'warnings number the pages of the PDF, and a template left with no page fails.',
       inputSchema,
       outputSchema,
     },

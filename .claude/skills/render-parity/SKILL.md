@@ -64,7 +64,8 @@ Legitimately asymmetric, and must not be forced into `common`:
 
 ## The authored/resolved asymmetry
 
-`resolveShapes()` is called in exactly one place: `ExportService.exportToPDF`.
+`resolveShapes()` is called in exactly one place: `resolvePages()`, which only
+`ExportService.exportToPDF` calls.
 The editor never calls it. This is deliberate — you cannot select, drag or
 rename a shape that only exists because a repeat materialised it.
 
@@ -81,7 +82,12 @@ So in the editor:
   item, through the shared `isConditionMet`. Its siblings do not reflow: the
   editor's layout keeps every authored child, the export's leaves it out;
 - `hidden` shapes are skipped by `SVGSelectionWrapper` (still listed in the
-  shape tree panel, still selectable there).
+  shape tree panel, still selectable there);
+- a page is edited once whatever its own `repeat` and `visibleWhen` say: the
+  page context bar and its thumbnail carry them, the thumbnail badged and
+  faded when `previewPageCondition` finds the defaults would leave it out. A
+  repeated page's item fields are in scope for every picker on it
+  (`repeatsInScope` puts the page's repeat outermost).
 
 And in the export, `resolveShapes` flattens all of that to absolute-positioned
 leaves: `hidden` dropped, conditions evaluated, repeat copies materialised with
