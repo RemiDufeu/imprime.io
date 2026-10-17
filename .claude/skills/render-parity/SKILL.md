@@ -31,6 +31,7 @@ Anything where "the editor and the PDF must agree" is the requirement:
 | `strokeUtils.ts` | `getDashArray` — dashed/dotted stroke patterns |
 | `svgRenderers.ts` | `getEllipseGeometry` — ellipse geometry from a bounding box |
 | `boxGeometry.ts` | `getBoxPaths` (outline + per-side border as path data, Bézier corners, CSS radius fitting), `getBorderWidths`, `getCornerRadii`, `getPadding`, `getBorderOverhang` — every rectangle and group box |
+| `rotation.ts` | `getRotation` (sanitised, in (-180, 180]), `getCenter`, `rotatePoint`, `Frame` with `getContentFrame` / `shapeToPage` / `shapeFromPage` (a group's turn composed into its children), `getRotatedBounds` — every rotated shape |
 | `imageLayout.ts` | `getImageLayout` (fit, alignment and crop → the rect the *whole* image is drawn at, clipped to the box), `getImageCrop`, `getImageCornerRadius` (clamped as react-pdf clamps a clip), `getImageOpacity` |
 | `groupLayout.ts` | `distributeMainAxis`, `crossAxisOffset`, `layoutGroupChildren` — the flexbox subset, padding, `stack` |
 | `shapeResolver.ts` | `resolveShapes` — repeats, conditions, group expansion; `getGroupBox` — a group's background and border as rectangles |
@@ -85,8 +86,14 @@ So in the editor:
 And in the export, `resolveShapes` flattens all of that to absolute-positioned
 leaves: `hidden` dropped, conditions evaluated, repeat copies materialised with
 re-forged ids (`reidShape`), group boxes emitted as rectangles, coordinates
-translated into page space. By the time `renderShape` runs, **no group can
-reach it**.
+brought into page space — each group's rotation composed into its leaves'.
+By the time `renderShape` runs, **no group can reach it**.
+
+Rotation itself: the editor turns a shape's `<g>` about its box centre; the
+export turns the shape's node with a `transform` style — its `Svg` layer
+(then unclamped, so the clamp does not turn with it), its text `View`, or a
+`View` wrapping the image's clip, since react-pdf clips a node before it
+applies that node's own transform.
 
 The one place the editor deliberately mirrors resolution is layout: the write
 path (`DocumentWriteSlice.updatePageShapes`) runs `layoutTree`

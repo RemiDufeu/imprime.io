@@ -50,6 +50,21 @@ export {
   ZERO_SIDES,
 } from './boxGeometry.js'
 export type { BoxPaths, BoxStroke, BoxRect } from './boxGeometry.js'
+export {
+  getRotation,
+  normalizeRotation,
+  getCenter,
+  rotatePoint,
+  rotateVector,
+  pointToPage,
+  pointFromPage,
+  getContentFrame,
+  shapeToPage,
+  shapeFromPage,
+  getRotatedBounds,
+  PAGE_FRAME,
+} from './rotation.js'
+export type { Point, TurnedBox, Frame } from './rotation.js'
 export { resolveShapes, getGroupBox } from './shapeResolver.js'
 export type { GroupBox } from './shapeResolver.js'
 export {

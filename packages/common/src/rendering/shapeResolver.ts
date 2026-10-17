@@ -10,6 +10,7 @@ import type {
 import { isContainerShape } from '../types.js'
 import { layoutTree } from './groupLayout.js'
 import { getBorderOverhang } from './boxGeometry.js'
+import { getContentFrame, shapeToPage, PAGE_FRAME, type Frame } from './rotation.js'
 import {
   isConditionMet,
   resolveVariable,
@@ -20,10 +21,6 @@ import {
 } from './variables.js'
 
 export type { ResolveContext }
-
-function translate(shape: Shape, dx: number, dy: number): Shape {
-  return { ...shape, x: shape.x + dx, y: shape.y + dy } as Shape
-}
 
 function reidShape(shape: Shape, suffix: string): Shape {
   const id = `${shape.id}::${suffix}`
@@ -141,7 +138,8 @@ export interface GroupBox {
 
 /**
  * A group's own background and border, as rectangles both renderers already
- * draw, at the group's position. Each is null when there is nothing to paint.
+ * draw, at the group's position and turned with it. Each is null when there
+ * is nothing to paint.
  */
 export function getGroupBox(group: GroupShape): GroupBox {
   const hasFill = group.fill !== undefined && group.fill !== 'none' && group.fill !== 'transparent'
@@ -152,6 +150,7 @@ export function getGroupBox(group: GroupShape): GroupBox {
     y: group.y,
     width: group.width,
     height: group.height,
+    rotation: group.rotation,
     cornerRadius: group.cornerRadius,
   }
 
@@ -242,18 +241,21 @@ function bakeImage(shape: ImageShape, ctx: ResolveContext | undefined, scope: Va
 }
 
 // Into page space, as leaves: each group's box around its children — its
-// background under them, its border over them.
-function flatten(shapes: Shape[], dx: number, dy: number): Shape[] {
+// background under them, its border over them. `frame` is where the siblings'
+// coordinates lie on the page: a turned group turns its children with it, so
+// each leaf carries the sum of its ancestors' rotations and its own, about
+// its own centre, placed where the turns take that centre.
+function flatten(shapes: Shape[], frame: Frame): Shape[] {
   const out: Shape[] = []
   for (const shape of shapes) {
-    const placed = translate(shape, dx, dy)
+    const placed = shapeToPage(shape, frame)
     if (placed.type !== 'group') {
       out.push(placed)
       continue
     }
     const { background, border } = getGroupBox(placed)
     if (background) out.push(background)
-    out.push(...flatten(placed.children, placed.x, placed.y))
+    out.push(...flatten(placed.children, getContentFrame(frame, shape)))
     if (border) out.push(border)
   }
   return out
@@ -264,12 +266,12 @@ function flatten(shapes: Shape[], dx: number, dy: number): Shape[] {
  * data (hidden shapes and failed conditions dropped, repeated groups copied,
  * item values baked), then the layout of what that left (`layoutTree`: hugging
  * groups sized, children placed), then page space, with each group's box
- * emitted as rectangles.
+ * emitted as rectangles and its rotation composed into its leaves.
  */
 export function resolveShapes(
   shapes: Shape[],
   ctx?: ResolveContext,
   scope: VariableScope = [],
 ): Shape[] {
-  return flatten(layoutTree(instantiate(shapes, ctx, scope, true)), 0, 0)
+  return flatten(layoutTree(instantiate(shapes, ctx, scope, true)), PAGE_FRAME)
 }

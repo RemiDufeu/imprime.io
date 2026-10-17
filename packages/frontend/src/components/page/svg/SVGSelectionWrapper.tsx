@@ -1,9 +1,12 @@
 import type { Shape } from '@imprime/sdk'
+import { getCenter, getRotation, normalizeRotation } from '@imprime/sdk'
 import { theme } from 'antd'
 import { useCallback, useRef, cloneElement, isValidElement, useEffect } from 'react'
 import { useEditorStore } from '../../../store/editor/EditorStore'
 import type { ResizeHandle } from '../../../store/editor/TransformationSlice'
+import { selectCurrentPage } from '../../../store/editor/selectors'
 import { previewCondition } from '../../../utils/conditionPreview'
+import { findShapeById } from '../../../utils/shapeTree'
 import { ShapeBadges } from './ShapeBadges'
 
 interface SVGSelectionWrapperProps {
@@ -19,20 +22,35 @@ const TEXT_BORDER_WIDTH = 12
 // is still drawn and edited, faded.
 const GHOST_OPACITY = 0.35
 
+// From the top edge to the centre of the rotation handle, which sits above it.
+const ROTATION_HANDLE_DISTANCE = 28
+const ROTATION_HANDLE_RADIUS = HANDLE_SIZE / 2
+
+// `angle` is the handle's direction from the centre of the unturned box, in
+// degrees clockwise from north: its cursor turns with the shape.
 const RESIZE_HANDLES: {
     position: ResizeHandle
-    cursor: string
+    angle: number
     getPosition: (w: number, h: number) => { x: number; y: number }
 }[] = [
-        { position: 'nw', cursor: 'nwse-resize', getPosition: () => ({ x: -HANDLE_OFFSET, y: -HANDLE_OFFSET }) },
-        { position: 'n', cursor: 'ns-resize', getPosition: (w) => ({ x: w / 2 - HANDLE_OFFSET, y: -HANDLE_OFFSET }) },
-        { position: 'ne', cursor: 'nesw-resize', getPosition: (w) => ({ x: w - HANDLE_OFFSET, y: -HANDLE_OFFSET }) },
-        { position: 'e', cursor: 'ew-resize', getPosition: (w, h) => ({ x: w - HANDLE_OFFSET, y: h / 2 - HANDLE_OFFSET }) },
-        { position: 'se', cursor: 'nwse-resize', getPosition: (w, h) => ({ x: w - HANDLE_OFFSET, y: h - HANDLE_OFFSET }) },
-        { position: 's', cursor: 'ns-resize', getPosition: (w, h) => ({ x: w / 2 - HANDLE_OFFSET, y: h - HANDLE_OFFSET }) },
-        { position: 'sw', cursor: 'nesw-resize', getPosition: (_, h) => ({ x: -HANDLE_OFFSET, y: h - HANDLE_OFFSET }) },
-        { position: 'w', cursor: 'ew-resize', getPosition: (_, h) => ({ x: -HANDLE_OFFSET, y: h / 2 - HANDLE_OFFSET }) },
+        { position: 'nw', angle: 315, getPosition: () => ({ x: -HANDLE_OFFSET, y: -HANDLE_OFFSET }) },
+        { position: 'n', angle: 0, getPosition: (w) => ({ x: w / 2 - HANDLE_OFFSET, y: -HANDLE_OFFSET }) },
+        { position: 'ne', angle: 45, getPosition: (w) => ({ x: w - HANDLE_OFFSET, y: -HANDLE_OFFSET }) },
+        { position: 'e', angle: 90, getPosition: (w, h) => ({ x: w - HANDLE_OFFSET, y: h / 2 - HANDLE_OFFSET }) },
+        { position: 'se', angle: 135, getPosition: (w, h) => ({ x: w - HANDLE_OFFSET, y: h - HANDLE_OFFSET }) },
+        { position: 's', angle: 180, getPosition: (w, h) => ({ x: w / 2 - HANDLE_OFFSET, y: h - HANDLE_OFFSET }) },
+        { position: 'sw', angle: 225, getPosition: (_, h) => ({ x: -HANDLE_OFFSET, y: h - HANDLE_OFFSET }) },
+        { position: 'w', angle: 270, getPosition: (_, h) => ({ x: -HANDLE_OFFSET, y: h / 2 - HANDLE_OFFSET }) },
     ]
+
+// One per 45° from north, repeating every 180°.
+const RESIZE_CURSORS = ['ns-resize', 'nesw-resize', 'ew-resize', 'nwse-resize']
+
+// The resize cursor closest to the handle's direction on the page.
+function resizeCursor(angle: number): string {
+    const step = Math.round(normalizeRotation(angle) / 45)
+    return RESIZE_CURSORS[((step % 4) + 4) % 4]
+}
 
 export function SVGSelectionWrapper({ shape, readonly, children }: SVGSelectionWrapperProps) {
     const { token } = theme.useToken()
@@ -48,9 +66,18 @@ export function SVGSelectionWrapper({ shape, readonly, children }: SVGSelectionW
     )
     const conditionPreview = useEditorStore((s) => previewCondition(s.template, shape))
 
+    // The turn of the selected shape's parents, which its handles' cursors
+    // follow. Only the selected shape has handles.
+    const parentRotation = useEditorStore((s) => {
+        if (s.selectedShapeId !== shape.id) return 0
+        const page = selectCurrentPage(s)
+        return page ? findShapeById(page.shapes, shape.id)?.parentFrame.rotation ?? 0 : 0
+    })
+
     const selectShape = useEditorStore((s) => s.selectShape)
     const startDrag = useEditorStore((s) => s.startDrag)
     const startResize = useEditorStore((s) => s.startResize)
+    const startRotate = useEditorStore((s) => s.startRotate)
 
     const dragData = useEditorStore((s) => s.dragData)
     const onMouseMove = useEditorStore((s) => s.onMouseMove)
@@ -60,7 +87,7 @@ export function SVGSelectionWrapper({ shape, readonly, children }: SVGSelectionW
         if (!dragData) return
 
         const handleMouseMove = (e: MouseEvent) => {
-            onMouseMove(e.clientX, e.clientY)
+            onMouseMove(e.clientX, e.clientY, e.shiftKey)
         }
 
         const handleMouseUp = () => {
@@ -83,6 +110,12 @@ export function SVGSelectionWrapper({ shape, readonly, children }: SVGSelectionW
     const displayShape = transformationData
         ? { ...shape, ...transformationData }
         : shape
+
+    // The shape, its selection and its handles turn together about the
+    // centre of its box, as both renderers turn it.
+    const rotation = getRotation(displayShape)
+    const center = getCenter(displayShape)
+    const turn = rotation !== 0 ? `rotate(${rotation} ${center.x} ${center.y})` : undefined
 
     const handleClick = useCallback((e: React.MouseEvent) => {
         if (readonly || selectedTool !== 'move') return
@@ -113,6 +146,16 @@ export function SVGSelectionWrapper({ shape, readonly, children }: SVGSelectionW
         startResize(svgElement, handle, e.clientX, e.clientY)
     }, [readonly, startResize])
 
+    const handleRotateStart = (e: React.MouseEvent) => {
+        if (readonly) return
+        e.stopPropagation()
+
+        const svgElement = svgRef.current?.ownerSVGElement
+        if (!svgElement) return
+
+        startRotate(svgElement, e.clientX, e.clientY)
+    }
+
     const cursor = readonly
         ? undefined
         : isSelected ? 'grab' : 'pointer'
@@ -125,6 +168,7 @@ export function SVGSelectionWrapper({ shape, readonly, children }: SVGSelectionW
     return (
         <g ref={svgRef} data-shape-id={shape.id}>
             <g
+                transform={turn}
                 onClick={handleClick}
                 onMouseDown={shape.type != 'text' ? handleDragStart : undefined}
                 style={{ cursor }}
@@ -135,10 +179,12 @@ export function SVGSelectionWrapper({ shape, readonly, children }: SVGSelectionW
                     : children}
             </g>
 
+            {/* Unturned, over the turned box's top-left corner: a label reads
+                level whatever the shape's angle. */}
             {!readonly && <ShapeBadges shape={displayShape} preview={conditionPreview} />}
 
             {showSelection && (
-                <g>
+                <g transform={turn}>
                     <rect
                         data-selection-rect={shape.id}
                         x={displayShape.x}
@@ -193,6 +239,31 @@ export function SVGSelectionWrapper({ shape, readonly, children }: SVGSelectionW
                         </>
                     )}
 
+                    {showAnchors && (
+                        <>
+                            <line
+                                x1={center.x}
+                                y1={displayShape.y}
+                                x2={center.x}
+                                y2={displayShape.y - ROTATION_HANDLE_DISTANCE}
+                                stroke={token.colorPrimary}
+                                strokeWidth={2}
+                                pointerEvents="none"
+                            />
+                            <circle
+                                data-rotation-handle={shape.id}
+                                cx={center.x}
+                                cy={displayShape.y - ROTATION_HANDLE_DISTANCE}
+                                r={ROTATION_HANDLE_RADIUS}
+                                fill="#ffffff"
+                                stroke={token.colorPrimary}
+                                strokeWidth={2}
+                                style={{ cursor: 'grab' }}
+                                onMouseDown={handleRotateStart}
+                            />
+                        </>
+                    )}
+
                     {showAnchors && RESIZE_HANDLES.map((handle) => {
                         const pos = handle.getPosition(displayShape.width, displayShape.height)
                         return (
@@ -205,7 +276,7 @@ export function SVGSelectionWrapper({ shape, readonly, children }: SVGSelectionW
                                 fill="#ffffff"
                                 stroke={token.colorPrimary}
                                 strokeWidth={2}
-                                style={{ cursor: handle.cursor }}
+                                style={{ cursor: resizeCursor(handle.angle + parentRotation + rotation) }}
                                 onMouseDown={(e) => handleResizeStart(e, handle.position)}
                             />
                         )

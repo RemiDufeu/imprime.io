@@ -1,4 +1,5 @@
 import type { Shape } from '@imprime/sdk'
+import { rotateVector, shapeToPage } from '@imprime/sdk'
 import type { StateCreator } from 'zustand'
 import type { TemplateSlice } from './TemplateSlice'
 import type { PageSlice } from './PageSlice'
@@ -11,6 +12,8 @@ import {
     extractShapeById,
     insertShapeAt,
     insertNear,
+    findContentFrame,
+    relocateShape,
     cloneShapeWithNewIds,
     isDescendantOf,
     getSiblingList,
@@ -30,7 +33,8 @@ export interface ShapeSlice {
     // text box commits its typing as it unmounts, after its page was left.
     // A shape found nowhere is a no-op.
     updateShape: (id: string, updates: Partial<Shape>) => void
-    // Move a shape by (dx, dy) in its parent's space: the arrow keys.
+    // Move a shape by (dx, dy) along the page's axes, whatever its parent's
+    // turn: the arrow keys.
     nudgeShape: (id: string, dx: number, dy: number) => void
     // Deselects too, when the selection was the shape or inside it.
     deleteShape: (id: string) => void
@@ -95,8 +99,11 @@ export const createShapeSlice: StateCreator<
 
         nudgeShape: (id, dx, dy) => {
             const page = selectCurrentPage(get())
-            const shape = page ? findShapeById(page.shapes, id)?.shape : undefined
-            if (shape) get().updateShape(id, { x: shape.x + dx, y: shape.y + dy })
+            const loc = page ? findShapeById(page.shapes, id) : null
+            if (!loc) return
+            // Along the page's axes, which a turned group's are not.
+            const step = rotateVector({ x: dx, y: dy }, -loc.parentFrame.rotation)
+            get().updateShape(id, { x: loc.shape.x + step.x, y: loc.shape.y + step.y })
         },
 
         deleteShape: (id) => {
@@ -111,7 +118,9 @@ export const createShapeSlice: StateCreator<
             const loc = page ? findShapeById(page.shapes, id) : null
             if (!loc) return
             const copy = cloneShapeWithNewIds({ ...loc.shape, name: copyName(loc.shape) })
-            get()._editPage(shapes => insertNear(shapes, copy, loc.absX + COPY_OFFSET, loc.absY + COPY_OFFSET, id))
+            const onPage = shapeToPage(copy, loc.parentFrame)
+            const offset = { ...onPage, x: onPage.x + COPY_OFFSET, y: onPage.y + COPY_OFFSET }
+            get()._editPage(shapes => insertNear(shapes, offset, id))
             get().selectShape(copy.id)
         },
 
@@ -121,12 +130,12 @@ export const createShapeSlice: StateCreator<
                 if (targetGroupId !== null && isDescendantOf(shapes, targetGroupId, id)) return null
 
                 const source = findShapeById(shapes, id)
-                const target = targetGroupId === null ? { absX: 0, absY: 0 } : findShapeById(shapes, targetGroupId)
+                const target = findContentFrame(shapes, targetGroupId)
                 if (!source || !target) return null
 
                 const { removed, remaining } = extractShapeById(shapes, id)
                 if (!removed) return null
-                const repositioned = { ...removed, x: source.absX - target.absX, y: source.absY - target.absY }
+                const repositioned = relocateShape(removed, source.parentFrame, target)
 
                 // The caller's index is in the pre-removal tree: moving down
                 // within the same container shifts it by one.
@@ -150,9 +159,8 @@ export const createShapeSlice: StateCreator<
                 if (!loc || loc.parentGroupId === null) return null
                 const parentLoc = findShapeById(shapes, loc.parentGroupId)
                 if (!parentLoc || !isContainerShape(parentLoc.shape)) return null
-                const group = parentLoc.shape
 
-                const relocated = { ...loc.shape, x: loc.shape.x + group.x, y: loc.shape.y + group.y }
+                const relocated = relocateShape(loc.shape, loc.parentFrame, parentLoc.parentFrame)
                 const { remaining } = extractShapeById(shapes, id)
 
                 // Right after the (former) group in its own container, so the

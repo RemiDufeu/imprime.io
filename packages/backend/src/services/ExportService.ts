@@ -48,6 +48,8 @@ import {
   getListMarkerFormatting,
   getListLayout,
   getBulletBox,
+  getRotation,
+  getRotatedBounds,
   PARAGRAPH_SPACING
 } from '@imprime/common'
 import { readImageDataUrl, type ImageService } from './ImageService.js'
@@ -273,6 +275,10 @@ export class ExportService {
    * to the page. `draw` receives the layer's origin so it can express the shape
    * in layer-local coordinates. `overhang` is how far the stroke reaches
    * outside the shape's box: half its width, unless the shape says otherwise.
+   *
+   * A turned shape's layer is its whole box and stroke, not clamped to the
+   * page, turned about its centre — the layer's own, as the overhang is the
+   * same on every side. Clamped, the cut-off part would turn with it.
    */
   private renderInSvgLayer(
     shape: BaseShape,
@@ -280,6 +286,23 @@ export class ExportService {
     draw: (origin: { left: number; top: number }) => React.ReactElement | React.ReactElement[],
     overhang = (shape.strokeWidth || 0) / 2
   ): React.ReactElement {
+    if (getRotation(shape) !== 0) {
+      const left = shape.x - overhang
+      const top = shape.y - overhang
+      return React.createElement(Svg, {
+        key: shape.id,
+        fixed: true,
+        style: {
+          position: 'absolute',
+          left,
+          top,
+          width: shape.width + 2 * overhang,
+          height: shape.height + 2 * overhang,
+          ...this.rotationStyle(shape),
+        }
+      }, draw({ left, top }))
+    }
+
     const left = Math.max(0, shape.x - overhang)
     const top = Math.max(0, shape.y - overhang)
     const width = Math.max(0, Math.min(pageSize.width, shape.x + shape.width + overhang) - left)
@@ -298,6 +321,13 @@ export class ExportService {
       fixed: true,
       style: { position: 'absolute', left, top, width, height }
     }, draw({ left, top }))
+  }
+
+  // A turned shape's node turns about the centre of its box: react-pdf's
+  // default transform origin. An unturned one gets no transform at all.
+  private rotationStyle(shape: BaseShape): Style {
+    const rotation = getRotation(shape)
+    return rotation === 0 ? {} : { transform: `rotate(${rotation}deg)` }
   }
 
   // A rectangle — or a group's own box, which `resolveShapes` emits as one:
@@ -487,6 +517,7 @@ export class ExportService {
         width: shape.width,
         height: shape.height,
         justifyContent: getVerticalJustify(shape.verticalAlign),
+        ...this.rotationStyle(shape),
       }
     }, React.createElement(View, {
       fixed: true,
@@ -526,7 +557,8 @@ export class ExportService {
           backgroundColor: '#f0f0f0',
           border: '2px solid #ff0000',
           justifyContent: 'center',
-          alignItems: 'center'
+          alignItems: 'center',
+          ...this.rotationStyle(shape),
         }
       },
         React.createElement(PDFText, {
@@ -538,6 +570,8 @@ export class ExportService {
     const layout = getImageLayout(shape, image)
     // `fixed`, as a text box's: the image may overflow the page, and an
     // absolutely positioned box must not be reflowed onto a next page.
+    // The box turns, and an inner View clips: react-pdf clips a node to its
+    // box before turning it, so a View that did both would clip unturned.
     const picture = React.createElement(View, {
       key: border ? 'image' : shape.id,
       fixed: true,
@@ -545,6 +579,16 @@ export class ExportService {
         position: 'absolute',
         left: x,
         top: y,
+        width,
+        height,
+        ...this.rotationStyle(shape),
+      }
+    }, React.createElement(View, {
+      fixed: true,
+      style: {
+        position: 'absolute',
+        left: 0,
+        top: 0,
         width,
         height,
         overflow: 'hidden',
@@ -562,7 +606,7 @@ export class ExportService {
         objectFit: 'fill',
         opacity: getImageOpacity(shape),
       }
-    }))
+    })))
 
     return border ? React.createElement(React.Fragment, { key: shape.id }, picture, border) : picture
   }
@@ -648,11 +692,15 @@ export class ExportService {
     const { pageSize } = template
     // A shape starting beyond the page is left out — react-pdf would start a
     // new page for it — and the caller told, since content that grew with its
-    // data can land there without anyone placing it so.
+    // data can land there without anyone placing it so. A turned shape starts
+    // where its turned box does.
     const warnings: ExportDTO.Warning[] = []
     const resolvedPages: Page[] = template.pages.map((page, index) => {
       const shapes = resolveShapes(page.shapes, ctx)
-      const onPage = shapes.filter(s => s.y < pageSize.height && s.x < pageSize.width)
+      const onPage = shapes.filter(s => {
+        const bounds = getRotatedBounds(s)
+        return bounds.y < pageSize.height && bounds.x < pageSize.width
+      })
       const leftOut = shapes.length - onPage.length
       if (leftOut > 0) {
         warnings.push({

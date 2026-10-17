@@ -24,6 +24,11 @@ export interface BaseShape {
   // that axis then ignored (`flex: 1` is `grow: 1`). Unset or 0 keeps its size.
   // Ignored by any other parent. Read through `getGrow`.
   grow?: number
+  // Degrees, clockwise, about the centre of the box; `x`, `y`, `width` and
+  // `height` stay the unrotated box's. A group turns its children with it.
+  // Drawn only, as CSS's `transform` is: a layout places and sizes the
+  // unrotated box. Unset is 0. Read through `getRotation`.
+  rotation?: number
 }
 
 // A data-driven condition on a shape: a boolean variable — or a boolean field of

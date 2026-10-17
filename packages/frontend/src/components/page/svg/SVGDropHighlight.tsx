@@ -2,9 +2,9 @@ import { theme } from 'antd'
 import { useEditorStore } from '../../../store/editor/EditorStore'
 
 // Canva/Figma-style drop-target highlight: while a translation drag is in
-// progress, the group under the cursor gets a filled border. Purely visual —
-// the actual re-parent decision happens on mouseUp based on the final cursor
-// position.
+// progress, the group under the cursor gets a filled border, turned as the
+// group is. Purely visual — the actual re-parent decision happens on mouseUp
+// based on the final cursor position.
 export function SVGDropHighlight() {
     const { token } = theme.useToken()
     const highlightedGroup = useEditorStore(state =>
@@ -12,11 +12,13 @@ export function SVGDropHighlight() {
     )
 
     if (!highlightedGroup) return null
+    const { frame } = highlightedGroup
 
     return (
         <rect
-            x={highlightedGroup.x}
-            y={highlightedGroup.y}
+            transform={`translate(${frame.x} ${frame.y}) rotate(${frame.rotation})`}
+            x={0}
+            y={0}
             width={highlightedGroup.width}
             height={highlightedGroup.height}
             fill={token.colorPrimaryBg}
