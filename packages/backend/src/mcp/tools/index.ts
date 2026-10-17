@@ -4,7 +4,7 @@ import { registerPageTools } from './pages.js'
 import { registerVariableTools } from './variables.js'
 import { registerShapeTools } from './shapes.js'
 import { registerAssetTools } from './assets.js'
-import { registerExportTemplate } from './exportTemplate.js'
+import { registerPreviewTemplate } from './previewTemplate.js'
 
 /** `ownerId` : owner of the MCP session (resolved from the API key). */
 export function registerTools(server: McpServer, ownerId: string): void {
@@ -13,5 +13,5 @@ export function registerTools(server: McpServer, ownerId: string): void {
   registerVariableTools(server, ownerId)
   registerShapeTools(server, ownerId)
   registerAssetTools(server, ownerId)
-  registerExportTemplate(server, ownerId)
+  registerPreviewTemplate(server, ownerId)
 }

@@ -1,5 +1,5 @@
 import { createFontCatalog, importedFontFamilyName, isContainerShape } from '@imprime/sdk'
-import type { FontCatalog, FontDTO, Template, Shape } from '@imprime/sdk'
+import type { FontCatalog, FontDTO, Page, Shape } from '@imprime/sdk'
 import type { StateCreator } from 'zustand'
 import { fontsAPI } from '../../api/api'
 import { registerImportedFont } from '../../fonts'
@@ -15,12 +15,15 @@ export interface FontSlice {
     // uses: each face is a download of up to a few megabytes, and most fonts
     // of an instance appear in no given template.
     loadFonts: () => Promise<void>
+    // The same, for the text of `pages` rather than the open template's: a
+    // preview's.
+    loadFontsForPages: (pages: Page[]) => Promise<void>
     // Loads every imported font: the font picker previews each in itself.
     loadAllFonts: () => Promise<void>
 }
 
-// Families the text of `template` is set in, containers included.
-function usedFamilies(template: Template | null): Set<string> {
+// Families the text of `pages` is set in, containers included.
+function usedFamilies(pages: Page[]): Set<string> {
     const families = new Set<string>()
     const visit = (shapes: Shape[]) => {
         for (const shape of shapes) {
@@ -35,7 +38,7 @@ function usedFamilies(template: Template | null): Set<string> {
             }
         }
     }
-    for (const page of template?.pages ?? []) visit(page.shapes)
+    for (const page of pages) visit(page.shapes)
     return families
 }
 
@@ -84,10 +87,12 @@ export const createFontSlice: StateCreator<
         importedFonts: [],
         fontCatalog: createFontCatalog(),
 
-        loadFonts: async () => {
+        loadFonts: () => get().loadFontsForPages(get().template?.pages ?? []),
+
+        loadFontsForPages: async (pages) => {
             try {
                 await list()
-                const used = usedFamilies(get().template)
+                const used = usedFamilies(pages)
                 await load(listed.filter(font => used.has(font.family)))
             } catch (error) {
                 console.error('Failed to load fonts:', error)

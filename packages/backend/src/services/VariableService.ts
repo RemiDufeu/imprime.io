@@ -16,7 +16,7 @@ import type {
   VariableType,
   VariableValueType,
 } from '@imprime/common'
-import { collectPageVariableIds, exceedsMaxItems, exceedsMaxLength, findItemFieldIssue } from '@imprime/common'
+import { collectPageVariableIds, collectVariableIds, exceedsMaxItems, exceedsMaxLength, findItemFieldIssue } from '@imprime/common'
 import { touchTemplate } from './TemplateService.js'
 import { readImageDataUrl } from './ImageService.js'
 import { NotFoundError, ConflictError, ValidationError } from './errors.js'
@@ -241,12 +241,15 @@ export class VariableService {
 
   // Anywhere in the trees: text runs inside groups, image boxes, conditions
   // and repeats all point at the variable by id — and so do a page's own
-  // condition and repeat.
+  // condition and repeat, and the template's page-number box.
   private async isVariableInUse(templateId: string, variableId: string): Promise<boolean> {
-    const pages = await PageModel.find({
-      templateId: toObjectId(templateId),
-    }).select('shapes visibleWhen repeat')
+    const [pages, template] = await Promise.all([
+      PageModel.find({ templateId: toObjectId(templateId) }).select('shapes visibleWhen repeat'),
+      TemplateModel.findById(templateId).select('pageNumbering'),
+    ])
 
+    const box = template?.pageNumbering?.box
     return pages.some(page => collectPageVariableIds(page).has(variableId))
+      || (box !== undefined && collectVariableIds([box]).has(variableId))
   }
 }

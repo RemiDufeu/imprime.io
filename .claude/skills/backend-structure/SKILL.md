@@ -32,9 +32,8 @@ src/
     index.ts             the singletons, wired here
     TemplateService.ts  PageService.ts  VariableService.ts
     ImageService.ts  FontService.ts  ExportService.ts  AuthService.ts  MailerService.ts
-    SettingsService.ts
+    SettingsService.ts  PreviewService.ts  TemplateFileService.ts
     errors.ts            AppError, NotFoundError, ValidationError, ConflictError
-    pdfDownloadStore.ts  in-process single-use PDF store
   scripts/
     runAdminCommand.ts     shared runner: connects the auth DB, builds AuthService, sets the exit code
     resetAdminPassword.ts  break-glass: a new password for ADMIN_EMAIL

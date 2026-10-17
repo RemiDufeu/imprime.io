@@ -1,57 +1,25 @@
 import type { CustomRenderElementProps } from "./TextBoxEditor";
 import type { VariableElement } from "@imprime/sdk";
-import { getRunTextStyle } from "@imprime/sdk";
 import { useEditorStore } from "../../store/editor/EditorStore";
-import { theme } from 'antd';
 import { ThunderboltFilled } from '@ant-design/icons';
+import { InlineChip } from "./InlineChip";
 
 type VariableBlockProps = CustomRenderElementProps & {
   element: VariableElement;
 };
 
 export const VariableBlock = ({ attributes, children, element } : VariableBlockProps) => {
-  const { token } = theme.useToken();
   const template = useEditorStore(state => state.template);
-  const fontCatalog = useEditorStore(state => state.fontCatalog);
 
   const variable = template?.variableData?.find(v => v._id === element.variableId);
   const variableName = variable?.name || 'Unknown Variable';
-  // The chip names what is plugged in, never what it will evaluate to — the
-  // editor shows the authored tree. An item-scoped run names its field too, so
-  // 'pokemonList.name' is distinguishable from 'pokemonList'.
+  // An item-scoped run names its field too, so 'pokemonList.name' is
+  // distinguishable from 'pokemonList'.
   const label = element.itemPath ? `${variableName}.${element.itemPath}` : variableName;
 
-  const textStyle: React.CSSProperties = getRunTextStyle(element, fontCatalog);
-  if (element.color) textStyle.color = element.color;
-
-  const containerStyle: React.CSSProperties = {
-    display: 'inline-block',
-    position: 'relative',
-    padding: '0 4px',
-    border: `3px solid ${token.colorPrimary}`,
-    borderRadius: '4px',
-    ...textStyle,
-  };
-
-  const iconStyle: React.CSSProperties = {
-    position: 'absolute',
-    top: '-12px',
-    right: '-12px',
-    fontSize: '1.75rem',
-    color: token.colorPrimary,
-    backgroundColor: token.colorBgContainer,
-    borderRadius: '4px',
-  };
-
   return (
-    <span style={{
-      padding : '0 4px'
-    }}>
-      <span {...attributes} contentEditable={false} style={containerStyle}>
-        <ThunderboltFilled style={iconStyle} />
-        {label}
-        {children}
-      </span>
-    </span>
+    <InlineChip attributes={attributes} element={element} label={label} Icon={ThunderboltFilled}>
+      {children}
+    </InlineChip>
   );
 };

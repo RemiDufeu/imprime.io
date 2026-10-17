@@ -7,9 +7,12 @@ import type {
   ImageShape,
   VariableElement,
   CustomText,
+  TextRun,
+  PageNumbering,
 } from '../types.js'
 import { isContainerShape } from '../types.js'
 import { layoutTree } from './groupLayout.js'
+import { PAGE_NUMBER_SHAPE_ID, showsPageNumber } from './pageNumbering.js'
 import { getBorderOverhang } from './boxGeometry.js'
 import { getContentFrame, shapeToPage, PAGE_FRAME, type Frame } from './rotation.js'
 import {
@@ -173,10 +176,11 @@ export function getGroupBox(group: GroupShape): GroupBox {
   }
 }
 
-// An item-scoped run commits to its text here, while the scope stack is still
-// live. `ExportService.renderTextBox` runs after `resolveShapes` has flattened
-// the tree and cannot know which iteration a run came from; runs with no
-// `itemPath` are left untouched and resolved there, exactly as before.
+// A variable run commits to its text here, an item-scoped one while the
+// scope stack is still live: the renderer runs after `resolveShapes` has
+// flattened the tree and cannot know which iteration a run came from. Every
+// run is baked, template-scoped ones too, so that what leaves the resolution
+// is literal text: the PDF and the preview draw it as it is.
 function bakeVariableRun(
   run: VariableElement,
   ctx: ResolveContext | undefined,
@@ -189,11 +193,9 @@ function bakeVariableRun(
   }
 }
 
-function hasItemScopedRun(shape: TextBoxShape): boolean {
+function hasVariableRun(shape: TextBoxShape): boolean {
   return shape.paragraphes.some(paragraph =>
-    paragraph.children.some(
-      child => 'type' in child && child.type === 'variable' && child.itemPath !== undefined
-    )
+    paragraph.children.some(child => 'type' in child && child.type === 'variable')
   )
 }
 
@@ -202,22 +204,17 @@ function bakeTextBox(
   ctx: ResolveContext | undefined,
   scope: VariableScope,
 ): TextBoxShape {
-  // A box with no item-scoped run is handed back untouched — the common case,
-  // and what makes the scan worth it. Note the test is not `scope.length === 0`:
-  // a run carrying an `itemPath` outside any repeat must still be baked, to
-  // the empty string it resolves to. Left alone it would reach the renderer,
-  // which resolves by `variableId` only and would print the variable's whole
-  // value instead.
-  if (!hasItemScopedRun(shape)) return shape
+  // A box with no variable run is handed back untouched — the common case,
+  // and what makes the scan worth it. A run carrying an `itemPath` outside any
+  // repeat is baked too, to the empty string it resolves to.
+  if (!hasVariableRun(shape)) return shape
 
   return {
     ...shape,
     paragraphes: shape.paragraphes.map(paragraph => ({
       ...paragraph,
       children: paragraph.children.map(child =>
-        'type' in child && child.type === 'variable' && child.itemPath !== undefined
-          ? bakeVariableRun(child, ctx, scope)
-          : child
+        'type' in child && child.type === 'variable' ? bakeVariableRun(child, ctx, scope) : child
       ),
     })),
   }
@@ -296,16 +293,48 @@ function pageCopies(page: Page, ctx: ResolveContext | undefined): { page: Page; 
   }))
 }
 
+// A page's leaves with its page-number runs written: `number` is the page's,
+// 1-based, and `total` the count, both in the PDF.
+function bakePageNumbers(shapes: Shape[], number: number, total: number): Shape[] {
+  return shapes.map(shape => {
+    if (shape.type !== 'text') return shape
+    const hasPageNumber = shape.paragraphes.some(paragraph =>
+      paragraph.children.some(child => 'type' in child && child.type === 'page-number')
+    )
+    if (!hasPageNumber) return shape
+    return {
+      ...shape,
+      paragraphes: shape.paragraphes.map(paragraph => ({
+        ...paragraph,
+        children: paragraph.children.map((child): TextRun => {
+          if (!('type' in child) || child.type !== 'page-number') return child
+          const { type, kind, children, ...formatting } = child
+          return { ...formatting, text: String(kind === 'total' ? total : number) }
+        }),
+      })),
+    }
+  })
+}
+
 /**
  * The pages a template exports, in order, once the data is applied: a
  * repeated page is replaced by its copies, in place; a copy whose condition
  * fails — checked against its own item, as a repeated group's — is gone; and
- * each copy's shapes are resolved (`resolveShapes`) in its item's scope.
+ * each copy's shapes are resolved (`resolveShapes`) in its item's scope, the
+ * template's page-number box over them where `showsPageNumber` puts it. Page
+ * numbers are written last, once the pages are counted: what is left holds
+ * literal text only.
  */
-export function resolvePages(pages: Page[], ctx?: ResolveContext): Page[] {
-  return pages.flatMap(page =>
+export function resolvePages(pages: Page[], ctx?: ResolveContext, numbering?: PageNumbering): Page[] {
+  const copies = pages.flatMap(page =>
     pageCopies(page, ctx)
       .filter(copy => isConditionMet(page.visibleWhen, ctx, copy.scope))
-      .map(copy => ({ ...copy.page, shapes: resolveShapes(page.shapes, ctx, copy.scope) }))
+      .map(copy => ({ ...copy, source: page }))
   )
+  return copies.map(({ page, scope, source }, index) => {
+    const shapes = numbering && showsPageNumber(numbering, source, index)
+      ? [...source.shapes, { ...numbering.box, id: PAGE_NUMBER_SHAPE_ID }]
+      : source.shapes
+    return { ...page, shapes: bakePageNumbers(resolveShapes(shapes, ctx, scope), index + 1, copies.length) }
+  })
 }

@@ -132,9 +132,8 @@ the SDK method and the editor's API wrapper with it. → skill `api-surfaces`
 - a custom `X-Generation-Time` header carries timing for debugging, and
   `X-Export-Warnings` (`EXPORT_WARNINGS_HEADER`, exposed through CORS) the
   export's warnings as JSON, since the body is the PDF;
-- the one-shot download route (`GET /download/:token`) is **deliberately
-  unguarded by ownership** because the token itself is the capability —
-  single-use, 10-minute TTL, from `pdfDownloadStore`.
+- `POST /code/:code/pdf` takes no `requireOwnsTemplate`: the code is looked
+  up among the caller's own templates (`getIdByCode`), which is the check.
 
 Do not inline header juggling into a handler; give it a named helper as that
 file does.

@@ -8,7 +8,7 @@
  * through its own `visibleWhen` and `repeat`.
  */
 
-import type { CustomText, Page, Paragraph, RepeatBinding, Shape, VariableElement, VisibilityCondition } from './types.js'
+import type { Page, Paragraph, RepeatBinding, Shape, TextRun, VariableElement, VisibilityCondition } from './types.js'
 import { isContainerShape } from './types.js'
 
 /** Every variable id `shapes` refers to, containers included. */
@@ -81,7 +81,7 @@ function rebindOwnReferences(
   placeholder: (run: VariableElement) => string
 ): Shape {
   if (shape.type === 'text') {
-    const rebindRun = (child: CustomText | VariableElement): CustomText | VariableElement => {
+    const rebindRun = (child: TextRun): TextRun => {
       if (!('type' in child) || child.type !== 'variable') return child
       const variableId = rebind(child.variableId)
       if (variableId !== null) return variableId === child.variableId ? child : { ...child, variableId }

@@ -1,10 +1,11 @@
-import type { CustomText, Paragraph, VariableElement } from '@imprime/sdk';
+import type { CustomText, InlineElement, Paragraph, VariableElement } from '@imprime/sdk';
 import { getRunTextStyle, PARAGRAPH_SPACING } from '@imprime/sdk';
 import { useCallback } from 'react';
 import { Editor, type BaseEditor, type Descendant } from 'slate';
 import { Slate, Editable, ReactEditor, type RenderLeafProps, type RenderElementProps } from 'slate-react';
 import type { HistoryEditor } from 'slate-history';
 import { VariableBlock } from './VariableBlock';
+import { PageNumberBlock } from './PageNumberBlock';
 import { ParagraphElement } from './ParagraphElement';
 import { ListMarkersProvider } from './ListMarkersProvider';
 import { selectionHasListItem, shiftListIndent, toEditorValue } from '../../utils/paragraphs';
@@ -12,7 +13,7 @@ import { useEditorStore } from '../../store/editor/EditorStore';
 import { isRedoHotkey, isUndoHotkey } from '../../utils/hotkeys';
 import './TextBoxEditor.css';
 
-export type CustomElement = VariableElement | Paragraph;
+export type CustomElement = InlineElement | Paragraph;
 
 declare module 'slate' {
   interface CustomTypes {
@@ -41,9 +42,12 @@ export type VariableEditorProps = {
   onValueChange?: (descendants: Descendant[]) => void;
   onChange?: (descendants: Descendant[]) => void;
   onFocus?: () => void
+  // Shown while the box is empty. A preview shows nothing: its text is the
+  // PDF's.
+  placeholder?: string
 };
 
-export const TextBoxEditor = ({ initialContent, editor, readonly, fillHeight = true, onValueChange, onChange, onFocus }: VariableEditorProps) => {
+export const TextBoxEditor = ({ initialContent, editor, readonly, fillHeight = true, onValueChange, onChange, onFocus, placeholder = 'Insert some text' }: VariableEditorProps) => {
   const fontCatalog = useEditorStore(state => state.fontCatalog);
   const undo = useEditorStore(state => state.undo);
   const redo = useEditorStore(state => state.redo);
@@ -53,7 +57,9 @@ export const TextBoxEditor = ({ initialContent, editor, readonly, fillHeight = t
   const renderElement = useCallback((props: RenderElementProps) => {
     switch (props.element.type) {
       case 'variable':
-        return <VariableBlock {...props} element={props.element as VariableElement}/>;
+        return <VariableBlock {...props} element={props.element}/>;
+      case 'page-number':
+        return <PageNumberBlock {...props} element={props.element}/>;
       default:
         return <ParagraphElement {...props} element={props.element}/>;
     }
@@ -118,7 +124,7 @@ export const TextBoxEditor = ({ initialContent, editor, readonly, fillHeight = t
           }}
           renderElement={renderElement}
           renderLeaf={renderLeaf}
-          placeholder="Insert some text"
+          placeholder={placeholder}
         />
       </ListMarkersProvider>
     </Slate>

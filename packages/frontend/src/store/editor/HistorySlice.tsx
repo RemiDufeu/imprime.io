@@ -1,4 +1,4 @@
-import type { Shape, Page, VariableData } from '@imprime/sdk'
+import type { Shape, Page, PageNumbering, VariableData } from '@imprime/sdk'
 import type { StateCreator } from 'zustand'
 import { message } from 'antd'
 import type { TemplateSlice } from './TemplateSlice'
@@ -35,6 +35,8 @@ export type HistoryEntry =
     // A page's condition and repeat.
     | { kind: 'page-bindings'; pageId: string; bindings: PageBindings }
     | { kind: 'title'; title: string }
+    // The template's page numbering; null numbers no page.
+    | { kind: 'page-numbering'; numbering: PageNumbering | null }
     // A variable's definition; null removes it. It comes back under the same
     // id, because text runs and containers point to that id.
     | { kind: 'variable'; variableId: string; snapshot: VariableData | null }
@@ -115,6 +117,11 @@ export const createHistorySlice: StateCreator<
                 const { currentPageIndex, selectPage, _applyPageBindings } = get()
                 if (index !== currentPageIndex) selectPage(index)
                 _applyPageBindings(entry.pageId, entry.bindings)
+                return inverse
+            }
+            case 'page-numbering': {
+                const inverse: HistoryEntry = { kind: 'page-numbering', numbering: template.pageNumbering ?? null }
+                get()._applyPageNumbering(entry.numbering)
                 return inverse
             }
             case 'title': {

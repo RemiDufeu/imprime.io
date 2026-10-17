@@ -1,5 +1,5 @@
 import { ImprimeClient } from '@imprime/sdk'
-import type { Template, TemplateSummary, PageSize, Page, PageDTO, ImageDTO, FontDTO, FontVariant, VariableDTO, VariableValueType, ExportDTO, EmailSettingsDTO, SsoSettingsDTO, SsoProvider, AccessSettingsDTO } from '@imprime/sdk'
+import type { Template, TemplateSummary, TemplateDTO, PageSize, Page, PageDTO, ImageDTO, FontDTO, FontVariant, VariableDTO, VariableValueType, ExportDTO, PreviewDTO, EmailSettingsDTO, SsoSettingsDTO, SsoProvider, AccessSettingsDTO } from '@imprime/sdk'
 import { API_BASE } from '../config'
 
 // Create a single SDK client instance
@@ -26,12 +26,20 @@ export const templatesAPI = {
     return client.createTemplate(title, pageSize)
   },
 
-  async update(id: string, data: Partial<Template>): Promise<Template> {
+  async update(id: string, data: TemplateDTO.Update): Promise<Template> {
     return client.updateTemplate(id, data)
   },
 
   async delete(id: string): Promise<void> {
     return client.deleteTemplate(id)
+  },
+
+  async downloadFile(id: string): Promise<void> {
+    return client.downloadTemplateFile(id)
+  },
+
+  async importFile(file: unknown): Promise<Template> {
+    return client.importTemplate(file)
   },
 
   async updatePage(templateId: string, pageId: string, update: PageDTO.Update): Promise<void> {
@@ -56,6 +64,23 @@ export const templatesAPI = {
     variableValues?: Record<string, VariableValueType>
   ): Promise<ExportDTO.Warning[]> {
     return client.downloadPDF(templateId, filename, variableValues)
+  },
+}
+
+/**
+ * Previews API using Imprime SDK
+ */
+export const previewsAPI = {
+  async create(templateId: string, variableValues?: Record<string, VariableValueType>): Promise<PreviewDTO.Created> {
+    return client.createPreview(templateId, variableValues)
+  },
+
+  async getById(previewId: string): Promise<PreviewDTO.Response> {
+    return client.getPreview(previewId)
+  },
+
+  async downloadPDF(previewId: string, filename: string): Promise<ExportDTO.Warning[]> {
+    return client.downloadPreviewPDF(previewId, filename)
   },
 }
 

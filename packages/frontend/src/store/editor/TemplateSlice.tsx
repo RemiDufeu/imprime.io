@@ -6,6 +6,7 @@ import type { PageSlice } from './PageSlice'
 import type { SelectionSlice } from './SelectionSlice'
 import type { TextEditorSlice } from './TextEditorSlice'
 import type { VariableSlice } from './VariableSlice'
+import { withPageNumbering } from '../../utils/pageNumbering'
 
 export interface TemplateSlice {
   template: Template | null
@@ -14,6 +15,10 @@ export interface TemplateSlice {
 
   loadTemplate: (id: string) => Promise<void>
   updateTemplateTitle: (title: string) => Promise<void>
+  // Not a step of the history: the code is how integrations reach the
+  // template, not part of the document. Rejects with the API's error — a
+  // code another template has — for the caller to show; null removes it.
+  updateTemplateCode: (code: string | null) => Promise<void>
   // The half undo and redo replay, unrecorded. Writes the title alone, never
   // the server's copy of the template: that would overwrite shape edits
   // still being saved.
@@ -43,7 +48,7 @@ export const createTemplateSlice: StateCreator<
       // or a variable form would name what is not here. The clipboard stays —
       // a paste binds its variables to this template.
       set({
-        template: data,
+        template: withPageNumbering(data),
         currentPageIndex: 0,
         selectedShapeId: null,
         variableForm: null,
@@ -69,6 +74,14 @@ export const createTemplateSlice: StateCreator<
     } catch {
       set({ error: 'Failed to update title' })
     }
+  },
+
+  updateTemplateCode: async (code: string | null) => {
+    const { template } = get()
+    if (!template || (code ?? undefined) === template.code) return
+    const saved = await templatesAPI.update(template._id, { code })
+    const current = get().template
+    if (current) set({ template: { ...current, code: saved.code } })
   },
 
   _saveTitle: async (title: string) => {

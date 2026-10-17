@@ -1,49 +1,28 @@
-import { Router, type Response } from 'express'
+import { Router, type Request, type Response } from 'express'
 import type { ExportDTO } from '@imprime/common'
-import { EXPORT_WARNINGS_HEADER } from '@imprime/common'
 import { templateService, exportService } from '../services/index.js'
-import { takePdf } from '../services/pdfDownloadStore.js'
 import { requireOwnsTemplate } from '../middleware/requireOwnsTemplate.js'
+import { sendPdf } from './attachments.js'
 
 const router = Router()
 
-function setPdfDownloadHeaders(res: Response, buffer: Buffer, filename: string): void {
-  const ascii = filename.replace(/[^\w.\- ]/g, '_') || 'template.pdf'
-  const utf8 = encodeURIComponent(filename)
-  res.setHeader('Content-Type', 'application/pdf')
-  res.setHeader(
-    'Content-Disposition',
-    `attachment; filename="${ascii}"; filename*=UTF-8''${utf8}`
-  )
-  res.setHeader('Content-Length', buffer.length)
-}
-
-router.post('/:id/pdf', requireOwnsTemplate, async (req, res) => {
-  const template = await templateService.getById(req.params.id)
+async function sendTemplatePdf(req: Request, res: Response, templateId: string): Promise<void> {
+  const template = await templateService.getById(templateId)
   const payload: ExportDTO.PdfRequest = { variableValues: req.body || {} }
 
   const startTime = Date.now()
-  const { pdf, warnings } = await exportService.exportToPDF(template, req.user!.id, payload)
-  const duration = Date.now() - startTime
+  const result = await exportService.exportToPDF(template, req.user!.id, payload)
+  sendPdf(res, result, template.title, Date.now() - startTime)
+}
 
-  setPdfDownloadHeaders(res, pdf, `${template.title || 'template'}.pdf`)
-  res.setHeader('X-Generation-Time', duration.toString())
-  // The PDF is the body, so what the caller should know about it rides in a
-  // header — ASCII JSON, read by the SDK's `exportPDF`.
-  if (warnings.length > 0) res.setHeader(EXPORT_WARNINGS_HEADER, JSON.stringify(warnings))
-
-  res.send(pdf)
+// Found among the caller's own templates only: that is the ownership check.
+router.post('/code/:code/pdf', async (req, res) => {
+  const templateId = await templateService.getIdByCode(req.params.code, req.user!.id)
+  await sendTemplatePdf(req, res, templateId)
 })
 
-router.get('/download/:token', (req, res) => {
-  const entry = takePdf(req.params.token)
-  if (!entry) {
-    res.status(404).json({ error: 'Link expired or invalid' })
-    return
-  }
-
-  setPdfDownloadHeaders(res, entry.buffer, entry.filename)
-  res.send(entry.buffer)
+router.post('/:id/pdf', requireOwnsTemplate, async (req, res) => {
+  await sendTemplatePdf(req, res, req.params.id)
 })
 
 export default router

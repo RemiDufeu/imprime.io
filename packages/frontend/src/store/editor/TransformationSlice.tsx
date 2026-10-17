@@ -9,6 +9,7 @@ import type { SelectionSlice } from './SelectionSlice'
 import { findShapeById, findInnermostGroupAt, findContentFrame, extractShapeById, insertShape, relocateShape } from '../../utils/shapeTree'
 import { resizeTurnedRect, unionRect, type Rect, type ResizeHandle } from '../../utils/transform'
 import { selectCurrentPage, selectPageSize, selectSelectedShape } from './selectors'
+import { isPageNumberBox } from '../../utils/pageNumbering'
 
 export type { ResizeHandle }
 
@@ -264,7 +265,10 @@ export const createTransformationSlice: StateCreator<
             const page = selectCurrentPage(get())
             if (!page) return
 
-            const hit = findInnermostGroupAt(page.shapes, currentSVG.x, currentSVG.y, selectedShapeId)
+            // The page-number box enters no group: none is a drop target for it.
+            const hit = isPageNumberBox({ id: selectedShapeId })
+                ? null
+                : findInnermostGroupAt(page.shapes, currentSVG.x, currentSVG.y, selectedShapeId)
             const hoveredGroupId = hit?.id ?? null
             const highlightedGroup: GroupHighlight | null =
                 hit && hit.id !== dragData.originalParentGroupId

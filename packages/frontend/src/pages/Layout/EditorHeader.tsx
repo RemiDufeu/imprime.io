@@ -1,10 +1,10 @@
-import { DownloadOutlined, LeftOutlined, RedoOutlined, ThunderboltFilled, UndoOutlined } from "@ant-design/icons";
+import { DownloadOutlined, EyeOutlined, LeftOutlined, RedoOutlined, ThunderboltFilled, UndoOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom"
 import { useState, useEffect } from "react";
-import { templatesAPI } from "../../api/api";
+import { previewsAPI, templatesAPI } from "../../api/api";
 import { Button, Input, message, Modal, Form, Switch, Dropdown, Space, Tooltip } from "antd";
 import type { VariableValueType } from "@imprime/sdk";
-import { getVariableMaxItems, getVariableMaxLength } from "@imprime/sdk";
+import { getPreviewPath, getVariableMaxItems, getVariableMaxLength } from "@imprime/sdk";
 import "./EditorHeader.css";
 import { useEditorStore } from "../../store/editor/EditorStore";
 import { MOD_LABEL } from "../../utils/hotkeys";
@@ -15,6 +15,28 @@ import { selectCanRedo, selectCanUndo } from "../../store/editor/selectors";
 import { ImageValueInput, ItemListInput } from "../../components/common";
 import { DropdownVariablesContent } from "../EditorPage/components/PageEditor/TopBar/Context-toolbar/DropdownVariablesContent/DropdownVariablesContent";
 import { VariableFormModal } from "../EditorPage/components/PageEditor/TopBar/Context-toolbar/DropdownVariablesContent/VariableFormModal";
+import TemplateCodeInput from "./TemplateCodeInput";
+
+// What the variable values are asked for: a PDF to download, or a preview.
+type ValuesAction = 'download' | 'preview';
+
+// The values the author can fix; the form checks them too, but the server is
+// the one that decides. No page left is theirs to fix too: a condition or a
+// list. `fallback` says what failed, for any other error.
+function showExportError(error: unknown, fallback: string) {
+    console.error('Export error:', error);
+    const apiError = parseApiError(error);
+    if (
+        apiError.code === 'REQUIRED_VARIABLE_MISSING'
+        || apiError.code === 'VARIABLE_TOO_LONG'
+        || apiError.code === 'VARIABLE_TOO_MANY_ITEMS'
+        || apiError.code === 'NO_PAGE_TO_EXPORT'
+    ) {
+        message.error(apiError.message);
+    } else {
+        message.error(fallback);
+    }
+}
 
 export default function EditorHeader() {
     const navigate = useNavigate();
@@ -25,8 +47,12 @@ export default function EditorHeader() {
     const canUndo = useEditorStore(selectCanUndo);
     const canRedo = useEditorStore(selectCanRedo);
     const [localTitle, setLocalTitle] = useState(template?.title ?? '');
+    const endTextSession = useEditorStore(state => state.endTextSession);
+    const whenSaved = useEditorStore(state => state.whenSaved);
     const [isExporting, setIsExporting] = useState(false);
-    const [isVariableModalOpen, setIsVariableModalOpen] = useState(false);
+    const [isPreviewing, setIsPreviewing] = useState(false);
+    // The modal asking for the values is open while set.
+    const [valuesAction, setValuesAction] = useState<ValuesAction | null>(null);
     const [form] = Form.useForm();
 
     // In the store rather than here: opening the edit form has to close this
@@ -54,7 +80,7 @@ export default function EditorHeader() {
         return () => clearTimeout(timeoutId);
     }, [localTitle, template, updateTemplateTitle]);
 
-    const handleDownloadClick = () => {
+    const startAction = (action: ValuesAction) => {
         if (!template) {
             message.warning('No template loaded');
             return;
@@ -63,7 +89,7 @@ export default function EditorHeader() {
         const hasVariables = template.variableData && template.variableData.length > 0;
 
         if (hasVariables) {
-            setIsVariableModalOpen(true);
+            setValuesAction(action);
             const initialValues: Record<string, VariableValueType> = {};
             template.variableData?.forEach(variable => {
                 if (variable.default !== undefined && variable.default !== null) {
@@ -72,9 +98,14 @@ export default function EditorHeader() {
             });
             form.setFieldsValue(initialValues);
         } else {
-            // No variables, download directly
-            handleDownloadPDF({});
+            // No variables, go straight on
+            void runAction(action, {});
         }
+    };
+
+    const closeValues = () => {
+        setValuesAction(null);
+        form.resetFields();
     };
 
     const handleDownloadPDF = async (variableValues: Record<string, VariableValueType>) => {
@@ -97,33 +128,41 @@ export default function EditorHeader() {
             } else {
                 message.success('PDF exported successfully!');
             }
-            setIsVariableModalOpen(false);
-            form.resetFields();
+            closeValues();
         } catch (error) {
-            console.error('Export error:', error);
-            // The values the author can fix; the form checks them too, but the
-            // server is the one that decides. No page left is theirs to fix
-            // too: a condition or a list.
-            const apiError = parseApiError(error);
-            if (
-                apiError.code === 'REQUIRED_VARIABLE_MISSING'
-                || apiError.code === 'VARIABLE_TOO_LONG'
-                || apiError.code === 'VARIABLE_TOO_MANY_ITEMS'
-                || apiError.code === 'NO_PAGE_TO_EXPORT'
-            ) {
-                message.error(apiError.message);
-            } else {
-                message.error('Failed to export PDF. Please try again.');
-            }
+            showExportError(error, 'Failed to export PDF. Please try again.');
         } finally {
             setIsExporting(false);
         }
     };
 
+    // The preview reads the template from the server: the typing in progress
+    // is committed, and every save has landed, first.
+    const handlePreview = async (variableValues: Record<string, VariableValueType>) => {
+        if (!template) return;
+
+        setIsPreviewing(true);
+        try {
+            endTextSession();
+            await whenSaved();
+            const preview = await previewsAPI.create(template._id, variableValues);
+            closeValues();
+            navigate(getPreviewPath(preview._id));
+        } catch (error) {
+            showExportError(error, 'Failed to make the preview. Please try again.');
+        } finally {
+            setIsPreviewing(false);
+        }
+    };
+
+    const runAction = (action: ValuesAction, variableValues: Record<string, VariableValueType>) =>
+        action === 'preview' ? handlePreview(variableValues) : handleDownloadPDF(variableValues);
+
     const handleVariableFormSubmit = async () => {
+        if (!valuesAction) return;
         try {
             const values = await form.validateFields();
-            await handleDownloadPDF(values);
+            await runAction(valuesAction, values);
         } catch (error) {
             console.error('Form validation error:', error);
         }
@@ -149,6 +188,7 @@ export default function EditorHeader() {
                 placeholder="Template title"
                 size="large"
                 className="inputBtn"/>
+            <TemplateCodeInput key={template?._id} />
             <Space>
                 <Tooltip title={`Undo (${MOD_LABEL}+Z)`}>
                     <Button size="large" icon={<UndoOutlined />} disabled={!canUndo} onClick={undo} />
@@ -174,7 +214,14 @@ export default function EditorHeader() {
                 </Button>
             </Dropdown>
             <Button
-                onClick={handleDownloadClick}
+                onClick={() => startAction('preview')}
+                size="large"
+                loading={isPreviewing}
+                icon={<EyeOutlined/>}>
+                Preview
+            </Button>
+            <Button
+                onClick={() => startAction('download')}
                 color="primary"
                 size="large"
                 loading={isExporting}
@@ -186,15 +233,12 @@ export default function EditorHeader() {
 
     <Modal
         title="Variable Values"
-        open={isVariableModalOpen}
+        open={valuesAction !== null}
         onOk={handleVariableFormSubmit}
-        onCancel={() => {
-            setIsVariableModalOpen(false);
-            form.resetFields();
-        }}
-        okText="Export PDF"
+        onCancel={closeValues}
+        okText={valuesAction === 'preview' ? 'Preview' : 'Export PDF'}
         cancelText="Cancel"
-        confirmLoading={isExporting}
+        confirmLoading={isExporting || isPreviewing}
     >
         <Form
             form={form}

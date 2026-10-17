@@ -21,6 +21,7 @@ import {
     isContainerShape,
 } from '../../utils/shapeTree'
 import { selectCurrentPage } from './selectors'
+import { isPageNumberBox } from '../../utils/pageNumbering'
 
 // Offset between a copy and what it was copied from, so it reads as new.
 export const COPY_OFFSET = 20
@@ -113,7 +114,9 @@ export const createShapeSlice: StateCreator<
             if (selectedShapeId && page && !findShapeById(page.shapes, selectedShapeId)) selectShape(null)
         },
 
+        // The page-number box has no copy: it is the template's one.
         duplicateShape: (id) => {
+            if (isPageNumberBox({ id })) return
             const page = selectCurrentPage(get())
             const loc = page ? findShapeById(page.shapes, id) : null
             if (!loc) return
@@ -128,6 +131,8 @@ export const createShapeSlice: StateCreator<
             get()._editPage(shapes => {
                 // Reject moves into own subtree (would make a group its own descendant).
                 if (targetGroupId !== null && isDescendantOf(shapes, targetGroupId, id)) return null
+                // The page-number box stays at the root: it is drawn over the page.
+                if (targetGroupId !== null && isPageNumberBox({ id })) return null
 
                 const source = findShapeById(shapes, id)
                 const target = findContentFrame(shapes, targetGroupId)

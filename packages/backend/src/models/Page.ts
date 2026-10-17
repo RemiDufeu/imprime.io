@@ -10,6 +10,8 @@ export interface IPage {
   // Unset is always exported, and not repeated.
   visibleWhen?: VisibilityCondition
   repeat?: PageRepeat
+  // Unset shows the template's page-number box, if it has one.
+  hidePageNumber?: boolean
   // Derived from `shapes` on every save (see the hook below), so "does any
   // page still show this image?" is an indexed query rather than a walk of
   // every tree. An image can be shared: duplicating or pasting an image shape
@@ -35,6 +37,7 @@ const PageSchema = new Schema<IPage>({
   shapes: [{ type: Schema.Types.Mixed }],
   visibleWhen: { type: VisibilityConditionSchema },
   repeat: { type: PageRepeatSchema },
+  hidePageNumber: { type: Boolean },
   imageIds: { type: [String], index: true },
 }, { timestamps: true })
 

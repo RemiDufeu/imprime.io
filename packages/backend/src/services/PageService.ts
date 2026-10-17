@@ -3,7 +3,7 @@ import { PageModel } from '../models/Page.js'
 import { VariableDataModel } from '../models/VariableData.js'
 import { isObjectIdString, pageCreateToModel, pageToDTO, pageUpdateToModel, toObjectId } from '../models/mappers.js'
 import type { Shape, Page, PageDTO, PageRepeat, VisibilityCondition } from '@imprime/common'
-import { collectImageIds, isContainerShape, layoutTree } from '@imprime/common'
+import { collectImageIds, isContainerShape, layoutTree, PAGE_NUMBER_SHAPE_ID } from '@imprime/common'
 import { randomUUID } from 'node:crypto'
 import type { Types } from 'mongoose'
 import type { ImageService } from './ImageService.js'
@@ -22,6 +22,7 @@ interface PageReferences {
   shapes?: Shape[]
   visibleWhen?: VisibilityCondition | null
   repeat?: PageRepeat | null
+  hidePageNumber?: boolean
 }
 
 const isOptionalOf = (value: unknown, type: 'string' | 'boolean') => value === undefined || typeof value === type
@@ -47,6 +48,22 @@ function assertPageBindings(data: PageReferences): void {
     typeof repeat !== 'object' || Array.isArray(repeat) || !isOptionalOf(repeat.variableId, 'string')
   )) {
     throw new ValidationError('repeat must be an object with an optional variableId', 'INVALID_PAGE_REPEAT')
+  }
+  if (!isOptionalOf(data.hidePageNumber, 'boolean')) {
+    throw new ValidationError('hidePageNumber must be a boolean', 'INVALID_PAGE_NUMBER_HIDE')
+  }
+}
+
+// The template's page-number box is drawn under its id on every page, which
+// must keep it unique within each.
+function assertNoReservedShapeId(shapes: Shape[] | undefined): void {
+  const visit = (list: Shape[]): boolean =>
+    list.some(shape => shape.id === PAGE_NUMBER_SHAPE_ID || (isContainerShape(shape) && visit(shape.children)))
+  if (shapes && visit(shapes)) {
+    throw new ValidationError(
+      `"${PAGE_NUMBER_SHAPE_ID}" is the id of the template's page-number box: no shape of a page may take it`,
+      'RESERVED_SHAPE_ID'
+    )
   }
 }
 
@@ -93,6 +110,7 @@ export class PageService {
       throw new ValidationError('shapes must be an array')
     }
     assertPageBindings(data)
+    assertNoReservedShapeId(data.shapes)
     if (data._id !== undefined) {
       if (!isObjectIdString(data._id)) {
         throw new ValidationError('Invalid page id', 'INVALID_PAGE_ID')
@@ -157,6 +175,7 @@ export class PageService {
       throw new ValidationError('shapes must be an array')
     }
     assertPageBindings(data)
+    assertNoReservedShapeId(data.shapes)
 
     await this.assertVariableReferences(page.templateId, data)
 
