@@ -8,11 +8,12 @@ import type {
   Template,
   TemplateDTO,
   TemplateSummary,
-  Shape,
   Page,
   PageDTO,
+  PageRepeat,
   VariableData,
   VariableDTO,
+  VisibilityCondition,
 } from '@imprime/common'
 import { DEFAULT_PAGE_SIZE } from '@imprime/common'
 import type { FontDocument, IFont, IFontFace } from './Font.js'
@@ -22,11 +23,27 @@ import type { ITemplate, TemplateDocument } from './Template.js'
 import type { IPage, PageDocument } from './Page.js'
 import type { IVariableData, VariableDataDocument } from './VariableData.js'
 
+// A page's condition and repeat, field by field, whichever way they go: a
+// subdocument going out, a request body coming in. Neither is copied whole.
+function conditionFields(condition: VisibilityCondition): VisibilityCondition {
+  const fields: VisibilityCondition = {}
+  if (condition.variableId !== undefined) fields.variableId = condition.variableId
+  if (condition.itemPath !== undefined) fields.itemPath = condition.itemPath
+  if (condition.negate !== undefined) fields.negate = condition.negate
+  return fields
+}
+
+function repeatFields(repeat: PageRepeat): PageRepeat {
+  return repeat.variableId !== undefined ? { variableId: repeat.variableId } : {}
+}
+
 export function pageToDTO(doc: PageDocument): Page {
   return {
     _id: doc._id.toString(),
     order: doc.order,
     shapes: doc.shapes,
+    ...(doc.visibleWhen ? { visibleWhen: conditionFields(doc.visibleWhen) } : {}),
+    ...(doc.repeat ? { repeat: repeatFields(doc.repeat) } : {}),
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt,
   }
@@ -81,19 +98,29 @@ export function templateUpdateToModel(
 export function pageCreateToModel(
   templateId: Types.ObjectId,
   order: number,
-  shapes: Shape[] = []
-): Pick<IPage, 'templateId' | 'order' | 'shapes'> {
+  dto: Pick<PageDTO.Create, 'shapes' | 'visibleWhen' | 'repeat'> = {}
+): Pick<IPage, 'templateId' | 'order' | 'shapes' | 'visibleWhen' | 'repeat'> {
   return {
     templateId,
     order,
-    shapes,
+    shapes: dto.shapes ?? [],
+    ...(dto.visibleWhen ? { visibleWhen: conditionFields(dto.visibleWhen) } : {}),
+    ...(dto.repeat ? { repeat: repeatFields(dto.repeat) } : {}),
   }
 }
 
+// A condition or a repeat set to undefined is unset on save: what `null`
+// asks for.
 export function pageUpdateToModel(
   dto: PageDTO.Update
-): Partial<Pick<IPage, 'shapes'>> {
-  return { shapes: dto.shapes }
+): Partial<Pick<IPage, 'shapes' | 'visibleWhen' | 'repeat'>> {
+  const update: Partial<Pick<IPage, 'shapes' | 'visibleWhen' | 'repeat'>> = {}
+  if (dto.shapes !== undefined) update.shapes = dto.shapes
+  if (dto.visibleWhen !== undefined) {
+    update.visibleWhen = dto.visibleWhen === null ? undefined : conditionFields(dto.visibleWhen)
+  }
+  if (dto.repeat !== undefined) update.repeat = dto.repeat === null ? undefined : repeatFields(dto.repeat)
+  return update
 }
 
 export function pagesReorderToOrderUpdates(

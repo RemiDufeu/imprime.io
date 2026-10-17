@@ -16,7 +16,7 @@ import type {
   VariableType,
   VariableValueType,
 } from '@imprime/common'
-import { collectVariableIds, exceedsMaxItems, exceedsMaxLength, findItemFieldIssue } from '@imprime/common'
+import { collectPageVariableIds, exceedsMaxItems, exceedsMaxLength, findItemFieldIssue } from '@imprime/common'
 import { touchTemplate } from './TemplateService.js'
 import { readImageDataUrl } from './ImageService.js'
 import { NotFoundError, ConflictError, ValidationError } from './errors.js'
@@ -223,7 +223,7 @@ export class VariableService {
       throw new ValidationError(
         `Cannot delete variable that is currently in use`,
         'VARIABLE_IN_USE',
-        [`Variable "${variable.name}" is used by text, a condition or a repeated group`]
+        [`Variable "${variable.name}" is used by text, an image, a condition, or a repeated group or page`]
       )
     }
 
@@ -240,12 +240,13 @@ export class VariableService {
   }
 
   // Anywhere in the trees: text runs inside groups, image boxes, conditions
-  // and repeats all point at the variable by id.
+  // and repeats all point at the variable by id — and so do a page's own
+  // condition and repeat.
   private async isVariableInUse(templateId: string, variableId: string): Promise<boolean> {
     const pages = await PageModel.find({
       templateId: toObjectId(templateId),
-    }).select('shapes')
+    }).select('shapes visibleWhen repeat')
 
-    return pages.some(page => collectVariableIds(page.shapes).has(variableId))
+    return pages.some(page => collectPageVariableIds(page).has(variableId))
   }
 }

@@ -1,4 +1,5 @@
 import type {
+  Page,
   Shape,
   GroupShape,
   RectangleShape,
@@ -274,4 +275,37 @@ export function resolveShapes(
   scope: VariableScope = [],
 ): Shape[] {
   return flatten(layoutTree(instantiate(shapes, ctx, scope, true)), PAGE_FRAME)
+}
+
+// The copies of a page, each with the scope its shapes resolve in: a page
+// that is not repeated is its own single copy, with an empty scope. A repeated
+// page whose list is unset, unknown, not a list or empty has none.
+function pageCopies(page: Page, ctx: ResolveContext | undefined): { page: Page; scope: VariableScope }[] {
+  if (!page.repeat) return [{ page, scope: [] }]
+  const variableId = page.repeat.variableId
+  if (!variableId) return []
+
+  const items = resolveVariable(variableId, ctx)
+  if (!Array.isArray(items)) return []
+
+  // A page iterates a variable's own value, so its frame's path is the root.
+  // Each copy reforges its id so the renderer never sees a duplicate key.
+  return items.map((item, i) => ({
+    page: { ...page, _id: `${page._id}::rep-${i}` },
+    scope: [{ variableId, path: '', value: item }],
+  }))
+}
+
+/**
+ * The pages a template exports, in order, once the data is applied: a
+ * repeated page is replaced by its copies, in place; a copy whose condition
+ * fails — checked against its own item, as a repeated group's — is gone; and
+ * each copy's shapes are resolved (`resolveShapes`) in its item's scope.
+ */
+export function resolvePages(pages: Page[], ctx?: ResolveContext): Page[] {
+  return pages.flatMap(page =>
+    pageCopies(page, ctx)
+      .filter(copy => isConditionMet(page.visibleWhen, ctx, copy.scope))
+      .map(copy => ({ ...copy.page, shapes: resolveShapes(page.shapes, ctx, copy.scope) }))
+  )
 }

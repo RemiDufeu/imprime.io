@@ -4,6 +4,7 @@ import { ShapeContextBar } from './ShapeContextBar'
 import { TextContextBar } from './TextContextBar'
 import { ImageContextBar } from './ImageContextBar/ImageContextBar'
 import { GroupContextBar } from './GroupContextBar/GroupContextBar'
+import { PageContextBar } from './PageContextBar/PageContextBar'
 
 export function ContextToolbar() {
   const contextBarType = useEditorStore(selectContextBar)
@@ -18,6 +19,7 @@ export function ContextToolbar() {
       {contextBarType === 'text' && <TextContextBar />}
       {contextBarType === 'image' && <ImageContextBar />}
       {contextBarType === 'group' && <GroupContextBar />}
+      {contextBarType === 'page' && <PageContextBar />}
     </>
   )
 }

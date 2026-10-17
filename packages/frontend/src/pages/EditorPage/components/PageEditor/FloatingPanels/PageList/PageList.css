@@ -91,18 +91,80 @@
   box-shadow: 0 0 4px var(--ant-color-primary);
 }
 
-.page-thumbnail-delete {
+/* The menu, duplicate and delete buttons, top right, shown on hover — and
+   while the menu is open, which antd marks on its trigger. */
+.page-thumbnail-actions {
   position: absolute;
   top: 4px;
   right: 4px;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-  background-color: rgba(255, 255, 255, 0.9) !important;
+  display: flex;
+  gap: var(--space-xs);
   z-index: 1;
 }
 
-.page-thumbnail:hover .page-thumbnail-delete {
+.page-thumbnail-delete,
+.page-thumbnail-duplicate,
+.page-thumbnail-menu {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  background-color: var(--ant-color-bg-container) !important;
+}
+
+.page-thumbnail:hover .page-thumbnail-delete,
+.page-thumbnail:hover .page-thumbnail-duplicate,
+.page-thumbnail:hover .page-thumbnail-menu,
+.page-thumbnail-menu.ant-dropdown-open {
   opacity: 1;
+}
+
+/* Left out with the default values — its condition fails, or its list is
+   empty: as faded as a shape is on the canvas. */
+.page-preview-excluded {
+  opacity: 0.35;
+}
+
+/* What the data does to the page, bottom left, over the preview. */
+.page-thumbnail-badges {
+  position: absolute;
+  left: var(--space-s);
+  right: var(--space-s);
+  bottom: var(--space-s);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  z-index: 1;
+  pointer-events: none;
+}
+
+.page-thumbnail-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  max-width: 100%;
+  padding: 0 var(--space-xs);
+  border-radius: var(--ant-border-radius-sm);
+  font-size: var(--ant-font-size-sm);
+  line-height: 1.6;
+  color: var(--ant-color-text-light-solid);
+  pointer-events: auto;
+}
+
+.page-thumbnail-badge-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.page-thumbnail-badge.repeat {
+  background: var(--ant-color-warning);
+}
+
+.page-thumbnail-badge.condition {
+  background: var(--ant-color-info);
+}
+
+.page-thumbnail-badge.muted {
+  background: var(--ant-color-text-tertiary);
 }
 
 .page-thumbnail-delete:hover {

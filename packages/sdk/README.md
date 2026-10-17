@@ -100,21 +100,34 @@ await client.deleteTemplate('674abc123def456')
 
 #### `addPage(templateId: string, page?: PageDTO.Create)`
 Add a page to a template and return it. Blank and last by default; `order`
-inserts it at that 0-based position, `shapes` gives it content, and `_id`
-restores a deleted page under its former id (409 if that id is in use).
+inserts it at that 0-based position, `shapes` gives it content, `visibleWhen`
+and `repeat` a condition and a repeat (see `updatePage`), and `_id` restores a
+deleted page under its former id (409 if that id is in use).
 
 ```typescript
 const page = await client.addPage('674abc123def456')
 const second = await client.addPage('674abc123def456', { order: 1, shapes: [] })
 ```
 
-#### `updatePage(templateId: string, pageId: string, shapes: Shape[])`
-Update all shapes on a page.
+#### `updatePage(templateId: string, pageId: string, update: PageDTO.Update)`
+Update a page. Each field given replaces the page's, the others are left
+alone: `shapes` replaces all its shapes, `visibleWhen` exports it only while a
+boolean variable is `true` (`false` with `negate`), and `repeat` exports it once
+per item of a list variable, each copy's shapes reading their item's fields
+through `itemPath`. `null` removes a condition or a repeat.
 
 ```typescript
-await client.updatePage('674abc123def456', 'page-123', [
-  { id: 'rect-1', type: 'rectangle', x: 0, y: 0, width: 100, height: 100, fill: '#000' }
-])
+await client.updatePage('674abc123def456', 'page-123', {
+  shapes: [
+    { id: 'rect-1', type: 'rectangle', x: 0, y: 0, width: 100, height: 100, fill: '#000' }
+  ]
+})
+
+// One page per item of the `invoices` list, only for the paid ones
+await client.updatePage('674abc123def456', 'page-123', {
+  repeat: { variableId: invoicesVariableId },
+  visibleWhen: { variableId: invoicesVariableId, itemPath: 'paid' }
+})
 ```
 
 #### `deletePage(templateId: string, pageId: string)`
@@ -520,6 +533,15 @@ Limits worth handling:
   the limits when saved: `400 INVALID_VARIABLE_DEFAULT`. A limit that is not a
   positive whole number fails with `400 INVALID_VARIABLE_MAX_ITEMS`;
   `maxItems: null` in an update removes it.
+- **A page can be conditional or repeated** (`visibleWhen`, `repeat`: see
+  `updatePage`). An export that leaves no page at all — every condition false,
+  every repeated list empty — fails with `400 NO_PAGE_TO_EXPORT`. A
+  `CONTENT_OFF_PAGE` warning's `page` counts the PDF's pages, copies included.
+  `addPage` and `updatePage` fail with `400 INVALID_PAGE_CONDITION` when
+  `visibleWhen` is not an object of an optional string `variableId` and
+  `itemPath` and boolean `negate`, with `400 INVALID_PAGE_REPEAT` when `repeat`
+  is not an object of an optional string `variableId`, and with `400` naming
+  each reference when a variable id is not one of the template's.
 
 ## TypeScript Support
 

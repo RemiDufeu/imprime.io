@@ -65,7 +65,7 @@ export {
   PAGE_FRAME,
 } from './rotation.js'
 export type { Point, TurnedBox, Frame } from './rotation.js'
-export { resolveShapes, getGroupBox } from './shapeResolver.js'
+export { resolveShapes, resolvePages, getGroupBox } from './shapeResolver.js'
 export type { GroupBox } from './shapeResolver.js'
 export {
   resolveVariable,

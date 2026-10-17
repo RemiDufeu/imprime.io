@@ -27,7 +27,7 @@ Each template picks its page format when it is created: A4 portrait, A4 landscap
 ## Dynamic variables
 Turn any document into a reusable template. Drop variables anywhere in your design, then generate finished documents on demand by injecting the data of your choice — perfect for invoices, contracts, reports, and any document you produce more than once.
 
-Go further with **conditional** blocks (`if`) that only show a section when a boolean is true, and **iteration** blocks (`for`) that repeat their content for each item of a list — lists can be nested to build tables and sub-lists.
+Go further with **conditional** blocks (`if`) that only show a section when a boolean is true, and **iteration** blocks (`for`) that repeat their content for each item of a list — lists can be nested to build tables and sub-lists. Whole pages work the same way: a page can be left out on a condition, or generated once per item of a list — one invoice per customer, one sheet per product.
 ![variable](./doc/variable.png)
 
 ## Built for automation
@@ -75,9 +75,6 @@ Sign in with an email and a password, or with Google, GitHub or Microsoft. The a
 # Roadmap
 
 Imprime is currently under active development. Here are the main planned updates:
-
-## Block enhancements
-- condition on page (if and for)
 
 ## Improve shape
 - Add arrow

@@ -71,6 +71,7 @@ to `false` must not fall back to its `default`.
 |---|---|
 | `visibleWhen` | `isConditionMet`: shown only when the value is exactly `true`, or exactly `false` with `negate`. **Strict identity**, no coercion: `"true"` shows nothing, a non-empty list shows nothing, and a missing value hides the shape *both ways* — a boolean that may be absent needs a `default`. The editor's picker filters to boolean variables for the same reason. |
 | `repeat` | value must be `Array.isArray`; one copy of the group per item, none for an empty list. Each copy pushes a `VariableScopeFrame` its subtree (and its own `visibleWhen`) reads `itemPath`s from. |
+| page `visibleWhen` / `repeat` | the same rules, one level up (`resolvePages`): a repeated page is exported once per item of a list variable (never an item field — a page sits in no repeat), its shapes resolved in that item's frame; its condition is checked copy by copy. No page left fails the export with `NO_PAGE_TO_EXPORT`. |
 | text run | `stringifyVariableValue`: string as-is, boolean → `"true"`/`"false"`, array → `join(', ')`, absent → `""`. |
 
 
@@ -145,6 +146,10 @@ A tree points at a variable in four places: a text run, an image box's
 `rebindVariables` (common `variableReferences.ts`) are the only walks over them —
 the in-use guard reads the first, the editor's paste the second. A fifth kind
 of reference is added there, once.
+
+A page points at variables too, through its own `visibleWhen` and `repeat`
+(`collectPageVariableIds`, which the in-use guard reads). Pages are not pasted,
+so `rebindVariables` does not cover them.
 
 ### Known gap
 

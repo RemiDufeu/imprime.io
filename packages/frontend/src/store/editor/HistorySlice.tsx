@@ -2,7 +2,8 @@ import type { Shape, Page, VariableData } from '@imprime/sdk'
 import type { StateCreator } from 'zustand'
 import { message } from 'antd'
 import type { TemplateSlice } from './TemplateSlice'
-import type { PageSlice } from './PageSlice'
+import type { PageBindings, PageSlice } from './PageSlice'
+import { pageBindings } from './PageSlice'
 import type { SelectionSlice } from './SelectionSlice'
 import type { DocumentWriteSlice } from './DocumentWriteSlice'
 import type { TextEditorSlice } from './TextEditorSlice'
@@ -31,6 +32,8 @@ export type HistoryEntry =
     // the same place, with the same shapes; null removes it.
     | { kind: 'page'; pageId: string; snapshot: PageSnapshot | null }
     | { kind: 'page-order'; pageIds: string[] }
+    // A page's condition and repeat.
+    | { kind: 'page-bindings'; pageId: string; bindings: PageBindings }
     | { kind: 'title'; title: string }
     // A variable's definition; null removes it. It comes back under the same
     // id, because text runs and containers point to that id.
@@ -103,6 +106,15 @@ export const createHistorySlice: StateCreator<
             case 'page-order': {
                 const inverse: HistoryEntry = { kind: 'page-order', pageIds: template.pages.map(s => s._id) }
                 await get()._applyPageOrder(entry.pageIds)
+                return inverse
+            }
+            case 'page-bindings': {
+                const index = template.pages.findIndex(s => s._id === entry.pageId)
+                if (index === -1) return null
+                const inverse = { ...entry, bindings: pageBindings(template.pages[index]) }
+                const { currentPageIndex, selectPage, _applyPageBindings } = get()
+                if (index !== currentPageIndex) selectPage(index)
+                _applyPageBindings(entry.pageId, entry.bindings)
                 return inverse
             }
             case 'title': {

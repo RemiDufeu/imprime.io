@@ -102,12 +102,14 @@ export default function EditorHeader() {
         } catch (error) {
             console.error('Export error:', error);
             // The values the author can fix; the form checks them too, but the
-            // server is the one that decides.
+            // server is the one that decides. No page left is theirs to fix
+            // too: a condition or a list.
             const apiError = parseApiError(error);
             if (
                 apiError.code === 'REQUIRED_VARIABLE_MISSING'
                 || apiError.code === 'VARIABLE_TOO_LONG'
                 || apiError.code === 'VARIABLE_TOO_MANY_ITEMS'
+                || apiError.code === 'NO_PAGE_TO_EXPORT'
             ) {
                 message.error(apiError.message);
             } else {

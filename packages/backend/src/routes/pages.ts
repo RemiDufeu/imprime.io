@@ -7,7 +7,7 @@ const router = Router()
 
 router.patch('/:id/pages/:pageId', requireOwnsTemplate, async (req, res) => {
   const data: PageDTO.Update = req.body
-  await pageService.updateShapes(req.params.id, req.user!.id, req.params.pageId, data)
+  await pageService.update(req.params.id, req.user!.id, req.params.pageId, data)
   res.status(204).end()
 })
 
