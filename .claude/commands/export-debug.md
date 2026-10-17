@@ -50,7 +50,7 @@ speculating down the pipeline.
 | Text wraps differently | expected: browser vs react-pdf metrics |
 | Stroke clipped at an edge | `renderInSvgLayer` clamps to the page; the editor does not |
 | 408 | render exceeded 30s |
-| Dead download link | `pdfDownloadStore` is single-use, 10-min TTL, process-local |
+| Dead preview link | expired (24 h), template deleted, or another account's |
 
 ## Close with
 

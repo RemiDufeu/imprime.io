@@ -4,9 +4,11 @@ import type { Page } from '@imprime/sdk'
 import { useCurrentPage, useEditorStore } from '../../../../../../../store/editor/EditorStore'
 import { usePageBindingMenus } from '../../../usePageBindingMenus'
 import { BindingButton } from '../BindingButton/BindingButton'
+import { PageNumberingControl } from './PageNumberingControl'
 
 // The page on screen, while no shape is selected: the list it is exported
-// once per item of, and when it is exported at all.
+// once per item of, when it is exported at all, and the template's page
+// numbers.
 export function PageContextBar() {
   const page = useCurrentPage()
   const index = useEditorStore(state => state.currentPageIndex)
@@ -49,6 +51,10 @@ function PageContextBarContent({ page, pageNumber }: { page: Page; pageNumber: n
           onSelect={select}
           broken={page.visibleWhen !== undefined && !page.visibleWhen.variableId}
         />
+      </div>
+      <Divider type="vertical" style={{ height: '24px' }} />
+      <div className="toolbar-item">
+        <PageNumberingControl page={page} />
       </div>
     </div>
   )

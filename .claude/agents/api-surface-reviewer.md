@@ -48,8 +48,8 @@ You report findings; you do not rewrite code.
   that user (e.g. a list query missing its `ownerId` filter).
 - Auth-adjacent routes added without rate limiting — `/api/auth` has a 20 per
   15 min limiter; a new credential-handling path needs one too.
-- An MCP tool returning a large binary inline instead of parking it in
-  `pdfDownloadStore` and returning a single-use URL.
+- An MCP tool returning a large binary inline: a PDF is shown through a
+  preview (`preview_template`), which the owner opens signed in.
 - `CORS_ORIGIN` handling weakened; `'*'` is rejected in production on purpose.
 
 ## Contract findings

@@ -33,7 +33,9 @@ Mounted in `packages/backend/src/server.ts`, all behind `requireAuth`:
 | Mount | Router |
 |---|---|
 | `/api/templates` | `templates.ts`, `pages.ts`, `variables.ts` (three routers, same mount) |
-| `/api/export` | `export.ts` |
+| `/api/templates` | `templates.ts` also serves `GET /:id/file` and `POST /import` (template files, 50 MB body parsed after auth); `previews.ts`' `templatePreviewsRouter` serves `POST /:id/previews` |
+| `/api/export` | `export.ts` — `/:id/pdf`, and `/code/:code/pdf` by the template's code, looked up among the caller's own |
+| `/api/previews` | `previews.ts` — `GET /:id`, `POST /:id/pdf`, behind `requireOwnsPreview` (the preview's owner and its template's) |
 | `/api/images` | `images.ts` — the uploader's own images (`Image.ownerId`), 500 MB each |
 | `/api/oauth-consent` | `oauthConsent.ts` — the pending OAuth authorization the consent page shows, to the user it was asked of |
 | `/api/fonts` | `fonts.ts` — instance-wide; reads open, writes behind `requireAdmin` |
@@ -133,13 +135,13 @@ own URL.
 
 The tools cover the whole authoring loop, one file per resource under
 `mcp/tools/` (`templates`, `pages`, `variables`, `shapes`, `assets`, plus
-`exportTemplate`): an agent can create a template, declare its variables, draw
-its pages and export it. A tool has: a zod `inputSchema` with `.describe()` on
+`previewTemplate`): an agent can create a template, declare its variables, draw
+its pages and preview it. A tool has: a zod `inputSchema` with `.describe()` on
 every field (that text is what the agent reads), `assertOwnsTemplate` first,
 `toolError(errorMessage(err))` on failure rather than a thrown exception, and a
 text result an agent can act on — plus an `outputSchema` and `structuredContent`
 when it creates something, so the new ids need no parsing out of prose (only
-`export_template` returns them for anything else). `annotations` say which tools only read and
+`preview_template` returns them for anything else). `annotations` say which tools only read and
 which destroy (`destructiveHint`), so a client knows what to confirm.
 `errorMessage` passes on an `AppError`'s message, code and `details` — how an
 agent learns which reference or field to fix — and logs anything else as an
@@ -162,8 +164,13 @@ runs `layoutTree` as the editor's write path does. The page rules live in
 (`LAST_PAGE`, which the editor never offers). The editor does not reload, so a page edited
 over MCP while open in the editor is overwritten by its next save.
 
-Binary results are not returned inline: the PDF goes into `pdfDownloadStore`
-and the tool returns a single-use URL with a 10-minute TTL.
+Binary results are not returned inline: `preview_template` stores a preview
+(`Preview`, a TTL-indexed collection, 24 h) and returns the editor's page for
+it (`getPreviewPath`, under `PUBLIC_APP_URL`). The owner opens it signed in —
+`RequireAuth` sends them back to it after login — and prints from there.
+Template files (export/import) have no tool, deliberately: a file holds its
+images in base64, megabytes in an agent's context, and `get_template` /
+`set_page_shapes` already read and write a whole template.
 
 ## Adding or changing an endpoint
 

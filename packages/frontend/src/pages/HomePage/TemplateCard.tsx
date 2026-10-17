@@ -1,9 +1,10 @@
-import { DeleteOutlined, EditOutlined } from "@ant-design/icons";
+import { DeleteOutlined, EditOutlined, ExportOutlined } from "@ant-design/icons";
 import type { TemplateSummary } from "@imprime/sdk";
 import { findPageFormat } from "@imprime/sdk";
-import { Button, Card } from "antd"
+import { Button, Card, Tag, Tooltip } from "antd"
+import "./TemplateCard.css"
 
-export default function TemplateCard({ template, onDeleteClicked, onDetailClick}: { template: TemplateSummary; onDeleteClicked: () => void; onDetailClick: () => void }) {
+export default function TemplateCard({ template, onDeleteClicked, onDetailClick, onExportClicked }: { template: TemplateSummary; onDeleteClicked: () => void; onDetailClick: () => void; onExportClicked: () => void }) {
     const { width, height } = template.pageSize
     const format = findPageFormat(template.pageSize)?.label ?? 'Custom'
 
@@ -40,18 +41,34 @@ export default function TemplateCard({ template, onDeleteClicked, onDetailClick}
                 </Button>,
               ]}
             >
-              <Card.Meta
-                title={template.title}
-                description={
-                  <>
-                    <div>{format} · {width} × {height}</div>
-                    {template.updatedAt && (
-                      <div>
-                        Updated on {new Date(template.updatedAt).toLocaleDateString('en-US')}
-                      </div>
-                    )}
-                  </>
-                }
-              />
+              {/* Top right of the tile, out of the actions: a secondary one. */}
+              <div className="template-card-body">
+                <Card.Meta
+                  className="template-card-meta"
+                  title={<>{template.title} {template.code && <Tag>{template.code}</Tag>}</>}
+                  description={
+                    <>
+                      <div>{format} · {width} × {height}</div>
+                      {template.updatedAt && (
+                        <div>
+                          Updated on {new Date(template.updatedAt).toLocaleDateString('en-US')}
+                        </div>
+                      )}
+                    </>
+                  }
+                />
+                <Tooltip title="Export as a file">
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<ExportOutlined />}
+                    aria-label="Export as a file"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onExportClicked()
+                    }}
+                  />
+                </Tooltip>
+              </div>
             </Card>)
 }

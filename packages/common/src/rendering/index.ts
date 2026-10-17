@@ -66,6 +66,7 @@ export {
 } from './rotation.js'
 export type { Point, TurnedBox, Frame } from './rotation.js'
 export { resolveShapes, resolvePages, getGroupBox } from './shapeResolver.js'
+export { PAGE_NUMBER_SHAPE_ID, createPageNumberBox, showsPageNumber } from './pageNumbering.js'
 export type { GroupBox } from './shapeResolver.js'
 export {
   resolveVariable,

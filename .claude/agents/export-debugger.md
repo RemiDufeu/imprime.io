@@ -38,7 +38,7 @@ already gone; do not guess at react-pdf.
 | Stroke clipped at an edge | `renderInSvgLayer` clamps the layer to the page; the editor does not |
 | Empty page / nothing at all | stage 1 threw, or every shape was `hidden`, or the page has no shapes |
 | 408 | stage 6 — render exceeded 30s |
-| Download link dead | `pdfDownloadStore` — single-use, 10-minute TTL, process-local |
+| Preview link dead | `PREVIEW_NOT_FOUND`: expired (24 h, TTL index), its template deleted, or opened by another account |
 
 ## Process
 

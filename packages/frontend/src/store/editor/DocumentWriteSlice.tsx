@@ -1,4 +1,4 @@
-import type { PageDTO, Shape } from '@imprime/sdk'
+import type { PageDTO, PageNumbering, Shape } from '@imprime/sdk'
 import { layoutTree } from '@imprime/sdk'
 import type { StateCreator } from 'zustand'
 import type { TemplateSlice } from './TemplateSlice'
@@ -7,6 +7,7 @@ import type { SelectionSlice } from './SelectionSlice'
 import type { HistorySlice } from './HistorySlice'
 import { templatesAPI } from '../../api/api'
 import { selectCurrentPage } from './selectors'
+import { splitPageNumberBox, withPageNumberBox } from '../../utils/pageNumbering'
 
 // What a shape write tells the history about itself.
 export interface HistoryHint {
@@ -29,10 +30,19 @@ export interface DocumentWriteSlice {
     // page on screen unless `pageId` names another.
     _editPage: (transform: (shapes: Shape[]) => Shape[] | null, options?: HistoryHint & { pageId?: string }) => void
     // Set and save without recording: the path undo and redo replay through.
+    // The template's page-number box among `shapes` is taken out: the page
+    // shows it or not (`hidePageNumber`), and a box changed is the template's
+    // new one, on every page.
     _writePageShapes: (pageId: string, shapes: Shape[]) => void
     // Fire-and-forget; saves of one page reach the server one at a time, in
     // order. Updates waiting are merged, each field keeping its latest value.
     _savePage: (pageId: string, update: PageDTO.Update) => void
+    // As `_savePage`, for the template's numbering: one save out at a time,
+    // the latest waiting.
+    _savePageNumbering: (numbering: PageNumbering | null) => void
+    // Resolves once every save out has landed, retries included: what reads
+    // the template from the server — a preview — sees what is on screen.
+    whenSaved: () => Promise<void>
 }
 
 const MAX_SAVE_RETRIES = 2
@@ -53,6 +63,30 @@ export const createDocumentWriteSlice: StateCreator<
     // one save out. Present in the map = a save is out; the value is the tree
     // to send once it is back (null: nothing newer yet).
     const pendingSaves = new Map<string, { templateId: string; update: PageDTO.Update } | null>()
+    // The drain of each page with a save out.
+    const drains = new Map<string, Promise<void>>()
+
+    // The numbering save out, and the one to send once it is back.
+    let numberingSave: Promise<void> | null = null
+    let numberingWaiting: { templateId: string; numbering: PageNumbering | null } | undefined
+    const drainNumbering = async () => {
+        for (let next = numberingWaiting; next; next = numberingWaiting) {
+            numberingWaiting = undefined
+            try {
+                await templatesAPI.update(next.templateId, { pageNumbering: next.numbering })
+            } catch {
+                set({ error: 'Failed to save the page numbering' })
+            }
+        }
+    }
+    // Started again when a save arrived between the drain's last check and
+    // its end.
+    const startNumberingDrain = () => {
+        numberingSave = drainNumbering().finally(() => {
+            numberingSave = null
+            if (numberingWaiting) startNumberingDrain()
+        })
+    }
 
     // Removed from the open template since (or undone): nothing to save to.
     // A page of a template no longer open is saved all the same.
@@ -134,19 +168,28 @@ export const createDocumentWriteSlice: StateCreator<
         },
 
         _writePageShapes: (pageId: string, shapes: Shape[]) => {
-            const { template, _savePage } = get()
+            const { template, _savePage, _savePageNumbering } = get()
             if (!template) return
+
+            const { shapes: own, box } = splitPageNumberBox(shapes)
+            const numbering = template.pageNumbering
+            // No numbering, no box: one left in a tree is dropped.
+            const next = numbering && box && box !== numbering.box ? { ...numbering, box } : numbering
+            const shown = numbering ? { hidePageNumber: box === undefined } : {}
 
             set({
                 template: {
                     ...template,
-                    pages: template.pages.map((page) =>
-                        page._id === pageId ? { ...page, shapes } : page
-                    ),
+                    pageNumbering: next,
+                    pages: template.pages.map((page) => {
+                        if (page._id === pageId) return withPageNumberBox({ ...page, ...shown, shapes: own }, next)
+                        return next !== numbering ? withPageNumberBox(page, next) : page
+                    }),
                 },
             })
 
-            _savePage(pageId, { shapes })
+            _savePage(pageId, { shapes: own, ...shown })
+            if (next !== numbering) _savePageNumbering(next ?? null)
         },
 
         _savePage: (pageId: string, update: PageDTO.Update) => {
@@ -158,7 +201,25 @@ export const createDocumentWriteSlice: StateCreator<
                 templateId: template._id,
                 update: waiting ? { ...waiting.update, ...update } : update,
             })
-            if (!sending) void drain(pageId)
+            if (!sending) {
+                // A drain started for this page before this one's `finally`
+                // ran is the next one, and stays.
+                const draining: Promise<void> = drain(pageId).finally(() => {
+                    if (drains.get(pageId) === draining) drains.delete(pageId)
+                })
+                drains.set(pageId, draining)
+            }
+        },
+
+        _savePageNumbering: (numbering) => {
+            const { template } = get()
+            if (!template) return
+            numberingWaiting = { templateId: template._id, numbering }
+            if (!numberingSave) startNumberingDrain()
+        },
+
+        whenSaved: async () => {
+            await Promise.all([...drains.values(), numberingSave])
         },
     }
 }

@@ -120,12 +120,26 @@ instantiate(siblings):            ← per list of siblings, before any layout
                           own scope; free-form parent: copy i shifted down by i × height
   visibleWhen fails     → drop
   (free-form parent: the copies go in a hugging column at the group's place)
-  text / image          → bake item-scoped values
+  text / image          → bake every variable run into text, and an image
+                          box's value into `resolvedImage` (item scope still live)
 layoutTree(tree)          ← measure bottom-up (hugGroup), then place top-down
                             (layoutGroupChildren); the editor's write path
                             runs the same function on the authored tree
 flatten(tree)             ← page space: background? · children · border?
 ```
+
+`resolvePages` runs this per page copy — the template's page-number box
+(`Template.pageNumbering.box`, id `PAGE_NUMBER_SHAPE_ID`) appended at the root
+where `showsPageNumber` puts it — then writes the page numbers
+(`PageNumberElement`) once the PDF's pages are counted: what leaves it is
+literal text only.
+
+In the editor the box is a shape of every page that shows it, last at the
+root (`utils/pageNumbering.ts`): `_writePageShapes` takes it back out before
+saving — a box changed becomes the template's, on every page; a box missing
+from a page is that page's `hidePageNumber`. It cannot be copied, duplicated
+or moved into a group, and no stored page shape may take its id
+(`RESERVED_SHAPE_ID`).
 
 Subtleties worth preserving:
 

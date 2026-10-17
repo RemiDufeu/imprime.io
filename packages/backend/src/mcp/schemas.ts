@@ -15,6 +15,9 @@ import type {
   ImageShape,
   ListType,
   PageFormatId,
+  PageNumberElement,
+  PageNumberKind,
+  PageNumbering,
   PageRepeat,
   PageSize,
   Paragraph,
@@ -26,6 +29,8 @@ import type {
   TextBoxShape,
   TextFormatting,
   TextVerticalAlign,
+  TemplateFileDTO,
+  VariableData,
   VariableElement,
   VariableItem,
   VariableItemField,
@@ -43,6 +48,10 @@ import {
   MAX_LIST_LEVEL,
   MAX_PAGE_DIMENSION,
   MIN_PAGE_DIMENSION,
+  TEMPLATE_CODE_MAX_LENGTH,
+  TEMPLATE_FILE_FORMAT,
+  TEMPLATE_FILE_VERSION,
+  isValidTemplateCode,
 } from '@imprime/common'
 import { isObjectIdString } from '../models/mappers.js'
 
@@ -78,6 +87,11 @@ function enumOf<T extends string>() {
 }
 
 export const objectIdSchema = z.string().refine(isObjectIdString, 'Not an Imprime id: 24 hexadecimal characters')
+
+export const templateCodeSchema = z.string().refine(
+  isValidTemplateCode,
+  `A template code is 1 to ${TEMPLATE_CODE_MAX_LENGTH} letters, digits, "-" or "_"`,
+)
 
 // What both renderers draw alike: the forms the export's `parseColor` reads.
 const colorSchema = z.string().regex(
@@ -230,7 +244,16 @@ const variableElementSchema = z.object({
     .describe('Always [{ "text": "" }]; may be left out'),
 } satisfies SchemaShape<VariableElement>).strict()
 
-const runSchema = z.union([variableElementSchema, customTextSchema])
+const pageNumberElementSchema = z.object({
+  ...textFormattingFields,
+  type: z.literal('page-number'),
+  kind: enumOf<PageNumberKind>()(['current', 'total'])
+    .describe('current: the number of the page the text is on. total: how many pages the PDF has'),
+  children: z.tuple([z.object({ text: z.literal('') }).strict()]).default((): [{ text: '' }] => [{ text: '' }])
+    .describe('Always [{ "text": "" }]; may be left out'),
+} satisfies SchemaShape<PageNumberElement>).strict()
+
+const runSchema = z.union([variableElementSchema, pageNumberElementSchema, customTextSchema])
 
 const paragraphSchema = z.object({
   type: z.literal('paragraph'),
@@ -241,7 +264,7 @@ const paragraphSchema = z.object({
     .describe('Makes the paragraph a list item. Numbers are counted over consecutive items'),
   indent: z.number().int().min(0).max(MAX_LIST_LEVEL).optional().describe('Nesting level of a list item'),
   children: z.array(runSchema).min(1)
-    .describe('Runs of text, literal or a variable\'s value, each with its own formatting'),
+    .describe('Runs of text, literal, a variable\'s value or a page number, each with its own formatting'),
 } satisfies SchemaShape<Paragraph>).strict()
 
 const imageAlignSchema = z.object({
@@ -331,6 +354,63 @@ export const shapeSchema: z.ZodType<Shape, z.ZodTypeDef, unknown> = z.discrimina
   shapeSchemas.image,
   shapeSchemas.group,
 ])
+
+// ============================================
+// Page numbering
+// ============================================
+
+export const pageNumberingSchema = z.object({
+  box: shapeSchemas.text.describe(
+    'The text box drawn on every page, over its shapes. Its id is replaced by "page-number". Number the page with ' +
+    'page-number runs: { "type": "page-number", "kind": "current" } and { "type": "page-number", "kind": "total" }'
+  ),
+  skipFirstPage: z.boolean().optional()
+    .describe('Leave the box off the first page of the PDF, which still counts: the next one shows 2'),
+} satisfies SchemaShape<PageNumbering>).strict()
+
+// ============================================
+// Template files
+// ============================================
+
+// What an import reads, checked whole before anything is written: a file is
+// anyone's to hand over. The rules no schema can say — a page size in bounds,
+// a variable's default within its limits, an image the export can draw — are
+// the services' to check, as for any other write.
+const templateFileVariableSchema = z.object({
+  _id: objectIdSchema,
+  type: variableTypeSchema,
+  name: z.string().min(1),
+  default: variableValueSchema.optional(),
+  required: z.boolean().optional(),
+  maxLength: z.number().optional(),
+  maxItems: z.number().optional(),
+  itemFields: z.array(variableItemFieldSchema).optional(),
+} satisfies SchemaShape<VariableData>)
+
+const templateFilePageSchema = z.object({
+  shapes: z.array(shapeSchema),
+  visibleWhen: visibilityConditionSchema.optional(),
+  repeat: pageRepeatSchema.optional(),
+  hidePageNumber: z.boolean().optional(),
+} satisfies SchemaShape<TemplateFileDTO.FilePage>)
+
+const templateFileImageSchema = z.object({
+  data: z.string().min(1),
+  mimeType: z.string(),
+  originalName: z.string().optional(),
+} satisfies SchemaShape<TemplateFileDTO.FileImage>)
+
+export const templateFileSchema = z.object({
+  format: z.literal(TEMPLATE_FILE_FORMAT),
+  version: z.literal(TEMPLATE_FILE_VERSION),
+  title: z.string(),
+  code: z.string().optional(),
+  pageSize: z.object({ width: z.number(), height: z.number() } satisfies SchemaShape<PageSize>),
+  pageNumbering: pageNumberingSchema.optional(),
+  variables: z.array(templateFileVariableSchema),
+  pages: z.array(templateFilePageSchema).min(1),
+  images: z.record(templateFileImageSchema),
+} satisfies SchemaShape<TemplateFileDTO.File>)
 
 // A field `update_shape` may remove with null: an optional one — a defaulted
 // one (`children`, `x`) would silently come back as its default — or one the

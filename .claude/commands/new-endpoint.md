@@ -54,8 +54,8 @@ built from `mcp/schemas.ts` and `.describe()` on every field, `annotations`
 (`readOnlyHint`, `destructiveHint`), `assertOwnsTemplate` first, and
 `toolError(errorMessage(err))` on failure instead of throwing. A shape edit goes
 through `PageService.editShapes`. Never accept an owner id as an argument — the
-tool closes over the `ownerId` from the API key. Large binaries go through
-`pdfDownloadStore` as a single-use URL.
+tool closes over the `ownerId` from the API key. A PDF is not returned
+inline: link to a preview (`preview_template`) instead.
 
 ### 8. `README.md`
 If it changes the publicly documented API or MCP surface.

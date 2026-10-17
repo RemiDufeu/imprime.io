@@ -13,10 +13,11 @@ import { authService, settingsService } from './services/index.js'
 import { CLIENT_IP_HEADER } from './services/AuthService.js'
 import { requireAuth } from './middleware/requireAuth.js'
 import { EXPORT_WARNINGS_HEADER } from '@imprime/common'
-import templatesRouter from './routes/templates.js'
+import templatesRouter, { TEMPLATE_IMPORT_PATH } from './routes/templates.js'
 import pageRouter from './routes/pages.js'
 import variablesRouter from './routes/variables.js'
 import exportRouter from './routes/export.js'
+import previewsRouter, { templatePreviewsRouter } from './routes/previews.js'
 import imagesRouter from './routes/images.js'
 import fontsRouter from './routes/fonts.js'
 import settingsRouter from './routes/settings.js'
@@ -158,7 +159,13 @@ const adaptWebHandler =
 app.get('/.well-known/oauth-authorization-server', adaptWebHandler(discovery))
 app.get('/.well-known/oauth-protected-resource', adaptWebHandler(protectedResource))
 
-app.use(express.json({ limit: '10mb' }))
+// A template file is larger, and parsed by its route once the caller is
+// authenticated: a 50 MB body is not read for anyone who asks.
+const jsonBody = express.json({ limit: '10mb' })
+app.use((req, res, next) => {
+  if (req.path === TEMPLATE_IMPORT_PATH) next()
+  else jsonBody(req, res, next)
+})
 
 // Request logging: the path, never the query string, which carries secrets —
 // the password reset link lands on /reset-password?token=…
@@ -181,7 +188,9 @@ app.get('/api/auth-providers', (_req, res) => {
 app.use('/api/templates', requireAuth, templatesRouter)
 app.use('/api/templates', requireAuth, pageRouter)
 app.use('/api/templates', requireAuth, variablesRouter)
+app.use('/api/templates', requireAuth, templatePreviewsRouter)
 app.use('/api/export', requireAuth, exportRouter)
+app.use('/api/previews', requireAuth, previewsRouter)
 app.use('/api/images', requireAuth, imagesRouter)
 app.use('/api/fonts', requireAuth, fontsRouter)
 app.use('/api/settings', requireAuth, settingsRouter)

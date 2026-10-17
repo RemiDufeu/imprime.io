@@ -14,7 +14,7 @@ Imprime turns a template — pages of shapes, some bound to variables — into a
 1. create_template (or list_templates / get_template to work on an existing one).
 2. create_variable for every value that changes from one PDF to the next. Note each _id: shapes refer to variables by _id, while values are given by name at export.
 3. Draw each page with set_page_shapes; touch it up with add_shapes, update_shape, delete_shapes.
-4. export_template, with sample values, to check the result. Its warnings say what did not fit on a page.
+4. preview_template, with sample values, to check the result, and hand its link to the user: they see the document and print it from there. Its warnings say what did not fit on a page.
 
 # Geometry
 - Every page of a template has the template's page size, in its own units: ${formats}. The PDF page is the same numbers in points.
@@ -27,6 +27,8 @@ Imprime turns a template — pages of shapes, some bound to variables — into a
 - fontSize is a CSS length string: "24px". Unset is ${DEFAULT_FONT_SIZE}px; unset fontFamily is ${DEFAULT_FONT}. list_fonts names the families.
 - Text wraps to the box's width and is not measured: make the box tall enough for its longest value, and use a variable's maxLength to bound it.
 - A line break is a new paragraph, never "\\n" in a run.
+- A run { "type": "page-number", "kind": "current" } writes the number of the page it is on, "kind": "total" how many pages there are — both counted in the PDF, after repeated pages are copied and pages whose condition fails are left out: [{ "text": "Page " }, { "type": "page-number", "kind": "current" }, { "text": " of " }, { "type": "page-number", "kind": "total" }]. It takes formatting as text does.
+- To number every page, as a slide number, use set_page_numbering rather than a box on each page: one text box, drawn over every page at the same place. skipFirstPage leaves it off the first page; update_page's hidePageNumber off any other.
 
 # Variables
 - string: text. boolean: conditions. image: a PNG or JPEG data URL, drawn by an image shape's imageVariable. object-list: a list of objects, whose properties itemFields declares.

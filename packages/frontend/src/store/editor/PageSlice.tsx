@@ -1,4 +1,4 @@
-import type { Page, PageDTO } from "@imprime/sdk"
+import type { Page, PageDTO, PageNumbering } from "@imprime/sdk"
 import type { StateCreator } from "zustand"
 import type { TemplateSlice } from "./TemplateSlice"
 import type { HistorySlice } from "./HistorySlice"
@@ -7,6 +7,7 @@ import type { SelectionSlice } from "./SelectionSlice"
 import type { DocumentWriteSlice } from "./DocumentWriteSlice"
 import { templatesAPI } from "../../api/api"
 import { cloneShapeWithNewIds } from "../../utils/shapeTree"
+import { isPageNumberBox, splitPageNumberBox, withPageNumberBox } from "../../utils/pageNumbering"
 
 // `pages` in the order of `pageIds`; pages the list leaves out keep their
 // relative order, after it. `order` is rewritten to match.
@@ -29,7 +30,7 @@ export const pageBindings = (page: Page): PageBindings => ({ visibleWhen: page.v
 
 // What a page is created with: its content, and an `_id` when it comes back
 // from a deletion.
-type PageContent = Pick<PageDTO.Create, '_id' | 'shapes' | 'visibleWhen' | 'repeat'>
+type PageContent = Pick<PageDTO.Create, '_id' | 'shapes' | 'visibleWhen' | 'repeat' | 'hidePageNumber'>
 
 /**
  * The template's pages as a set: which one is on screen, adding, deleting and
@@ -51,6 +52,12 @@ export interface PageSlice {
     // Merged into the page's bindings: a field given as undefined is removed,
     // one left out is kept. Recorded for undo.
     updatePageBindings: (pageId: string, changes: Partial<PageBindings>) => void
+    // The template's numbering, replaced whole — null numbers no page — and
+    // its box put on, or taken off, every page that shows it. Recorded.
+    setPageNumbering: (numbering: PageNumbering | null) => void
+    // Whether the page shows the template's page-number box: the box added
+    // to its shapes or taken out of them, which is what deleting it does too.
+    setPageNumberShown: (pageId: string, shown: boolean) => void
     // The halves undo and redo replay, unrecorded. Given content, `_insertPage`
     // creates the page with it — with an `_id`, recreates that one: same id,
     // same shapes. None of them takes the server's copy of the template back:
@@ -61,6 +68,7 @@ export interface PageSlice {
     // Replaces the page's bindings whole: set at once, saved in the page's
     // save queue, in order with its shape saves.
     _applyPageBindings: (pageId: string, bindings: PageBindings) => void
+    _applyPageNumbering: (numbering: PageNumbering | null) => void
 }
 
 export const createPageSlice: StateCreator<
@@ -95,12 +103,15 @@ export const createPageSlice: StateCreator<
         if (index === -1) return
         const page = template.pages[index]
 
-        // New ids: a shape's id is how the editor finds its page.
+        // New ids: a shape's id is how the editor finds its page. Not the
+        // page-number box's, which is the template's: the copy shows it as
+        // the page does.
         try {
             const copy = await _insertPage(index + 1, {
-                shapes: page.shapes.map(cloneShapeWithNewIds),
+                shapes: splitPageNumberBox(page.shapes).shapes.map(cloneShapeWithNewIds),
                 visibleWhen: page.visibleWhen,
                 repeat: page.repeat,
+                hidePageNumber: page.hidePageNumber,
             })
             _recordHistory({ kind: 'page', pageId: copy._id, snapshot: null })
         } catch {
@@ -146,19 +157,47 @@ export const createPageSlice: StateCreator<
         _applyPageBindings(pageId, { ...previous, ...changes })
     },
 
+    setPageNumbering: (numbering: PageNumbering | null) => {
+        const { template, _applyPageNumbering, _recordHistory } = get()
+        if (!template) return
+
+        _recordHistory({ kind: 'page-numbering', numbering: template.pageNumbering ?? null })
+        _applyPageNumbering(numbering)
+    },
+
+    setPageNumberShown: (pageId: string, shown: boolean) => {
+        const box = get().template?.pageNumbering?.box
+        if (!box) return
+        get()._editPage(shapes => {
+            const showing = shapes.some(isPageNumberBox)
+            if (showing === shown) return null
+            return shown ? [...shapes, box] : shapes.filter(shape => !isPageNumberBox(shape))
+        }, { pageId })
+    },
+
     _insertPage: async (index: number, content?: PageContent) => {
         const { template } = get()
         if (!template) throw new Error('No template loaded')
 
+        // A page's own shapes only: a page restored by undo holds the
+        // template's page-number box among them.
         const created = await templatesAPI.addPage(template._id, content
-            ? { _id: content._id, order: index, shapes: content.shapes, visibleWhen: content.visibleWhen, repeat: content.repeat }
+            ? {
+                _id: content._id,
+                order: index,
+                shapes: content.shapes && splitPageNumberBox(content.shapes).shapes,
+                visibleWhen: content.visibleWhen,
+                repeat: content.repeat,
+                hidePageNumber: content.hidePageNumber,
+            }
             : { order: index })
 
         // Read again: the document may have changed during the request.
         const current = get().template
         if (!current) return created
         const at = Math.min(index, current.pages.length)
-        const pages = [...current.pages.slice(0, at), created, ...current.pages.slice(at)]
+        const shown = withPageNumberBox(created, current.pageNumbering)
+        const pages = [...current.pages.slice(0, at), shown, ...current.pages.slice(at)]
         get().endTextSession()
         set({ template: { ...current, pages }, currentPageIndex: at, selectedShapeId: null })
         return created
@@ -226,5 +265,26 @@ export const createPageSlice: StateCreator<
         })
         // Both fields, always: null removes what undefined leaves out.
         _savePage(pageId, { visibleWhen: bindings.visibleWhen ?? null, repeat: bindings.repeat ?? null })
+    },
+
+    _applyPageNumbering: (numbering: PageNumbering | null) => {
+        const { template, selectedShapeId, _savePageNumbering } = get()
+        if (!template) return
+
+        // Typing in the box is committed while it is still there; a box taken
+        // away is no longer selected.
+        get().endTextSession()
+        const next = numbering ?? undefined
+        set({
+            template: {
+                ...template,
+                pageNumbering: next,
+                pages: template.pages.map(page => withPageNumberBox(page, next)),
+            },
+            ...(next === undefined && selectedShapeId !== null && isPageNumberBox({ id: selectedShapeId })
+                ? { selectedShapeId: null }
+                : {}),
+        })
+        _savePageNumbering(numbering)
     },
 })

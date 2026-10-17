@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Layout from './pages/Layout'
 import HomePage from './pages/HomePage/HomePage'
 import EditorPage from './pages/EditorPage/EditorPage'
+import PreviewPage from './pages/PreviewPage/PreviewPage'
 import LoginPage from './pages/LoginPage/LoginPage'
 import ConsentPage from './pages/LoginPage/ConsentPage'
 import VerifyEmailPage from './pages/LoginPage/VerifyEmailPage'
@@ -32,6 +33,8 @@ function App() {
               <Route path="/" element={<Layout />}>
                 <Route index element={<HomePage />} />
                 <Route path="editor/:id" element={<EditorPage />} />
+                {/* What `getPreviewPath` builds: the MCP links here. */}
+                <Route path="preview/:id" element={<PreviewPage />} />
                 <Route path="settings/api-keys" element={<ApiKeysPage />} />
 
                 {/* Administration de l'instance : rôle admin requis */}

@@ -4,7 +4,7 @@ import { DEFAULT_PAGE_SIZE, PAGE_FORMATS } from '@imprime/common'
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { templateService } from '../../services/index.js'
 import { assertOwnsTemplate } from '../../middleware/requireOwnsTemplate.js'
-import { objectIdSchema, pageFormatSchema, pageSizeSchema } from '../schemas.js'
+import { objectIdSchema, pageFormatSchema, pageNumberingSchema, pageSizeSchema, templateCodeSchema } from '../schemas.js'
 import { toolError, errorMessage, textResult } from './errors.js'
 
 const IMAGE_DATA_URL = /^data:image\/(png|jpeg);base64,/i
@@ -25,7 +25,7 @@ export function registerTemplateTools(server: McpServer, ownerId: string): void 
     'list_templates',
     {
       title: 'List templates',
-      description: 'List your templates, most recently changed first: _id, title and page size.',
+      description: 'List your templates, most recently changed first: _id, title, code (when set) and page size.',
       annotations: { readOnlyHint: true },
     },
     async () => {
@@ -73,6 +73,10 @@ export function registerTemplateTools(server: McpServer, ownerId: string): void 
           `One of the formats; unset (with no pageSize) is ${DEFAULT_PAGE_SIZE.width} × ${DEFAULT_PAGE_SIZE.height}`
         ),
         pageSize: pageSizeSchema.optional().describe('A custom page size, instead of a format'),
+        code: templateCodeSchema.optional().describe(
+          'A code an integration prints the template by instead of its _id (POST /api/export/code/{code}/pdf), ' +
+          'unique among your templates. Unset has none'
+        ),
       },
       outputSchema: {
         templateId: z.string().describe('_id of the new template'),
@@ -81,7 +85,7 @@ export function registerTemplateTools(server: McpServer, ownerId: string): void 
       },
       annotations: { readOnlyHint: false, destructiveHint: false },
     },
-    async ({ title, format, pageSize }) => {
+    async ({ title, format, pageSize, code }) => {
       try {
         if (format !== undefined && pageSize !== undefined) {
           return toolError('Give a format or a pageSize, not both')
@@ -89,7 +93,7 @@ export function registerTemplateTools(server: McpServer, ownerId: string): void 
         const size: PageSize | undefined = format !== undefined
           ? PAGE_FORMATS.find(candidate => candidate.id === format)?.size
           : pageSize
-        const template = await templateService.create({ title, pageSize: size }, ownerId)
+        const template = await templateService.create({ title, pageSize: size, code }, ownerId)
         const created = { templateId: template._id, pageId: template.pages[0]._id, pageSize: template.pageSize }
         return {
           ...textResult(`Template "${template.title}" created:\n${JSON.stringify(created, null, 2)}`),
@@ -102,23 +106,53 @@ export function registerTemplateTools(server: McpServer, ownerId: string): void 
   )
 
   server.registerTool(
-    'rename_template',
+    'update_template',
     {
-      title: 'Rename a template',
-      description: 'Change a template\'s title. Its page size is chosen once, at creation.',
+      title: 'Update a template',
+      description:
+        'Change a template\'s title, its code, or both; what is left out is kept. Its page size is chosen once, at creation.',
       inputSchema: {
         templateId: objectIdSchema.describe('_id of the template'),
-        title: z.string().min(1).describe('The new title'),
+        title: z.string().min(1).optional().describe('The new title'),
+        code: templateCodeSchema.nullable().optional().describe(
+          'The new code, unique among your templates; null removes it'
+        ),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
     },
-    async ({ templateId, title }) => {
+    async ({ templateId, title, code }) => {
+      try {
+        if (title === undefined && code === undefined) return toolError('Give a title, a code, or both')
+        await assertOwnsTemplate(templateId, ownerId)
+        const template = await templateService.update(templateId, { title, code })
+        const codeText = template.code !== undefined ? `code ${template.code}` : 'no code'
+        return textResult(`Template ${template._id}: "${template.title}", ${codeText}.`)
+      } catch (err) {
+        return toolError(`Failed to update the template: ${errorMessage(err)}`)
+      }
+    }
+  )
+
+  server.registerTool(
+    'set_page_numbering',
+    {
+      title: 'Number the pages',
+      description:
+        'Set the template\'s page numbering — one text box drawn on every page of the PDF, over its shapes, as a ' +
+        'slide number is — or remove it with null. Leave it off one page with update_page\'s hidePageNumber.',
+      inputSchema: {
+        templateId: objectIdSchema.describe('_id of the template'),
+        pageNumbering: pageNumberingSchema.nullable().describe('The numbering, replaced whole; null removes it'),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+    },
+    async ({ templateId, pageNumbering }) => {
       try {
         await assertOwnsTemplate(templateId, ownerId)
-        const template = await templateService.update(templateId, { title })
-        return textResult(`Template ${template._id} renamed "${template.title}".`)
+        await templateService.update(templateId, { pageNumbering })
+        return textResult(pageNumbering ? `Pages of ${templateId} numbered.` : `Pages of ${templateId} no longer numbered.`)
       } catch (err) {
-        return toolError(`Failed to rename the template: ${errorMessage(err)}`)
+        return toolError(`Failed to set the page numbering: ${errorMessage(err)}`)
       }
     }
   )

@@ -10,7 +10,6 @@ import type {
   EllipseShape,
   TextBoxShape,
   ImageShape,
-  CustomText,
   Paragraph,
   ListStyle,
   ListMarker,
@@ -25,12 +24,10 @@ import type {
 import {
   getDashArray,
   resolvePages,
-  resolveVariable,
   isEmptyVariableValue,
   exceedsMaxLength,
   exceedsMaxItems,
   findItemFieldIssue,
-  stringifyVariableValue,
   getEllipseGeometry,
   getBoxPaths,
   getBorderOverhang,
@@ -67,6 +64,11 @@ export interface RenderOptions {
 
 export interface ExportResult {
   pdf: Buffer
+  warnings: ExportDTO.Warning[]
+}
+
+export interface ResolvedTemplate {
+  pages: Page[]
   warnings: ExportDTO.Warning[]
 }
 
@@ -186,37 +188,53 @@ export class ExportService {
   }
 
   /**
-   * Every image the resolved boxes draw, `variableImages` (already read by
-   * `validateVariables`) included. An image variable's value that was not
+   * Every image a resolved box draws from a variable's value, `variableImages`
+   * (already read by `validateVariables`) included. A value that was not
    * checked there — a default, or a string variable bound to a box through
    * the API — is read now, and fails the export the same way.
-   *
-   * Only `ownerId`'s uploaded images: a shape's image id is anyone's to write,
-   * and an export must not draw someone else's. One not found is left out.
    */
-  private async fetchImageData(
+  private readVariableImages(
     resolvedPages: Page[],
-    ownerId: string,
     variableImages: Map<string, DataUrlImage>
-  ): Promise<Map<string, DataUrlImage>> {
-    const imageIds = new Set<string>()
-    const imageDataMap = new Map(variableImages)
+  ): Map<string, DataUrlImage> {
+    const images = new Map(variableImages)
 
     for (const page of resolvedPages) {
       for (const shape of page.shapes) {
         if (shape.type !== 'image') continue
         const value = shape.resolvedImage
-        if (value !== undefined) {
-          if (imageDataMap.has(value)) continue
-          const image = readImageDataUrl(value)
-          if (!image) {
-            throw new ValidationError(
-              'An image variable holds something that is not a PNG or JPEG data URL',
-              'INVALID_IMAGE_VALUE'
-            )
-          }
-          imageDataMap.set(value, image)
-        } else if (shape.imageId) {
+        if (value === undefined || images.has(value)) continue
+        const image = readImageDataUrl(value)
+        if (!image) {
+          throw new ValidationError(
+            'An image variable holds something that is not a PNG or JPEG data URL',
+            'INVALID_IMAGE_VALUE'
+          )
+        }
+        images.set(value, image)
+      }
+    }
+
+    return images
+  }
+
+  /**
+   * `images`, with the uploaded images the resolved boxes draw added by id.
+   *
+   * Only `ownerId`'s uploaded images: a shape's image id is anyone's to write,
+   * and an export must not draw someone else's. One not found is left out.
+   */
+  private async fetchUploadedImages(
+    resolvedPages: Page[],
+    ownerId: string,
+    images: Map<string, DataUrlImage>
+  ): Promise<Map<string, DataUrlImage>> {
+    const imageIds = new Set<string>()
+    const imageDataMap = new Map(images)
+
+    for (const page of resolvedPages) {
+      for (const shape of page.shapes) {
+        if (shape.type === 'image' && shape.resolvedImage === undefined && shape.imageId) {
           imageIds.add(shape.imageId)
         }
       }
@@ -462,16 +480,16 @@ export class ExportService {
     }, [text, markerElement])
   }
 
-  private renderTextBox(shape: TextBoxShape, ctx: ResolveContext, fonts: FontCatalog): React.ReactElement {
+  private renderTextBox(shape: TextBoxShape, fonts: FontCatalog): React.ReactElement {
     const markers = getListMarkers(shape.paragraphes)
 
     const paragraphElements = shape.paragraphes.map((paragraph, pIndex) => {
       const paragraphStyle = getParagraphStyle(paragraph)
 
       const textSegments = paragraph.children.map((child, cIndex) => {
-        const content = 'type' in child && child.type === 'variable'
-          ? stringifyVariableValue(resolveVariable(child.variableId, ctx))
-          : (child as CustomText).text
+        // `resolvePages` has replaced every variable and page number with its
+        // text: an element left would be one it does not know, drawn as nothing.
+        const content = 'text' in child ? child.text : ''
 
         return React.createElement(PDFText, {
           key: `${pIndex}-${cIndex}`,
@@ -640,8 +658,7 @@ export class ExportService {
   private renderShape(
     shape: Shape,
     pageSize: PageSize,
-    assets: RenderAssets,
-    ctx: ResolveContext
+    assets: RenderAssets
   ): React.ReactElement {
     switch (shape.type) {
       case 'rectangle':
@@ -649,7 +666,7 @@ export class ExportService {
       case 'ellipse':
         return this.renderEllipse(shape, pageSize)
       case 'text':
-        return this.renderTextBox(shape, ctx, assets.fonts)
+        return this.renderTextBox(shape, assets.fonts)
       case 'image':
         return this.renderImage(shape, pageSize, assets.images)
       default:
@@ -660,10 +677,9 @@ export class ExportService {
   private renderPage(
     page: Page,
     pageSize: PageSize,
-    assets: RenderAssets,
-    ctx: ResolveContext
+    assets: RenderAssets
   ): React.ReactElement {
-    const shapes = page.shapes.map(shape => this.renderShape(shape, pageSize, assets, ctx))
+    const shapes = page.shapes.map(shape => this.renderShape(shape, pageSize, assets))
 
     return React.createElement(PDFPage, {
       key: page._id,
@@ -678,21 +694,27 @@ export class ExportService {
     }, shapes)
   }
 
-  /** `ownerId` owns the template: only their images are drawn. */
   /**
-   * The PDF, and what the caller should know about it: the content left out
-   * because it starts beyond its page — one warning per page concerned.
+   * What the data makes of `template`: the pages its PDF has, in order, each
+   * shape a leaf placed on its page with its text and image written — what
+   * `exportToPDF` draws, and what a preview shows — and what the caller should
+   * know about them: the content left out because it starts beyond its page,
+   * one warning per page concerned. Fails as the export does: a value its
+   * variable refuses, an image that cannot be drawn, no page left.
+   *
+   * The images read from the values come along, so that they are not read twice.
    */
-  public async exportToPDF(template: Template, ownerId: string, options: RenderOptions = {}): Promise<ExportResult> {
-    const variableValues = options.variableValues || {}
-
-    const variableImages = this.validateVariables(template, variableValues)
+  private resolveTemplate(
+    template: Template,
+    variableValues: Record<string, VariableValueType>
+  ): ResolvedTemplate & { variableImages: Map<string, DataUrlImage> } {
+    const validatedImages = this.validateVariables(template, variableValues)
 
     const ctx: ResolveContext = { variableValues, template }
     const { pageSize } = template
     // Repeated pages copied, pages whose condition fails left out: what is
     // left is the PDF's pages, and a PDF needs one.
-    const exported = resolvePages(template.pages, ctx)
+    const exported = resolvePages(template.pages, ctx, template.pageNumbering)
     if (exported.length === 0) {
       throw new ValidationError(
         'No page to export: every page is left out by its condition, or repeated for an empty list',
@@ -704,7 +726,7 @@ export class ExportService {
     // data can land there without anyone placing it so. A turned shape starts
     // where its turned box does.
     const warnings: ExportDTO.Warning[] = []
-    const resolvedPages: Page[] = exported.map((page, index) => {
+    const pages: Page[] = exported.map((page, index) => {
       const { shapes } = page
       const onPage = shapes.filter(s => {
         const bounds = getRotatedBounds(s)
@@ -722,8 +744,26 @@ export class ExportService {
       return { ...page, shapes: onPage }
     })
 
+    return { pages, warnings, variableImages: this.readVariableImages(pages, validatedImages) }
+  }
+
+  /** `resolveTemplate`, without the images it read: what a preview shows. */
+  public resolve(template: Template, variableValues: Record<string, VariableValueType>): ResolvedTemplate {
+    const { pages, warnings } = this.resolveTemplate(template, variableValues)
+    return { pages, warnings }
+  }
+
+  /**
+   * The PDF, and what the caller should know about it (see `resolveTemplate`).
+   * `ownerId` owns the template: only their images are drawn.
+   */
+  public async exportToPDF(template: Template, ownerId: string, options: RenderOptions = {}): Promise<ExportResult> {
+    const { pageSize } = template
+    const { pages: resolvedPages, warnings, variableImages } =
+      this.resolveTemplate(template, options.variableValues || {})
+
     const [images, fonts] = await Promise.all([
-      this.fetchImageData(resolvedPages, ownerId, variableImages),
+      this.fetchUploadedImages(resolvedPages, ownerId, variableImages),
       this.loadFonts(resolvedPages),
     ])
     // Once per image, however many boxes draw it: see pdfJpeg.ts.
@@ -731,7 +771,7 @@ export class ExportService {
       images.set(key, { ...image, dataUrl: dataUrlForReactPdf(image.dataUrl) })
     }
     const assets: RenderAssets = { images, fonts }
-    const pages = resolvedPages.map(page => this.renderPage(page, pageSize, assets, ctx))
+    const pages = resolvedPages.map(page => this.renderPage(page, pageSize, assets))
 
     const doc = React.createElement(Document, {}, pages)
 

@@ -1,6 +1,6 @@
 ---
 name: pdf-export
-description: Constraints and traps of the Imprime PDF export path — @react-pdf/renderer quirks (colour alpha, per-shape Svg layers, fixed, absolute positioning), font registration, the 30s render timeout, and the single-use download store. Use when changing ExportService, debugging a PDF that does not match the editor, or touching fonts.
+description: Constraints and traps of the Imprime PDF export path — @react-pdf/renderer quirks (colour alpha, per-shape Svg layers, fixed, absolute positioning), font registration, the 30s render timeout, and the resolution the preview shares. Use when changing ExportService, debugging a PDF that does not match the editor, or touching fonts.
 metadata:
   origin: adapted from ECC (github.com/affaan-m/ECC)
 ---
@@ -8,11 +8,17 @@ metadata:
 # PDF Export
 
 `packages/backend/src/services/ExportService.ts`, built on
-`@react-pdf/renderer`. Reached from two entry points:
+`@react-pdf/renderer`. Reached from three entry points, each streaming the
+buffer back with download headers (`routes/attachments.ts`, `sendPdf`):
 
-- `POST /api/export/:id/pdf` → buffer streamed back with download headers;
-- MCP `export_template` → buffer parked in `pdfDownloadStore`, single-use
-  URL returned.
+- `POST /api/export/:id/pdf`, and `POST /api/export/code/:code/pdf` by the
+  template's code;
+- `POST /api/previews/:id/pdf`, the PDF a preview shows.
+
+The MCP returns no PDF: `preview_template` makes a preview and links to the
+editor's page for it, from which the owner prints. The resolution half of the
+pipeline — `resolveTemplate`, public as `resolve` — is what the preview shows,
+so a preview fails exactly where the PDF would.
 
 ## Pipeline
 
@@ -135,13 +141,13 @@ with the CSS Font Loading API, in `packages/frontend/src/fonts.ts`: built-ins
 at startup (URLs from `import.meta.glob`), imported fonts when the editor opens
 (`FontSlice.loadFonts`), which enter the catalog only once loaded.
 
-## Download store
+## Text reaches the renderer as text
 
-`packages/backend/src/services/pdfDownloadStore.ts` — an in-process `Map`:
-10-minute TTL, 200 MB / 100 entries cap with FIFO eviction, a 60s sweep, and
-**single-use** reads (`takePdf` deletes on read). It is deliberately
-process-local: it does not survive a restart and does not work across replicas.
-If the deployment ever scales horizontally, this is the thing that breaks.
+`resolvePages` adds the template's page-number box to the pages that show it,
+then writes every variable run and every page number (`PageNumberElement`,
+counted after repeated pages are copied and failed conditions left out) into
+literal text, so `renderTextBox` only reads `child.text`. A new inline element must be baked there too, or it draws as
+nothing.
 
 ## Debugging a PDF
 

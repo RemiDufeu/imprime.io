@@ -7,16 +7,17 @@ metadata:
 
 # Persistence and Mapping
 
-Seven collections, seven thin schemas, and one mapper module that is the only
+Eight collections, eight thin schemas, and one mapper module that is the only
 place a Mongoose document turns into something a client may see.
 
 ```
-Template      { title, ownerId, pageSize: { width, height }, timestamps }
-Page          { templateId, order, shapes: Mixed[], timestamps }
+Template      { title, ownerId, code? (unique per owner, partial index), pageSize: { width, height }, pageNumbering? { box: Mixed (text shape), skipFirstPage? }, timestamps }
+Page          { templateId, order, shapes: Mixed[], hidePageNumber?, timestamps }
 VariableData  { templateId, type, name, default: Mixed, required }
 Image         { data (base64), mimeType, originalName, size, orphanedAt? (TTL), timestamps }
 Font          { family, familyKey (unique), version, faces: { regular, bold?, italic?, boldItalic? } (size, name), timestamps }
 FontFile      { fontId, variant, data (binary) }   — one per face, unique (fontId, variant)
+Preview       { templateId, ownerId, variableValues (JSON string), expiresAt (TTL, 0 s), timestamps }   — deleted with its template
 InstanceSettings { _id: 'instance', email: { smtp? { host, port, secure, user?, password? (encrypted), from }, requireEmailVerification }, sso: { google?, github?, microsoft? } ({ clientId, clientSecret (encrypted), tenantId? }), access: { passwordPolicy ('open' | 'existing' | 'admins', default 'open'), allowedDomains (default []) }, timestamps }   — a single document, written with upserting findByIdAndUpdate
 ```
 

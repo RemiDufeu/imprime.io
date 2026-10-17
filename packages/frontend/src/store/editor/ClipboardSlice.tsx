@@ -9,6 +9,7 @@ import type { ShapeSlice } from './ShapeSlice'
 import { COPY_OFFSET, copyName } from './ShapeSlice'
 import { cloneShapeWithNewIds, findShapeById, insertNear } from '../../utils/shapeTree'
 import { selectCurrentPage } from './selectors'
+import { isPageNumberBox } from '../../utils/pageNumbering'
 
 // What the next paste inserts, and where. The shape is held as it lies on the
 // page — its rotation too, with its parents' — and the position is absolute,
@@ -66,7 +67,10 @@ export const createClipboardSlice: StateCreator<
     [],
     ClipboardSlice
 > = (set, get) => {
+    // Not the page-number box: it is the template's, on every page already,
+    // and a copy would be a text box no longer numbering anything.
     const take = (id: string, offset: number, shapeOf: (shape: Shape) => Shape) => {
+        if (isPageNumberBox({ id })) return false
         const page = selectCurrentPage(get())
         const loc = page ? findShapeById(page.shapes, id) : null
         if (!loc) return false

@@ -16,6 +16,7 @@ import type {
   FontDTO,
   FontVariant,
   TemplateDTO,
+  TemplateFileDTO,
   PageDTO,
   VariableDTO,
   VariableValueType,
@@ -29,6 +30,7 @@ import type {
   ImageAlign,
   ImageCrop,
   ExportDTO,
+  PreviewDTO,
 } from '@imprime/common'
 import { DEFAULT_IMAGE_ALIGN, DEFAULT_IMAGE_FIT, EXPORT_WARNINGS_HEADER } from '@imprime/common'
 
@@ -183,9 +185,11 @@ export class ImprimeClient {
   /**
    * Create a new template, with one blank page
    * @param pageSize - one of `PAGE_FORMATS`' sizes, or a custom one; 1920×1080 when omitted
+   * @param code - what `exportPDFByCode` finds it by; 409 `TEMPLATE_CODE_TAKEN`
+   *   when another of your templates has it
    */
-  async createTemplate(title?: string, pageSize?: PageSize): Promise<Template> {
-    const data: TemplateDTO.Create = { title, pageSize }
+  async createTemplate(title?: string, pageSize?: PageSize, code?: string): Promise<Template> {
+    const data: TemplateDTO.Create = { title, pageSize, code }
     return this.request<Template>('/templates', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -193,12 +197,48 @@ export class ImprimeClient {
   }
 
   /**
-   * Update a template (title and/or pages)
+   * Update a template: its title, its code (null removes it; 409
+   * `TEMPLATE_CODE_TAKEN` when another of your templates has it), the order
+   * of its pages
    */
   async updateTemplate(id: string, data: TemplateDTO.Update): Promise<Template> {
     return this.request<Template>(`/templates/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
+    })
+  }
+
+  /**
+   * A template as a file — its pages, variables and images — which
+   * `importTemplate` turns back into a template, on this instance or another.
+   */
+  async exportTemplateFile(id: string): Promise<TemplateFileDTO.File> {
+    return this.request<TemplateFileDTO.File>(`/templates/${id}/file`)
+  }
+
+  /**
+   * Save a template's file, named `<title>.imprime.json`. Only available in
+   * browser environments.
+   */
+  async downloadTemplateFile(id: string): Promise<void> {
+    this.assertBrowser('downloadTemplateFile')
+    const file = await this.exportTemplateFile(id)
+    const blob = new Blob([JSON.stringify(file)], { type: 'application/json' })
+    this.saveBlob(blob, `${file.title || 'template'}.imprime.json`)
+  }
+
+  /**
+   * A new template from a file `exportTemplateFile` wrote, every part of it
+   * under a new id. Typed `unknown` because it is usually read from disk:
+   * the server checks it whole, and answers 400 `INVALID_TEMPLATE_FILE` for
+   * anything else. The template takes the file's code: one of yours has it
+   * already, and the import is refused with 409 `TEMPLATE_CODE_TAKEN` — send
+   * it again with another code, or none.
+   */
+  async importTemplate(file: unknown): Promise<Template> {
+    return this.request<Template>('/templates/import', {
+      method: 'POST',
+      body: JSON.stringify(file),
     })
   }
 
@@ -690,24 +730,18 @@ export class ImprimeClient {
   // ============================================
 
   /**
-   * Export template to PDF, with what the caller should know about it.
-   * @param variableValues - Optional record of variable name to value; an
-   *   image variable (or image field of a list item) takes a PNG or JPEG data URL
-   * @returns The PDF, and its warnings: one per page whose content went beyond
-   *   the page's edge and was left out — typically a repeated list longer than
-   *   the page. Empty when everything fits.
+   * POST `body` to an endpoint answering with a PDF, and read the warnings
+   * its header carries.
    */
-  async exportPDF(
-    templateId: string,
-    variableValues?: Record<string, VariableValueType>
+  private async requestPdf(
+    endpoint: string,
+    body: unknown
   ): Promise<{ pdf: Blob; warnings: ExportDTO.Warning[] }> {
-    const url = `${this.baseUrl}/export/${templateId}/pdf`
-
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), this.timeout)
 
     try {
-      const response = await fetch(url, {
+      const response = await fetch(`${this.baseUrl}${endpoint}`, {
         method: 'POST',
         signal: controller.signal,
         credentials: 'include',
@@ -715,7 +749,7 @@ export class ImprimeClient {
           'Content-Type': 'application/json',
           ...this.authHeaders(),
         },
-        body: JSON.stringify({ ...variableValues }),
+        body: JSON.stringify(body),
       })
 
       if (!response.ok) {
@@ -730,6 +764,51 @@ export class ImprimeClient {
     } finally {
       clearTimeout(timeoutId)
     }
+  }
+
+  // Checked before the request, which is wasted outside a browser.
+  private assertBrowser(method: string): void {
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+      throw new Error(`${method} is only available in browser environments`)
+    }
+  }
+
+  /** Hands `blob` to the browser as a download named `filename`. */
+  private saveBlob(blob: Blob, filename: string): void {
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    window.URL.revokeObjectURL(url)
+  }
+
+  /**
+   * Export template to PDF, with what the caller should know about it.
+   * @param variableValues - Optional record of variable name to value; an
+   *   image variable (or image field of a list item) takes a PNG or JPEG data URL
+   * @returns The PDF, and its warnings: one per page whose content went beyond
+   *   the page's edge and was left out — typically a repeated list longer than
+   *   the page. Empty when everything fits.
+   */
+  async exportPDF(
+    templateId: string,
+    variableValues?: Record<string, VariableValueType>
+  ): Promise<{ pdf: Blob; warnings: ExportDTO.Warning[] }> {
+    return this.requestPdf(`/export/${templateId}/pdf`, { ...variableValues })
+  }
+
+  /**
+   * Export to PDF the template of yours that has this `code`, as `exportPDF`
+   * does by id. Fails with 404 when none has it.
+   */
+  async exportPDFByCode(
+    code: string,
+    variableValues?: Record<string, VariableValueType>
+  ): Promise<{ pdf: Blob; warnings: ExportDTO.Warning[] }> {
+    return this.requestPdf(`/export/code/${encodeURIComponent(code)}/pdf`, { ...variableValues })
   }
 
   /**
@@ -754,19 +833,54 @@ export class ImprimeClient {
     filename?: string,
     variableValues?: Record<string, VariableValueType>
   ): Promise<ExportDTO.Warning[]> {
-    if (typeof window === 'undefined' || typeof document === 'undefined') {
-      throw new Error('downloadPDF is only available in browser environments')
-    }
-
+    this.assertBrowser('downloadPDF')
     const { pdf, warnings } = await this.exportPDF(templateId, variableValues)
-    const url = window.URL.createObjectURL(pdf)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = filename || `template-${templateId}.pdf`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    window.URL.revokeObjectURL(url)
+    this.saveBlob(pdf, filename || `template-${templateId}.pdf`)
+    return warnings
+  }
+
+  // ============================================
+  // Preview Operations
+  // ============================================
+
+  /**
+   * Make a preview: the template drawn with these values, as its PDF would
+   * be, kept for a day. Fails as `exportPDF` would with them.
+   * @returns Its `_id` — the editor shows it at `getPreviewPath(_id)` — when
+   *   it expires, and the PDF's page count and warnings
+   */
+  async createPreview(
+    templateId: string,
+    variableValues?: Record<string, VariableValueType>
+  ): Promise<PreviewDTO.Created> {
+    return this.request<PreviewDTO.Created>(`/templates/${templateId}/previews`, {
+      method: 'POST',
+      body: JSON.stringify({ ...variableValues }),
+    })
+  }
+
+  /**
+   * A preview's pages, resolved against the template as it is now. 404
+   * `PREVIEW_NOT_FOUND` once it has expired.
+   */
+  async getPreview(previewId: string): Promise<PreviewDTO.Response> {
+    return this.request<PreviewDTO.Response>(`/previews/${previewId}`)
+  }
+
+  /** The PDF a preview shows, with its warnings (see `exportPDF`). */
+  async exportPreviewPDF(previewId: string): Promise<{ pdf: Blob; warnings: ExportDTO.Warning[] }> {
+    return this.requestPdf(`/previews/${previewId}/pdf`, {})
+  }
+
+  /**
+   * Download the PDF a preview shows, as a file named `filename`. Only
+   * available in browser environments.
+   * @returns The export's warnings (see `exportPDF`)
+   */
+  async downloadPreviewPDF(previewId: string, filename: string): Promise<ExportDTO.Warning[]> {
+    this.assertBrowser('downloadPreviewPDF')
+    const { pdf, warnings } = await this.exportPreviewPDF(previewId)
+    this.saveBlob(pdf, filename)
     return warnings
   }
 }

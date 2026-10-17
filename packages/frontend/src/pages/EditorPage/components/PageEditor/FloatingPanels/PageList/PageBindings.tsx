@@ -1,20 +1,30 @@
 import { Button, Dropdown, Tooltip, type MenuProps } from "antd";
-import { EllipsisOutlined, EyeOutlined, RetweetOutlined } from "@ant-design/icons";
+import { EllipsisOutlined, EyeOutlined, NumberOutlined, RetweetOutlined } from "@ant-design/icons";
 import type { ReactNode } from "react";
 import type { Page } from "@imprime/sdk";
 import { useEditorStore } from "../../../../../../store/editor/EditorStore";
 import type { PagePreview } from "../../../../../../utils/conditionPreview";
 import { variableReferenceLabel } from "../../../../../../utils/variableScope";
 import { usePageBindingMenus } from "../../usePageBindingMenus";
+import { isPageNumberBox } from "../../../../../../utils/pageNumbering";
+
+const PAGE_NUMBER_KEY = "page-number";
 
 // The thumbnail's menu: the page's repeat and condition, one submenu each, as
-// its context bar sets them.
+// its context bar sets them — and, while the template numbers its pages,
+// whether this one shows the number.
 export function PageBindingsMenu({ page }: { page: Page }) {
     const { condition, repeat, select } = usePageBindingMenus(page);
+    const isNumbered = useEditorStore(state => state.template?.pageNumbering !== undefined);
+    const setPageNumberShown = useEditorStore(state => state.setPageNumberShown);
+    const showsNumber = page.shapes.some(isPageNumberBox);
 
     const items: MenuProps["items"] = [
         { key: "repeat", icon: <RetweetOutlined />, label: "Repeat", children: repeat.items },
         { key: "show", icon: <EyeOutlined />, label: "Show", children: condition.items },
+        ...(isNumbered
+            ? [{ key: PAGE_NUMBER_KEY, icon: <NumberOutlined />, label: showsNumber ? "Hide page number" : "Show page number" }]
+            : []),
     ];
 
     // Neither the button nor the menu, rendered in a portal but still a React
@@ -29,7 +39,8 @@ export function PageBindingsMenu({ page }: { page: Page }) {
                 selectedKeys: [...repeat.selectedKeys, ...condition.selectedKeys],
                 onClick: ({ key, domEvent }) => {
                     domEvent.stopPropagation();
-                    select(key);
+                    if (key === PAGE_NUMBER_KEY) setPageNumberShown(page._id, !showsNumber);
+                    else select(key);
                 },
                 style: { maxHeight: 320, overflowY: "auto" },
             }}

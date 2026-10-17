@@ -1,7 +1,7 @@
 import { Editor, Element, Transforms, type BaseSelection, type Descendant } from 'slate'
 import { ReactEditor } from 'slate-react'
 import type { StateCreator } from 'zustand'
-import type { CustomText, ListType, Paragraph, TextAlign, VariableElement } from '@imprime/sdk'
+import type { CustomText, InlineElement, ListType, PageNumberKind, Paragraph, TextAlign, TextFormatting } from '@imprime/sdk'
 import { DEFAULT_FONT, DEFAULT_FONT_SIZE, DEFAULT_LINE_HEIGHT, getListStyle, getParagraphStyle } from '@imprime/sdk'
 import type { TemplateSlice } from './TemplateSlice'
 import type { ShapeSlice } from './ShapeSlice'
@@ -53,7 +53,7 @@ const BOOLEAN_MARKS: readonly BooleanMark[] = ['bold', 'italic', 'underline', 's
 const hasTextChanged = (current: Descendant[], start: Descendant[]) =>
     current !== start && JSON.stringify(current) !== JSON.stringify(start)
 
-const isVariable = (n: unknown) => Element.isElement(n) && n.type === 'variable'
+const isInlineElement = (n: unknown) => Element.isElement(n) && (n.type === 'variable' || n.type === 'page-number')
 
 /**
  * The text box being edited. Editing is a session: it begins when a box's
@@ -85,6 +85,7 @@ export interface TextEditorSlice {
     // `color: null` takes the colour off: the text is the default colour again.
     applyTextFormat: (format: Partial<Omit<TextFormat, 'color'>> & { color?: string | null }) => void
     insertVariable: (variableId: string, itemPath?: string) => void
+    insertPageNumber: (kind: PageNumberKind) => void
     // A command rather than a format: the level is relative, and each
     // selected item moves from its own.
     changeListIndent: (delta: number) => void
@@ -123,11 +124,39 @@ export const createTextEditorSlice: StateCreator<
     })
 
     // A mark on the text runs of the selection, and the same property on the
-    // variable runs in it, which are elements rather than marked text.
+    // inline elements in it — variables, page numbers — which are elements
+    // rather than marked text.
     const setMark = (editor: Editor, key: keyof CustomText, value: string | boolean | null) => {
         if (value === null || value === false) Editor.removeMark(editor, key)
         else Editor.addMark(editor, key, value)
-        Transforms.setNodes(editor, { [key]: value === null ? undefined : value }, { match: isVariable, at: editor.selection ?? undefined })
+        Transforms.setNodes(editor, { [key]: value === null ? undefined : value }, { match: isInlineElement, at: editor.selection ?? undefined })
+    }
+
+    // Drops `element`, built from the formatting at the caret, then a space
+    // in the same formatting to type on.
+    const insertInline = (build: (formatting: TextFormatting) => InlineElement) => {
+        const { editor, lastSelection } = get()
+        if (!editor) return
+
+        // The dropdown took the focus and with it the selection.
+        if (lastSelection) {
+            Transforms.select(editor, lastSelection)
+        }
+
+        const marks = Editor.marks(editor)
+        const markStyles = {
+            bold: marks?.bold === true,
+            italic: marks?.italic === true,
+            underline: marks?.underline === true,
+            strikethrough: marks?.strikethrough === true,
+            uppercase: marks?.uppercase === true,
+            fontFamily: marks?.fontFamily,
+            fontSize: marks?.fontSize,
+            color: marks?.color,
+        }
+        const textNode: CustomText = { ...markStyles, text: ' ' }
+
+        Transforms.insertNodes(editor, [build(markStyles), textNode])
     }
 
     return {
@@ -220,38 +249,19 @@ export const createTextEditorSlice: StateCreator<
         },
 
         insertVariable: (variableId, itemPath) => {
-            const { editor, lastSelection } = get()
-            if (!editor) return
-
-            // The dropdown took the focus and with it the selection.
-            if (lastSelection) {
-                Transforms.select(editor, lastSelection)
-            }
-
-            const marks = Editor.marks(editor)
-            const markStyles = {
-                bold: marks?.bold === true,
-                italic: marks?.italic === true,
-                underline: marks?.underline === true,
-                strikethrough: marks?.strikethrough === true,
-                uppercase: marks?.uppercase === true,
-                fontFamily: marks?.fontFamily,
-                fontSize: marks?.fontSize,
-                color: marks?.color,
-            }
-
-            const variable: VariableElement = {
-                ...markStyles,
+            insertInline(formatting => ({
+                ...formatting,
                 type: 'variable',
                 variableId,
                 // Left unset for a template-wide reference, which is what
                 // resolves against the variable's own value at export.
                 ...(itemPath !== undefined ? { itemPath } : {}),
                 children: [{ text: '' }],
-            }
-            const textNode: CustomText = { ...markStyles, text: ' ' }
+            }))
+        },
 
-            Transforms.insertNodes(editor, [variable, textNode])
+        insertPageNumber: (kind) => {
+            insertInline(formatting => ({ ...formatting, type: 'page-number', kind, children: [{ text: '' }] }))
         },
 
         changeListIndent: (delta) => {

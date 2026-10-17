@@ -8,6 +8,7 @@ import { selectCurrentPage } from '../../../store/editor/selectors'
 import { previewCondition } from '../../../utils/conditionPreview'
 import { findShapeById } from '../../../utils/shapeTree'
 import { ShapeBadges } from './ShapeBadges'
+import { isPageNumberBox } from '../../../utils/pageNumbering'
 
 interface SVGSelectionWrapperProps {
     shape: Shape
@@ -65,6 +66,12 @@ export function SVGSelectionWrapper({ shape, readonly, children }: SVGSelectionW
         s.selectedShapeId === shape.id && s.dragData !== null
     )
     const conditionPreview = useEditorStore((s) => previewCondition(s.template, shape))
+    // The page-number box the export leaves off the first page: faded there,
+    // as a shape its condition leaves out — the page on screen being the
+    // first, which the export's first usually is.
+    const isSkippedPageNumber = useEditorStore((s) =>
+        isPageNumberBox(shape) && s.currentPageIndex === 0 && s.template?.pageNumbering?.skipFirstPage === true
+    )
 
     // The turn of the selected shape's parents, which its handles' cursors
     // follow. Only the selected shape has handles.
@@ -172,7 +179,7 @@ export function SVGSelectionWrapper({ shape, readonly, children }: SVGSelectionW
                 onClick={handleClick}
                 onMouseDown={shape.type != 'text' ? handleDragStart : undefined}
                 style={{ cursor }}
-                opacity={conditionPreview === 'hidden' ? GHOST_OPACITY : undefined}
+                opacity={conditionPreview === 'hidden' || isSkippedPageNumber ? GHOST_OPACITY : undefined}
             >
                 {isValidElement(children)
                     ? cloneElement(children, { shape: displayShape } as any)

@@ -66,7 +66,11 @@ const TEXT_PREVIEW_LENGTH = 60
 function textPreview(shape: Extract<Shape, { type: 'text' }>): string {
   const text = shape.paragraphes
     .map(paragraph => paragraph.children
-      .map(child => ('type' in child ? `{${child.itemPath ?? 'variable'}}` : child.text))
+      .map(child => {
+        if (!('type' in child)) return child.text
+        if (child.type === 'page-number') return child.kind === 'total' ? '{pages}' : '{page}'
+        return `{${child.itemPath ?? 'variable'}}`
+      })
       .join(''))
     .join(' / ')
   return text.length > TEXT_PREVIEW_LENGTH ? `${text.slice(0, TEXT_PREVIEW_LENGTH)}…` : text

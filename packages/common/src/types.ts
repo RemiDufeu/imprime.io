@@ -119,6 +119,26 @@ export type VariableElement = TextFormatting & {
   children: [{ text: '' }]; // Required by Slate for inline elements
 };
 
+// Which number a page-number run writes: that of the page it is on, or how
+// many pages there are.
+export type PageNumberKind = 'current' | 'total'
+
+// A page number, counted in the PDF — once repeated pages are copied and pages
+// whose condition fails left out — so it is known only then: `resolvePages`
+// writes it. The editor shows a chip naming it, as it names a variable rather
+// than its value.
+export type PageNumberElement = TextFormatting & {
+  type: 'page-number';
+  kind: PageNumberKind;
+  children: [{ text: '' }]; // Required by Slate for inline elements
+};
+
+// What a paragraph holds besides literal text: an element Slate keeps inline
+// and void, which the export replaces with text.
+export type InlineElement = VariableElement | PageNumberElement
+
+export type TextRun = CustomText | InlineElement
+
 export interface Paragraph {
   type: 'paragraph';
   // Block-level formatting. Unset means 'left' and DEFAULT_LINE_HEIGHT. Read
@@ -133,7 +153,7 @@ export interface Paragraph {
   // `getListStyle`.
   list?: ListType;
   indent?: number;
-  children: (CustomText | VariableElement)[];
+  children: TextRun[];
 }
 
 export interface TextBoxShape extends BaseShape {
@@ -277,6 +297,9 @@ export interface Page {
   // copy's shapes reading that item's fields (`itemPath`). The editor shows
   // one copy.
   repeat?: PageRepeat
+  // Leaves the template's page-number box off this page — off every copy of
+  // it. Ignored while the template numbers no page.
+  hidePageNumber?: boolean
   createdAt?: Date
   updatedAt?: Date
 }
@@ -289,10 +312,28 @@ export interface PageSize {
   height: number
 }
 
+// A template's page numbering: one text box, drawn on every page of the PDF
+// — over its shapes, at the same place — as Google Slides draws a slide
+// number. Its text numbers the page through page-number runs
+// (`PageNumberElement`), as any text can.
+export interface PageNumbering {
+  // Its id is always PAGE_NUMBER_SHAPE_ID: the box is the template's, not a
+  // shape of any page.
+  box: TextBoxShape
+  // Leaves the box off the PDF's first page — which still counts: the next
+  // one shows 2.
+  skipFirstPage?: boolean
+}
+
 export interface Template {
   _id: string
   title: string
+  // What an integration prints the template by instead of its `_id`, unique
+  // among its owner's templates (see `isValidTemplateCode`). Unset has none.
+  code?: string
   pageSize: PageSize
+  // Unset numbers no page.
+  pageNumbering?: PageNumbering
   pages: Page[]
   variableData: VariableData[]
   createdAt?: Date
@@ -302,6 +343,7 @@ export interface Template {
 export interface TemplateSummary {
   _id: string
   title: string
+  code?: string
   pageSize: PageSize
   createdAt?: Date
   updatedAt?: Date
@@ -369,10 +411,18 @@ export namespace TemplateDTO {
     // DEFAULT_PAGE_SIZE when absent. Whole numbers from MIN_PAGE_DIMENSION to
     // MAX_PAGE_DIMENSION, or the request is refused (`INVALID_PAGE_SIZE`).
     pageSize?: PageSize
+    // Refused when not `isValidTemplateCode` (`INVALID_TEMPLATE_CODE`), or
+    // when another of the owner's templates has it (409 `TEMPLATE_CODE_TAKEN`).
+    code?: string
   }
 
   export interface Update {
     title?: string
+    // As `Create.code`; null removes the template's code.
+    code?: string | null
+    // Replaces the numbering whole, its box a text shape whose variables are
+    // the template's (`INVALID_PAGE_NUMBERING`); null numbers no page.
+    pageNumbering?: PageNumbering | null
     pages?: Page[]
   }
 
@@ -384,6 +434,47 @@ export namespace TemplateDTO {
   }
 }
 
+// What a template file says it is: an import refuses any other.
+export const TEMPLATE_FILE_FORMAT = 'imprime-template'
+export const TEMPLATE_FILE_VERSION = 1
+
+// A template as a file, to move it to another account or instance: all it is
+// made of, its images included. Ids in it — of variables, of images — tie its
+// parts together within the file only: an import gives every one a new id, so
+// one file imports any number of times. Its code, unique among the
+// importer's templates, refuses the import when taken (409
+// `TEMPLATE_CODE_TAKEN`): send the file again with another, or none.
+export namespace TemplateFileDTO {
+  export interface FilePage {
+    shapes: Shape[]
+    visibleWhen?: VisibilityCondition
+    repeat?: PageRepeat
+    hidePageNumber?: boolean
+  }
+
+  // An uploaded image, as `ImageDTO.Create` takes it back.
+  export interface FileImage {
+    data: string
+    mimeType: string
+    originalName?: string
+  }
+
+  export interface File {
+    format: typeof TEMPLATE_FILE_FORMAT
+    version: typeof TEMPLATE_FILE_VERSION
+    title: string
+    code?: string
+    pageSize: PageSize
+    pageNumbering?: PageNumbering
+    // Their `_id` is what the pages refer to them by.
+    variables: VariableData[]
+    pages: FilePage[]
+    // By the `imageId` the shapes refer to them by. A shape's image missing
+    // from here — deleted before the export — imports as an empty box.
+    images: Record<string, FileImage>
+  }
+}
+
 export namespace PageDTO {
   // Each field present replaces the page's; an absent one is left alone.
   export interface Update {
@@ -392,6 +483,7 @@ export namespace PageDTO {
     visibleWhen?: VisibilityCondition | null
     // null makes the page a single one again.
     repeat?: PageRepeat | null
+    hidePageNumber?: boolean
   }
 
   export interface Create {
@@ -401,6 +493,7 @@ export namespace PageDTO {
     shapes?: Shape[]
     visibleWhen?: VisibilityCondition
     repeat?: PageRepeat
+    hidePageNumber?: boolean
     // Restores a deleted page under its former id, so references to it stay
     // valid (the editor's undo). Rejected with 409 when the id is in use.
     _id?: string
@@ -623,6 +716,40 @@ export namespace ExportDTO {
 // The response header an exported PDF's warnings travel in, as a JSON
 // `ExportDTO.Warning[]`. Absent when there are none.
 export const EXPORT_WARNINGS_HEADER = 'X-Export-Warnings'
+
+// A template drawn with a set of values, as its PDF would be, for its owner to
+// look at before printing it. Created with the values an export takes (the
+// body of `POST /templates/:id/previews`), and deleted once it expires. It
+// reads the template as it is when it is opened: an edit since shows.
+export namespace PreviewDTO {
+  export interface Created {
+    _id: string
+    expiresAt: Date
+    // How many pages the PDF has, and what did not fit on them, with the
+    // template as it is when the preview is made.
+    pageCount: number
+    warnings: ExportDTO.Warning[]
+  }
+
+  export interface Response {
+    _id: string
+    templateId: string
+    title: string
+    pageSize: PageSize
+    // The PDF's pages, resolved: each shape a leaf placed on its page — no
+    // group, no condition, no repeat — its text written and its image a data
+    // URL (`resolvedImage`) or an uploaded image's id. Drawn as they are.
+    pages: Page[]
+    warnings: ExportDTO.Warning[]
+    expiresAt: Date
+  }
+}
+
+// Where the editor shows a preview, under the app's origin: what the MCP links
+// to, and the route the editor declares.
+export function getPreviewPath(previewId: string): string {
+  return `/preview/${encodeURIComponent(previewId)}`
+}
 
 // ============================================
 // API Response Types

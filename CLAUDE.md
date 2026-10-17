@@ -67,11 +67,13 @@ generating a PDF, never by typecheck alone.
    *and* in the export (`packages/backend/src/services/ExportService.ts`). Shared
    geometry, layout and resolution logic belongs in `packages/common/src/rendering/`
    so the two cannot drift. → skill `render-parity`
-2. **The editor shows the authored tree; the export shows the resolved tree.**
-   `resolveShapes()` is called only by `ExportService`. Groups stay nested in
-   the editor, `visibleWhen` conditions are not applied (a shape they would
-   hide with the default values is only faded), a `repeat` group shows one copy.
-   → skill `shape-model`
+2. **The editor shows the authored tree; the export and the preview show the
+   resolved tree.** `resolveShapes()` is called only by `ExportService`: the
+   preview page (`/preview/:id`) draws the pages `ExportService.resolve`
+   returns, and resolves nothing itself. Groups stay nested in the editor,
+   `visibleWhen` conditions are not applied (a shape they would hide with the
+   default values is only faded), a `repeat` group shows one copy, and a
+   variable or a page number is a chip naming it. → skill `shape-model`
 3. **One definition of variable semantics.** `resolveVariable`,
    `isEmptyVariableValue` and `stringifyVariableValue` in
    `packages/common/src/rendering/variables.ts` are the only place that decides

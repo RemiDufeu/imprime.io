@@ -12,7 +12,7 @@
  * substitute one from another font where the PDF cannot.
  */
 
-import type { CustomText, ListType, Paragraph, TextFormatting, VariableElement } from '../types.js'
+import type { ListType, Paragraph, TextFormatting, TextRun } from '../types.js'
 import { getParagraphStyle, parseFontSize } from './pageContentStyles.js'
 
 // Deepest nesting level; levels run from 0 to this.
@@ -127,11 +127,12 @@ export function getListMarkers(paragraphes: Paragraph[]): (ListMarker | null)[] 
 
 /**
  * Formatting the marker takes from its item: that of the first run with
- * visible content. Slate keeps an empty text leaf before an inline variable,
- * and its marks say nothing about how the item looks, so it is skipped.
+ * visible content. Slate keeps an empty text leaf before an inline element —
+ * a variable, a page number — and its marks say nothing about how the item
+ * looks, so it is skipped.
  */
 export function getListMarkerFormatting(paragraph: Paragraph): TextFormatting {
-  const isVisible = (child: CustomText | VariableElement) => !('text' in child) || child.text !== ''
+  const isVisible = (child: TextRun) => !('text' in child) || child.text !== ''
   const source = paragraph.children.find(isVisible) ?? paragraph.children[0]
 
   return {
