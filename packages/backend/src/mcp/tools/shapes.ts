@@ -51,7 +51,8 @@ export function registerShapeTools(server: McpServer, ownerId: string): void {
       title: 'Set a page\'s shapes',
       description:
         'Replace every shape of a page with this tree — to draw a page in one call, or write back a page read with ' +
-        'get_template. Groups with a layout are laid out as the editor does. Returns the outline of the page: each ' +
+        'get_template. Groups with a layout are laid out as the editor does — build pages from them rather than ' +
+        'from x and y (see the server instructions, Layout). Returns the outline of the page: each ' +
         'shape\'s id, type and box.',
       inputSchema: {
         templateId: templateIdField,

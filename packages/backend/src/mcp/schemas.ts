@@ -203,7 +203,8 @@ const baseFields = {
   visibleWhen: visibilityConditionSchema.optional()
     .describe('Drawn in the PDF only when this boolean holds. A shape left out takes no room in a layout'),
   grow: lengthSchema.optional()
-    .describe('In a horizontal or vertical group: share of the free space along that axis (CSS flex-grow)'),
+    .describe('In a horizontal or vertical group: share of the free space along that axis (CSS flex-grow), its own ' +
+      'size along it then ignored. Ignored in a group that hugs that axis'),
   rotation: z.number().finite().optional()
     .describe('Degrees, clockwise, about the centre of the box. Drawn only: layouts place the unrotated box'),
 } satisfies SchemaShape<BaseShape>
@@ -328,17 +329,22 @@ const shapeSchemas = {
       .describe('Shapes inside the group, back to front, positioned relative to the group\'s box'),
     layout: enumOf<GroupLayoutDirection>()(['none', 'horizontal', 'vertical', 'stack']).optional()
       .describe('none (unset): children keep their x/y. horizontal/vertical: lined up as a CSS flex row/column, ' +
-        'their x/y computed. stack: laid over each other, each aligned by justify (across) and align (down)'),
+        'their x/y computed — prefer these to placing children by hand (see the server instructions, Layout). ' +
+        'stack: laid over each other, each aligned by justify (horizontally) and align (vertically)'),
     justify: enumOf<GroupJustify>()(['start', 'center', 'end', 'space-between', 'space-around']).optional()
-      .describe('Along the layout axis. Unset is start'),
+      .describe('Along the layout axis — horizontally in a stack. Unset is start. No effect while a child grows: ' +
+        'no room is left to spread'),
     align: enumOf<GroupAlign>()(['start', 'center', 'end', 'stretch']).optional()
-      .describe('Across the layout axis. Unset is start'),
+      .describe('Across the layout axis — vertically in a stack. Unset is start. stretch: each child takes the ' +
+        'group\'s inner size across, a column\'s width or a row\'s height (in a stack, the height only)'),
     gap: lengthSchema.optional().describe('Space between laid-out children'),
     padding: sidesSchema.optional().describe('Space between the group\'s edge and its laid-out children'),
     hug: z.boolean().optional()
       .describe('horizontal/vertical only: the group\'s size along its axis is its children\'s, gaps and padding — ' +
-        'it grows with the copies of a repeat'),
-    fill: colorSchema.optional().describe('Background under the children. Unset is transparent'),
+        'it grows with the copies of a repeat. Along that axis only: across, it keeps its own size, so a row does ' +
+        'not grow taller than its height. Its children\'s grow is then ignored'),
+    fill: colorSchema.optional()
+      .describe('Background under the children — a card needs no rectangle behind it. Unset is transparent'),
     repeat: repeatBindingSchema.optional()
       .describe('Draws the group once per item of a list, each copy a sibling placed by the parent\'s layout ' +
         '(stacked downwards in a free-form parent). The editor shows one copy'),
