@@ -135,7 +135,8 @@ await client.addRectangle('674abc123def456', 'page-123', {
   y: 100,
   width: 200,
   height: 100,
-  fill: '#3b82f6' // optional, default: '#3b82f6'
+  fill: '#3b82f6', // optional, default: '#3b82f6'
+  rotation: 15     // optional, degrees clockwise about the centre, default: 0
 })
 ```
 
@@ -148,7 +149,8 @@ await client.addEllipse('674abc123def456', 'page-123', {
   y: 100,
   width: 150,
   height: 150,
-  fill: '#f59e0b' // optional, default: '#f59e0b'
+  fill: '#f59e0b', // optional, default: '#f59e0b'
+  rotation: 15     // optional, degrees clockwise about the centre, default: 0
 })
 ```
 
@@ -171,7 +173,8 @@ Second paragraph',
   align: 'center',         // optional: 'left' | 'center' | 'right' | 'justify', default: 'left'
   lineHeight: 1.15,        // optional, multiplier of the font size, default: 1.5
   verticalAlign: 'middle', // optional: 'top' | 'middle' | 'bottom', default: 'top'
-  list: 'bullet'           // optional: 'bullet' | 'number', makes each line a list item
+  list: 'bullet',          // optional: 'bullet' | 'number', makes each line a list item
+  rotation: -90            // optional, degrees clockwise about the centre, default: 0
 })
 ```
 
@@ -194,6 +197,7 @@ await client.addImage('674abc123def456', 'page-123', {
   crop: { x: 0.25, y: 0, width: 0.5, height: 1 }, // optional, the part shown, in fractions of the image's size; default: all of it
   opacity: 0.8,            // optional, 0 to 1, default: 1
   cornerRadius: 12,        // optional, at most half the box's shorter side, default: 0
+  rotation: 15,            // optional, degrees clockwise about the centre, default: 0
 })
 ```
 
@@ -264,6 +268,18 @@ await client.addShape('674abc123def456', 'page-123', {
     children: [/* text boxes reading itemPath 'name', 'price'… */],
   }],
 })
+```
+
+#### Rotation
+
+Every shape — groups included — takes a `rotation`: degrees, clockwise, about
+the centre of its box. `x`, `y`, `width` and `height` stay those of the
+unrotated box. A rotated group turns its children with it. Rotation is drawn
+only, as CSS's `transform` is: a group's layout places and sizes its children
+by their unrotated boxes, and a hugging group is as large as those.
+
+```typescript
+await client.updateShape('674abc123def456', 'page-123', 'stamp', { rotation: -12 })
 ```
 
 #### `updateShape(templateId, pageId, shapeId, updates)`

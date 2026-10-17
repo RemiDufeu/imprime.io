@@ -118,8 +118,9 @@ those areas, say which other agent should also run.
 
 ### MEDIUM
 
-- Missing `absX`/`absY` handling when moving a shape between parents — position
-  must be re-expressed against the new parent.
+- Moving a shape between parents without `relocateShape` (or
+  `shapeToPage`/`shapeFromPage`) — position and rotation must be re-expressed
+  against the new parent's frame, which a turned group turns.
 - `key={index}` on a shape list; shapes have stable ids.
 - Silent `catch` that neither sets `error` nor logs.
 - A component past ~200 lines, or a slice action doing three unrelated things.

@@ -278,6 +278,7 @@ export class ImprimeClient {
       width: number
       height: number
       fill?: string
+      rotation?: number
     }
   ): Promise<void> {
     const shape: RectangleShape = {
@@ -288,6 +289,7 @@ export class ImprimeClient {
       width: options.width,
       height: options.height,
       fill: options.fill || '#3b82f6',
+      rotation: options.rotation,
     }
     return this.addShape(templateId, pageId, shape)
   }
@@ -304,6 +306,7 @@ export class ImprimeClient {
       width: number
       height: number
       fill?: string
+      rotation?: number
     }
   ): Promise<void> {
     const shape: EllipseShape = {
@@ -314,6 +317,7 @@ export class ImprimeClient {
       width: options.width,
       height: options.height,
       fill: options.fill || '#f59e0b',
+      rotation: options.rotation,
     }
     return this.addShape(templateId, pageId, shape)
   }
@@ -338,6 +342,7 @@ export class ImprimeClient {
       lineHeight?: number
       verticalAlign?: TextVerticalAlign
       list?: ListType
+      rotation?: number
     }
   ): Promise<void> {
     const paragraphes: Paragraph[] = options.text.split('\n').map(line => ({
@@ -361,6 +366,7 @@ export class ImprimeClient {
       width: options.width || 200,
       height: options.height || 50,
       verticalAlign: options.verticalAlign,
+      rotation: options.rotation,
       paragraphes,
     }
     return this.addShape(templateId, pageId, shape)
@@ -457,6 +463,7 @@ export class ImprimeClient {
       crop?: ImageCrop
       opacity?: number
       cornerRadius?: number
+      rotation?: number
     }
   ): Promise<void> {
     const shape: ImageShape = {
@@ -474,6 +481,7 @@ export class ImprimeClient {
       crop: options.crop,
       opacity: options.opacity,
       cornerRadius: options.cornerRadius,
+      rotation: options.rotation,
     }
     return this.addShape(templateId, pageId, shape)
   }

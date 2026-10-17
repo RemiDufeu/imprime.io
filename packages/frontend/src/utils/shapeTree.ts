@@ -1,5 +1,5 @@
-import type { ContainerShape, Shape } from '@imprime/sdk'
-import { isContainerShape } from '@imprime/sdk'
+import type { ContainerShape, Frame, Shape } from '@imprime/sdk'
+import { getContentFrame, isContainerShape, PAGE_FRAME, pointFromPage, shapeFromPage, shapeToPage } from '@imprime/sdk'
 
 // Re-exported so tree helpers and their callers import the guard from one place.
 export { isContainerShape }
@@ -7,30 +7,45 @@ export { isContainerShape }
 export interface ShapeLocation {
   shape: Shape
   parentGroupId: string | null
-  // Absolute top-left of the shape in page coordinates
-  absX: number
-  absY: number
+  // Where the shape's own x/y lie on the page: its parent's content frame,
+  // turned by every enclosing group's rotation. `shapeToPage(shape,
+  // parentFrame)` is the shape as it lies on the page.
+  parentFrame: Frame
 }
 
-// Locate a shape anywhere in the tree along with its parent group and absolute
-// top-left position (needed for hit-testing during drag).
+// Locate a shape anywhere in the tree along with its parent group and the
+// frame its coordinates are in (needed for hit-testing during drag).
 export function findShapeById(
   shapes: Shape[],
   id: string,
   parentGroupId: string | null = null,
-  offX = 0,
-  offY = 0,
+  frame: Frame = PAGE_FRAME,
 ): ShapeLocation | null {
   for (const s of shapes) {
     if (s.id === id) {
-      return { shape: s, parentGroupId, absX: offX + s.x, absY: offY + s.y }
+      return { shape: s, parentGroupId, parentFrame: frame }
     }
     if (isContainerShape(s)) {
-      const found = findShapeById(s.children, id, s.id, offX + s.x, offY + s.y)
+      const found = findShapeById(s.children, id, s.id, getContentFrame(frame, s))
       if (found) return found
     }
   }
   return null
+}
+
+// The frame the children of `groupId` are drawn in — the page's for null, the
+// root. Null when there is no such group.
+export function findContentFrame(shapes: Shape[], groupId: string | null): Frame | null {
+  if (groupId === null) return PAGE_FRAME
+  const loc = findShapeById(shapes, groupId)
+  return loc ? getContentFrame(loc.parentFrame, loc.shape) : null
+}
+
+// `shape`, its coordinates in frame `from`, re-expressed in frame `to` so
+// that it stays where it is on the page, turned as it is: what moving it to
+// another parent takes.
+export function relocateShape<T extends Shape>(shape: T, from: Frame, to: Frame): T {
+  return shapeFromPage(shapeToPage(shape, from), to)
 }
 
 // The containers enclosing a shape, outermost first. Recursive like every other
@@ -156,17 +171,17 @@ export function cloneShapeWithNewIds(shape: Shape): Shape {
   return { ...shape, id: nextId }
 }
 
-// `shapes` with `shape` placed at absolute (x, y), right after `anchorId` in
-// the anchor's container — the page root when there is no anchor or it is
-// not in the tree. Duplicate and paste both put the copy next to its source.
-export function insertNear(shapes: Shape[], shape: Shape, x: number, y: number, anchorId: string | null): Shape[] {
+// `shapes` with `shape` — its x, y and rotation those it has on the page —
+// placed right after `anchorId` in the anchor's container, the page root when
+// there is no anchor or it is not in the tree, and re-expressed there.
+// Duplicate and paste both put the copy next to its source.
+export function insertNear(shapes: Shape[], shape: Shape, anchorId: string | null): Shape[] {
   const anchor = anchorId !== null ? findShapeById(shapes, anchorId) : null
   const parentId = anchor?.parentGroupId ?? null
-  const parent = parentId !== null ? findShapeById(shapes, parentId) : null
   const siblings = getSiblingList(shapes, parentId)
   const anchorIndex = siblings.findIndex(s => s.id === anchorId)
   const index = anchorIndex === -1 ? siblings.length : anchorIndex + 1
-  const placed = { ...shape, x: x - (parent?.absX ?? 0), y: y - (parent?.absY ?? 0) }
+  const placed = shapeFromPage(shape, anchor?.parentFrame ?? PAGE_FRAME)
   return insertShapeAt(shapes, parentId, index, placed)
 }
 
@@ -221,26 +236,35 @@ export function nextShapeName(shapes: Shape[], kind: ShapeKind): string {
   return `${KIND_LABEL[kind]} ${count + 1}`
 }
 
-// Find the innermost container whose absolute bounding box contains (px, py).
-// Skips the shape identified by `excludeId` (used to avoid dropping a group
-// into itself, or a shape into its current parent while dragging).
+// A container found on the page: its children are drawn in `frame`, which is
+// also where its box (0, 0, width, height) lies.
+export interface GroupHit {
+  id: string
+  frame: Frame
+  width: number
+  height: number
+}
+
+// Find the innermost container whose box, turned as it is drawn, contains the
+// page point (px, py). Skips the shape identified by `excludeId` (used to
+// avoid dropping a group into itself, or a shape into its current parent
+// while dragging).
 export function findInnermostGroupAt(
   shapes: Shape[],
   px: number,
   py: number,
   excludeId?: string,
-  offX = 0,
-  offY = 0,
-): { id: string; absX: number; absY: number; width: number; height: number } | null {
+  frame: Frame = PAGE_FRAME,
+): GroupHit | null {
   for (let i = shapes.length - 1; i >= 0; i--) {
     const s = shapes[i]
     if (!isContainerShape(s)) continue
     if (s.id === excludeId) continue
-    const ax = offX + s.x
-    const ay = offY + s.y
-    if (px >= ax && px <= ax + s.width && py >= ay && py <= ay + s.height) {
-      const nested = findInnermostGroupAt(s.children, px, py, excludeId, ax, ay)
-      return nested ?? { id: s.id, absX: ax, absY: ay, width: s.width, height: s.height }
+    const content = getContentFrame(frame, s)
+    const local = pointFromPage(content, { x: px, y: py })
+    if (local.x >= 0 && local.x <= s.width && local.y >= 0 && local.y <= s.height) {
+      const nested = findInnermostGroupAt(s.children, px, py, excludeId, content)
+      return nested ?? { id: s.id, frame: content, width: s.width, height: s.height }
     }
   }
   return null

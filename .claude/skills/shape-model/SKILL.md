@@ -15,7 +15,13 @@ Shape = RectangleShape | EllipseShape | TextBoxShape | ImageShape | GroupShape
 ```
 
 All extend `BaseShape`: `id`, `x`, `y`, `width`, `height`, optional `stroke`,
-`strokeWidth`, `strokeStyle`, `hidden`, `name`, `visibleWhen`.
+`strokeWidth`, `strokeStyle`, `hidden`, `name`, `visibleWhen`, `grow`,
+`rotation`.
+
+`rotation` is degrees, clockwise, about the centre of the box; `x`/`y`/`width`/
+`height` stay the **unrotated** box's. A group turns its children with it.
+Rotation is drawn only, like CSS `transform`: layout and hug read the
+unrotated boxes. All of its geometry is in `common/rendering/rotation.ts`.
 
 `RectangleShape` and `GroupShape` also take `BoxStyle`: `strokeWidths` (one
 border width per side, overriding `strokeWidth`) and `cornerRadius` (a number,
@@ -43,15 +49,24 @@ This is the most common source of off-by-a-parent bugs.
 
 - A shape's `x`/`y` are **relative to its parent container**, or to the page
   when it sits at the root.
-- `SVGGroup` renders `<g transform="translate(x y)">`, so the browser applies
-  the parent offset. Nothing in the editor stores absolute positions.
-- `findShapeById` (`packages/frontend/src/utils/shapeTree.ts`) returns
-  `{ shape, parentGroupId, absX, absY }` — the accumulated absolute position,
-  computed on the way down. Use it whenever you need page-space coordinates.
-- Moving a shape between parents means re-expressing its position:
-  `newX = sourceLoc.absX - targetParentAbs.absX`. `ShapeSlice.moveShape` and
-  `ungroupShape` both do this; copy that pattern rather than inventing another.
-- `resolveShapes` translates everything to page space, once, at export time.
+- `SVGSelectionWrapper` turns a shape with `rotate(r cx cy)` about its box
+  centre, and `SVGGroup` renders `<g transform="translate(x y)">` inside it,
+  so the browser applies the parent's offset and turn. Nothing in the editor
+  stores absolute positions.
+- Because a group can be turned, a parent's coordinate space is a `Frame`
+  (`{ x, y, rotation }`: SVG's `translate(x y) rotate(rotation)`), not an
+  offset. `findShapeById` (`packages/frontend/src/utils/shapeTree.ts`) returns
+  `{ shape, parentGroupId, parentFrame }`, accumulated on the way down with
+  `getContentFrame`. `shapeToPage(shape, parentFrame)` is the shape as it lies
+  on the page; `pointToPage` / `pointFromPage` convert points; a pointer's move
+  is turned by `-parentFrame.rotation` before it is applied to `x`/`y`.
+- Moving a shape between parents means re-expressing it so it stays where it
+  is on the page, turned as it is: `relocateShape(shape, fromFrame, toFrame)`
+  (target frame from `findContentFrame`). `moveShape`, `ungroupShape`, the
+  drop re-parent, drawing into a group, duplicate and paste all go through it
+  or its halves; copy that pattern rather than inventing another.
+- `resolveShapes` brings everything to page space, once, at export time:
+  `flatten` composes each group's rotation into its leaves (`shapeToPage`).
 
 ## Groups, conditions, repeats
 

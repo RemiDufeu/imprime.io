@@ -8,6 +8,7 @@ import {
   DeleteFilled,
   UngroupOutlined,
 } from '@ant-design/icons'
+import { shapeToPage } from '@imprime/sdk'
 import './LayeringToolbar.css'
 import { useCurrentPage, useEditorStore } from '../../../../store/editor/EditorStore'
 import { findShapeById, getSiblingList } from '../../../../utils/shapeTree'
@@ -35,10 +36,12 @@ export default function LayeringToolbar() {
   const loc = currentPage && selectedShapeId ? findShapeById(currentPage.shapes, selectedShapeId) : null
   // The selection's box moves without the selection changing — an undo, a
   // nudge, a group reflowing — and the toolbar has to follow it.
-  const boxX = loc?.absX
-  const boxY = loc?.absY
-  const boxWidth = loc?.shape.width
-  const boxHeight = loc?.shape.height
+  const box = loc ? shapeToPage(loc.shape, loc.parentFrame) : null
+  const boxX = box?.x
+  const boxY = box?.y
+  const boxWidth = box?.width
+  const boxHeight = box?.height
+  const boxRotation = box?.rotation
 
   useEffect(() => {
     if (!selectedShapeId || isDragging || isTransforming) {
@@ -56,8 +59,12 @@ export default function LayeringToolbar() {
 
     const updatePosition = () => {
       const rect = selectionRect.getBoundingClientRect()
+      // A shape turned on its side puts its rotation handle to its right:
+      // clear that too.
+      const handle = document.querySelector(`[data-rotation-handle="${selectedShapeId}"]`)
+      const handleRight = handle?.getBoundingClientRect().right ?? -Infinity
       setPosition({
-        left: rect.right + TOOLBAR_OFFSET,
+        left: Math.max(rect.right, handleRight) + TOOLBAR_OFFSET,
         top: rect.top,
       })
     }
@@ -72,7 +79,7 @@ export default function LayeringToolbar() {
       window.removeEventListener('scroll', handleUpdate, true)
       window.removeEventListener('resize', handleUpdate)
     }
-  }, [selectedShapeId, isDragging, isTransforming, zoom, boxX, boxY, boxWidth, boxHeight])
+  }, [selectedShapeId, isDragging, isTransforming, zoom, boxX, boxY, boxWidth, boxHeight, boxRotation])
 
   if (!position) return null
   if (!loc) return null

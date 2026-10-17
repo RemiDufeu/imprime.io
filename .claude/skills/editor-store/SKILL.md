@@ -250,7 +250,8 @@ and ends the session if it unmounts while active.
 immutable**, rebuilding only the branches it touches:
 
 ```
-findShapeById → { shape, parentGroupId, absX, absY }
+findShapeById → { shape, parentGroupId, parentFrame }
+findContentFrame   relocateShape
 updateShapeById / deleteShapeById / extractShapeById
 insertShape / insertShapeAt / insertNear
 getSiblingList / replaceSiblingList

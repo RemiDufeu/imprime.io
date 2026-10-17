@@ -12,9 +12,10 @@ interface SVGGroupProps {
 
 // The authored group, in the export's order — its background, its children,
 // its border over them — with its children once: a repeated group shows its
-// first copy, the one being edited.
+// first copy, the one being edited. SVGSelectionWrapper has turned it already.
 export function SVGGroup({ shape, readonly = false }: SVGGroupProps) {
-    const { background, border } = getGroupBox({ ...shape, x: 0, y: 0 })
+    // In the group's own coordinates, which its wrapper turns: not twice.
+    const { background, border } = getGroupBox({ ...shape, x: 0, y: 0, rotation: 0 })
 
     return (
         <g transform={`translate(${shape.x} ${shape.y})`}>

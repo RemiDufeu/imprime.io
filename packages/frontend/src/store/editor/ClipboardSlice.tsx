@@ -1,5 +1,5 @@
 import type { Shape, VariableData } from '@imprime/sdk'
-import { rebindVariables } from '@imprime/sdk'
+import { rebindVariables, shapeToPage } from '@imprime/sdk'
 import type { StateCreator } from 'zustand'
 import type { TemplateSlice } from './TemplateSlice'
 import type { PageSlice } from './PageSlice'
@@ -10,8 +10,10 @@ import { COPY_OFFSET, copyName } from './ShapeSlice'
 import { cloneShapeWithNewIds, findShapeById, insertNear } from '../../utils/shapeTree'
 import { selectCurrentPage } from './selectors'
 
-// What the next paste inserts, and where. The position is absolute, so the
-// copy lands in the same place whichever container receives it.
+// What the next paste inserts, and where. The shape is held as it lies on the
+// page — its rotation too, with its parents' — and the position is absolute,
+// so the copy lands in the same place, turned the same way, whichever
+// container receives it.
 export interface Clipboard {
     shape: Shape
     x: number
@@ -68,10 +70,11 @@ export const createClipboardSlice: StateCreator<
         const page = selectCurrentPage(get())
         const loc = page ? findShapeById(page.shapes, id) : null
         if (!loc) return false
+        const onPage = shapeToPage(loc.shape, loc.parentFrame)
         set({ clipboard: {
-            shape: shapeOf(loc.shape),
-            x: loc.absX + offset,
-            y: loc.absY + offset,
+            shape: shapeOf(onPage),
+            x: onPage.x + offset,
+            y: onPage.y + offset,
             token: crypto.randomUUID(),
             variables: get().template?.variableData ?? [],
         } })
@@ -93,7 +96,7 @@ export const createClipboardSlice: StateCreator<
             const { clipboard, selectedShapeId, template } = get()
             if (!clipboard || !template) return
             const copy = cloneShapeWithNewIds(bindVariables(clipboard.shape, clipboard.variables, template.variableData ?? []))
-            get()._editPage(shapes => insertNear(shapes, copy, clipboard.x, clipboard.y, selectedShapeId))
+            get()._editPage(shapes => insertNear(shapes, { ...copy, x: clipboard.x, y: clipboard.y }, selectedShapeId))
             get().selectShape(copy.id)
             // The next paste lands one step further, not on top of this one.
             set({ clipboard: { ...clipboard, x: clipboard.x + COPY_OFFSET, y: clipboard.y + COPY_OFFSET } })

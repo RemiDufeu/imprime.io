@@ -1,4 +1,5 @@
 import type { Shape } from '@imprime/sdk'
+import { getRotatedBounds } from '@imprime/sdk'
 import { EyeOutlined, PictureOutlined, RetweetOutlined } from '@ant-design/icons'
 import { useEditorStore } from '../../../store/editor/EditorStore'
 import type { ConditionPreview } from '../../../utils/conditionPreview'
@@ -52,5 +53,7 @@ export function ShapeBadges({ shape, preview }: ShapeBadgesProps) {
         })
     }
 
-    return <CanvasBadges x={shape.x} y={shape.y} badges={badges} />
+    // Over the top-left corner of what the shape covers, turned or not.
+    const { x, y } = getRotatedBounds(shape)
+    return <CanvasBadges x={x} y={y} badges={badges} />
 }

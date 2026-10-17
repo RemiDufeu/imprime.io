@@ -1,5 +1,5 @@
 import type { Shape } from '@imprime/sdk'
-import { DEFAULT_IMAGE_ALIGN, DEFAULT_IMAGE_FIT } from '@imprime/sdk'
+import { DEFAULT_IMAGE_ALIGN, DEFAULT_IMAGE_FIT, shapeFromPage } from '@imprime/sdk'
 import type { StateCreator } from 'zustand'
 import type { TemplateSlice } from './TemplateSlice'
 import type { PageSlice } from './PageSlice'
@@ -148,11 +148,12 @@ export const createToolSlice: StateCreator<
             const shape = drawnShape(selectedTool, page.shapes, x, y, width, height)
 
             // Drawing over a container drops the shape inside it, with the
-            // rect converted into that container's local coordinate space.
+            // rect converted into that container's local coordinate space —
+            // turned against a turned one's, so it stays as it was drawn.
             get()._editPage(shapes => {
                 const parent = findInnermostGroupAt(shapes, x, y)
                 return parent
-                    ? insertShape(shapes, parent.id, { ...shape, x: x - parent.absX, y: y - parent.absY })
+                    ? insertShape(shapes, parent.id, shapeFromPage(shape, parent.frame))
                     : [...shapes, shape]
             })
             get().selectShape(shape.id)
