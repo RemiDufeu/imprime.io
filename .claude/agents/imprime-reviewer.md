@@ -53,8 +53,8 @@ those areas, say which other agent should also run.
 - **A type hole in the only safety net.** `any`, `as` on a domain type,
   `@ts-ignore`, or a `default:` case that swallows a new union member. This repo
   has no tests — the compiler is the test suite. A suppression is acceptable
-  only with the form used in `mcp/tools/exportTemplate.ts`: an upstream
-  issue link and a condition for rechecking it.
+  only with a comment giving an upstream issue link and a condition for
+  rechecking it.
 - **Missing ownership check** on a template-scoped route or MCP tool
   (flag it, then defer detail to `api-surface-reviewer`).
 

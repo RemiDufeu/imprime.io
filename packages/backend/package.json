@@ -30,7 +30,7 @@
     "mongodb": "^6.20.0",
     "mongoose": "^8.9.5",
     "nodemailer": "^10.0.14",
-    "zod": "^3.23.8"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",

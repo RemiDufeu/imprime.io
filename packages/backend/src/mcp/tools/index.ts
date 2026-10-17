@@ -1,9 +1,17 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
-import { registerListTemplates } from './listTemplates.js'
+import { registerTemplateTools } from './templates.js'
+import { registerPageTools } from './pages.js'
+import { registerVariableTools } from './variables.js'
+import { registerShapeTools } from './shapes.js'
+import { registerAssetTools } from './assets.js'
 import { registerExportTemplate } from './exportTemplate.js'
 
 /** `ownerId` : owner of the MCP session (resolved from the API key). */
 export function registerTools(server: McpServer, ownerId: string): void {
-  registerListTemplates(server, ownerId)
+  registerTemplateTools(server, ownerId)
+  registerPageTools(server, ownerId)
+  registerVariableTools(server, ownerId)
+  registerShapeTools(server, ownerId)
+  registerAssetTools(server, ownerId)
   registerExportTemplate(server, ownerId)
 }

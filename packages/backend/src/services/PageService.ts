@@ -3,7 +3,8 @@ import { PageModel } from '../models/Page.js'
 import { VariableDataModel } from '../models/VariableData.js'
 import { isObjectIdString, pageCreateToModel, pageToDTO, pageUpdateToModel, toObjectId } from '../models/mappers.js'
 import type { Shape, Page, PageDTO, PageRepeat, VisibilityCondition } from '@imprime/common'
-import { collectImageIds, isContainerShape } from '@imprime/common'
+import { collectImageIds, isContainerShape, layoutTree } from '@imprime/common'
+import { randomUUID } from 'node:crypto'
 import type { Types } from 'mongoose'
 import type { ImageService } from './ImageService.js'
 import { touchTemplate } from './TemplateService.js'
@@ -49,7 +50,33 @@ function assertPageBindings(data: PageReferences): void {
   }
 }
 
+// The tree with an id on every shape left without one (an empty id): shape
+// ids are the client's, which the server takes over when it builds the tree.
+export function withShapeIds(shapes: Shape[]): Shape[] {
+  return shapes.map(shape => {
+    const id = shape.id || randomUUID()
+    return isContainerShape(shape) ? { ...shape, id, children: withShapeIds(shape.children) } : { ...shape, id }
+  })
+}
+
+function duplicateShapeIds(shapes: Shape[]): string[] {
+  const seen = new Set<string>()
+  const duplicates = new Set<string>()
+  const visit = (list: Shape[]) => {
+    for (const shape of list) {
+      if (seen.has(shape.id)) duplicates.add(shape.id)
+      seen.add(shape.id)
+      if (isContainerShape(shape)) visit(shape.children)
+    }
+  }
+  visit(shapes)
+  return [...duplicates]
+}
+
 export class PageService {
+  // The edit of each page's tree in progress, which the next one waits for.
+  private shapeEdits = new Map<string, Promise<unknown>>()
+
   constructor(private imageService: ImageService) { }
 
   // `ownerId` owns the template (the route checked it): the images its
@@ -152,6 +179,108 @@ export class PageService {
     }
   }
 
+  /**
+   * Rewrites a page's tree from its current one, for callers that edit it on
+   * the server (MCP) rather than send it whole, as the editor does. Returns
+   * the tree written. `edit` may throw to refuse the change.
+   *
+   * One edit at a time per page, so that concurrent edits — an agent's
+   * parallel tool calls — each start from the last one's result. In process
+   * only: the editor's writes are not queued with them.
+   */
+  async editShapes(
+    templateId: string,
+    ownerId: string,
+    pageId: string,
+    edit: (shapes: Shape[]) => Shape[]
+  ): Promise<Shape[]> {
+    const previous = this.shapeEdits.get(pageId) ?? Promise.resolve()
+    const run = previous
+      .catch(() => undefined)
+      .then(() => this.applyShapeEdit(templateId, ownerId, pageId, edit))
+    this.shapeEdits.set(pageId, run)
+    try {
+      return await run
+    } finally {
+      if (this.shapeEdits.get(pageId) === run) this.shapeEdits.delete(pageId)
+    }
+  }
+
+  private async applyShapeEdit(
+    templateId: string,
+    ownerId: string,
+    pageId: string,
+    edit: (shapes: Shape[]) => Shape[]
+  ): Promise<Shape[]> {
+    const page = await PageModel.findOne({
+      _id: toObjectId(pageId),
+      templateId: toObjectId(templateId),
+    }).select('shapes')
+    if (!page) {
+      throw new NotFoundError('Page not found', 'PAGE_NOT_FOUND')
+    }
+
+    // Laid out as the editor's write path does, so that the editor reads the
+    // positions and sizes the export computes.
+    const previous = page.toObject().shapes
+    const shapes = layoutTree(withShapeIds(edit(previous)))
+    const duplicates = duplicateShapeIds(shapes)
+    if (duplicates.length) {
+      throw new ValidationError(
+        'Shape ids must be unique within a page',
+        'DUPLICATE_SHAPE_ID',
+        duplicates.map(id => `"${id}" is the id of more than one shape`)
+      )
+    }
+
+    // An image id the caller cannot draw exports as an empty box, without a
+    // word: refused instead. Only those the edit brings in, so that an image
+    // deleted since does not block every edit of the page.
+    const shown = new Set(collectImageIds(previous))
+    const missing = await this.imageService.findMissing(
+      collectImageIds(shapes).filter(id => !shown.has(id)),
+      ownerId
+    )
+    if (missing.length) {
+      throw new ValidationError(
+        'Unknown images',
+        'IMAGE_NOT_FOUND',
+        missing.map(id => `No image "${id}": upload it first, and use the _id it returns`)
+      )
+    }
+
+    await this.update(templateId, ownerId, pageId, { shapes })
+    return shapes
+  }
+
+  // The template's page ids in their new order.
+  async move(templateId: string, pageId: string, position: number): Promise<string[]> {
+    const pages = await PageModel.find({ templateId: toObjectId(templateId) })
+      .sort({ order: 1 })
+      .select('_id order')
+    const page = pages.find(candidate => candidate._id.toString() === pageId)
+    if (!page) {
+      throw new NotFoundError('Page not found', 'PAGE_NOT_FOUND')
+    }
+    if (!Number.isInteger(position) || position < 0) {
+      throw new ValidationError('position must be a whole number from 0')
+    }
+
+    const others = pages.filter(candidate => candidate !== page)
+    const at = Math.min(position, others.length)
+    const ordered = [...others.slice(0, at), page, ...others.slice(at)]
+    const renumbered = ordered
+      .map((candidate, order) => ({ candidate, order }))
+      .filter(({ candidate, order }) => candidate.order !== order)
+    if (renumbered.length) {
+      await PageModel.bulkWrite(renumbered.map(({ candidate, order }) => ({
+        updateOne: { filter: { _id: candidate._id }, update: { order } },
+      })))
+      await touchTemplate(page.templateId)
+    }
+    return ordered.map(candidate => candidate._id.toString())
+  }
+
   async delete(templateId: string, ownerId: string, pageId: string): Promise<void> {
     const page = await PageModel.findOne({
       _id: toObjectId(pageId),
@@ -159,6 +288,11 @@ export class PageService {
     })
     if (!page) {
       throw new NotFoundError('Page not found', 'PAGE_NOT_FOUND')
+    }
+    // The editor offers no way to delete the last page, and assumes there is
+    // one: no other surface may either.
+    if (await PageModel.countDocuments({ templateId: page.templateId }) <= 1) {
+      throw new ValidationError('A template keeps at least one page', 'LAST_PAGE')
     }
 
     await page.deleteOne()

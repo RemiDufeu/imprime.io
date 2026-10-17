@@ -154,11 +154,14 @@ the session hooks never see these credentials.
 client, 30-minute idle timeout. Tools are registered per session, closed over the
 resolved `ownerId`. → skill `api-surfaces`
 
-**zod is used only here** — the MCP tools define `inputSchema`/`outputSchema` with
-it. Note `import { z } from 'zod/v3'`: the MCP SDK ≥1.23 added Zod v4 support and
-the v3 entry point is what currently type-checks. The same file carries a
-documented `@ts-ignore TS2589` with an upstream issue link; that is the house
-form for a suppression.
+**zod is used only here** — the MCP tools define their `inputSchema` with it,
+from the domain mirror in `mcp/schemas.ts`. Imports are `from 'zod/v3'` (the v3
+API, which zod 4 still ships), and the backend's `zod` must stay the very copy
+the MCP SDK resolves (`npm ls zod`: one version, deduped). With a second copy,
+`registerTool`'s inference compares two declarations of `ZodType`
+structurally: every tool fails with TS2589 and the typecheck runs out of heap.
+That, not an SDK regression, was behind the `@ts-expect-error TS2589` the
+export tool used to carry.
 
 REST routes do **not** use zod. → skill `backend-routes`
 

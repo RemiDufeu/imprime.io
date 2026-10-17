@@ -65,7 +65,18 @@ Imprime exposes an MCP server at `https://imprime.io/api/mcp` (Streamable HTTP t
 }
 ```
 
-Both paths land on the same server and expose the same tools — plug Imprime into your AI agents or chat interfaces and let them generate PDFs on your behalf.
+Both paths land on the same server and expose the same tools — plug Imprime into your AI agents or chat interfaces and let them design templates and generate PDFs on your behalf:
+
+| | Tools |
+|---|---|
+| Templates | `list_templates`, `get_template`, `create_template`, `rename_template`, `delete_template` |
+| Pages | `add_page`, `update_page` (condition, repeat), `move_page`, `delete_page` |
+| Variables | `create_variable`, `update_variable`, `delete_variable` |
+| Shapes | `set_page_shapes`, `add_shapes`, `update_shape`, `delete_shapes` |
+| Assets | `list_fonts`, `upload_image` |
+| Export | `export_template` |
+
+Ask *"Create an A4 invoice template with a customer name and a list of lines, then export it with sample data"* and the agent builds it end to end. Every shape it writes is validated, and groups are laid out exactly as the editor would. Reload the editor to see an agent's changes to a template you have open.
 
 ![MCP](./doc/mcp.png)
 
@@ -75,6 +86,11 @@ Sign in with an email and a password, or with Google, GitHub or Microsoft. The a
 # Roadmap
 
 Imprime is currently under active development. Here are the main planned updates:
+
+## Technical
+- Add technical code on pres
+- Add export / import
+- Add preview mode (use full for mcp)
 
 ## Improve shape
 - Add arrow

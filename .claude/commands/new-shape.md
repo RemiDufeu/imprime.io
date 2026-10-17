@@ -35,6 +35,11 @@ only works if nothing suppresses it with `as` or a `default:` case.
   Containers need neither: `resolveShapes` has already expanded them.
 - Colour-carrying props go through `parseColor`; vector shapes through
   `renderInSvgLayer`.
+- `src/mcp/schemas.ts` — its schema in `shapeSchemas`, written
+  `satisfies SchemaShape<XShape>` with `.describe()` on each field, and in the
+  `discriminatedUnion` list below it. The compiler flags the missing
+  `shapeSchemas` key; the list it does not. Then a line in
+  `mcp/instructions.ts` if agents need to know how it combines with the rest.
 
 ### 3. `packages/sdk`
 

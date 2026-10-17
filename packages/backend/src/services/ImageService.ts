@@ -193,6 +193,17 @@ export class ImageService {
     )
   }
 
+  // Of `ids`, those that are not images of `ownerId`'s: missing, someone
+  // else's, or not ids at all.
+  public async findMissing(ids: string[], ownerId: string): Promise<string[]> {
+    const valid = [...new Set(ids)].filter(isObjectIdString)
+    const found = valid.length
+      ? await ImageModel.find({ _id: { $in: valid }, ownerId }).select('_id')
+      : []
+    const owned = new Set(found.map(image => image._id.toString()))
+    return [...new Set(ids)].filter(id => !owned.has(id))
+  }
+
   // Deleted now, without a grace period: their template, `ownerId`'s, is
   // gone. Those another template shows are kept.
   public async deleteUnused(ids: string[], ownerId: string): Promise<number> {

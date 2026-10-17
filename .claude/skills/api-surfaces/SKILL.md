@@ -131,11 +131,36 @@ redirect URI; the consent page shows where the access goes from
 `GET /api/oauth-consent/:code` (`AuthService.getOAuthConsent`), never from its
 own URL.
 
-A tool has: a zod `inputSchema` and `outputSchema` with `.describe()` on every
-field (that text is what the agent reads), `assertOwnsTemplate` first,
-`toolError(...)` on failure rather than a thrown exception, and both
-`content` (human-readable) and `structuredContent` (machine-readable) on success.
-`exportTemplate.ts` is the reference implementation, including the
+The tools cover the whole authoring loop, one file per resource under
+`mcp/tools/` (`templates`, `pages`, `variables`, `shapes`, `assets`, plus
+`exportTemplate`): an agent can create a template, declare its variables, draw
+its pages and export it. A tool has: a zod `inputSchema` with `.describe()` on
+every field (that text is what the agent reads), `assertOwnsTemplate` first,
+`toolError(errorMessage(err))` on failure rather than a thrown exception, and a
+text result an agent can act on — plus an `outputSchema` and `structuredContent`
+when it creates something, so the new ids need no parsing out of prose (only
+`export_template` returns them for anything else). `annotations` say which tools only read and
+which destroy (`destructiveHint`), so a client knows what to confirm.
+`errorMessage` passes on an `AppError`'s message, code and `details` — how an
+agent learns which reference or field to fix — and logs anything else as an
+internal error, as the REST error handler does.
+
+**The domain's zod mirror is `mcp/schemas.ts`**, the only validation a shape
+gets (pages store `shapes` as Mixed). Each object is written
+`z.object({...} satisfies SchemaShape<T>)`, so a field added to or removed from
+a type in `common` fails the typecheck there; enums go through `enumOf`, which
+asks for every member. Reuse its schemas in a tool rather than writing another.
+**`MCP_INSTRUCTIONS`** (`mcp/instructions.ts`) is the authoring guide every
+client receives on connecting: how the pieces combine, which no field schema says.
+
+Shape edits go through `PageService.editShapes`, never a read and a separate
+`update`: it queues edits per page (an agent's parallel calls would otherwise
+lose writes), fills blank shape ids, refuses duplicates and image ids the owner
+has no image for (`IMAGE_NOT_FOUND`, which would export as a blank box), and
+runs `layoutTree` as the editor's write path does. The page rules live in
+`PageService` for every surface: `move`, and `delete` refusing the last page
+(`LAST_PAGE`, which the editor never offers). The editor does not reload, so a page edited
+over MCP while open in the editor is overwritten by its next save.
 
 Binary results are not returned inline: the PDF goes into `pdfDownloadStore`
 and the tool returns a single-use URL with a 10-minute TTL.
@@ -154,8 +179,9 @@ Use `/new-endpoint`. The sites, in order:
 5. `packages/sdk/src/ImprimeClient.ts` — the typed method, in the matching
    `// ===` section.
 6. `packages/frontend/src/api/api.ts` — the wrapper, if the editor needs it.
-7. `packages/backend/src/mcp/tools/` — a tool, if it is useful to an agent, plus
-   registration in `tools/index.ts`.
+7. `packages/backend/src/mcp/tools/` — a tool in its resource's file, if it is
+   useful to an agent, with schemas from `mcp/schemas.ts` (a new domain type
+   gets its mirror there first).
 8. `README.md` — if it changes the documented public API or MCP surface.
 
 ## Related

@@ -242,6 +242,7 @@ export class ImprimeClient {
 
   /**
    * Delete a page from a template. Returns 204 — refetch the template to sync.
+   * Fails with 400 `LAST_PAGE` for the template's only page.
    */
   async deletePage(templateId: string, pageId: string): Promise<void> {
     return this.request<void>(`/templates/${templateId}/pages/${pageId}`, {

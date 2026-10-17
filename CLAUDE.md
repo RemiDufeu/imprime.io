@@ -54,9 +54,8 @@ not "green".
 
 Run `/verify` rather than remembering any of this. Because typecheck is the only
 gate, treat `any`, `as` casts and `@ts-ignore` as holes punched straight through
-the safety net — each one needs a comment saying why (see
-`packages/backend/src/mcp/tools/exportTemplate.ts` for the form: a link to
-the upstream issue and a recheck condition).
+the safety net — each one needs a comment saying why: a link to the upstream
+issue and a recheck condition.
 
 The export path has no static safety at all — `@react-pdf/renderer` accepts
 styles it silently ignores. A change to `ExportService` is verified by

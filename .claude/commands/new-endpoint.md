@@ -48,10 +48,12 @@ The wrapper on `templatesAPI` / `imagesAPI` / `variablesAPI`, if the editor
 uses it. Store slices call these, never `fetch`.
 
 ### 7. `packages/backend/src/mcp/tools/`
-If useful to an agent: zod `inputSchema` and `outputSchema` with `.describe()`
-on every field, `assertOwnsTemplate` first, `toolError(...)` on failure
-instead of throwing, both `content` and `structuredContent` on success, then
-register it in `tools/index.ts`. Never accept an owner id as an argument — the
+If useful to an agent: a tool in its resource's file (`templates.ts`,
+`pages.ts`, `variables.ts`, `shapes.ts`, `assets.ts`), with a zod `inputSchema`
+built from `mcp/schemas.ts` and `.describe()` on every field, `annotations`
+(`readOnlyHint`, `destructiveHint`), `assertOwnsTemplate` first, and
+`toolError(errorMessage(err))` on failure instead of throwing. A shape edit goes
+through `PageService.editShapes`. Never accept an owner id as an argument — the
 tool closes over the `ownerId` from the API key. Large binaries go through
 `pdfDownloadStore` as a single-use URL.
 

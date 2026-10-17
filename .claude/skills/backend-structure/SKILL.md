@@ -112,7 +112,7 @@ Rules:
 | business logic | a method on the service that owns the resource, or a new service wired in `services/index.ts` |
 | a persisted collection | `models/<Name>.ts` + mappers in `models/mappers.ts` |
 | a cross-cutting request concern | `middleware/` |
-| a capability for agents | `mcp/tools/<name>.ts` + registration in `mcp/tools/index.ts` |
+| a capability for agents | a tool in `mcp/tools/<resource>.ts` (registered by that file's `register*Tools`), zod schemas from `mcp/schemas.ts` |
 | a shared error type | `services/errors.ts` |
 | startup/connection config | `config/` |
 | logic the **frontend also needs** | not here at all — `packages/common/` |

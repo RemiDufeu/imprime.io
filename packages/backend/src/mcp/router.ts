@@ -4,6 +4,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js'
 import { registerTools } from './tools/index.js'
+import { MCP_INSTRUCTIONS } from './instructions.js'
 import { authService } from '../services/index.js'
 
 interface SessionMeta {
@@ -153,7 +154,7 @@ export function createMcpRouter(): McpRouter {
       if (transport.sessionId) sessions.delete(transport.sessionId)
     }
 
-    const mcp = new McpServer({ name: 'imprime-mcp', version: '1.0.0' })
+    const mcp = new McpServer({ name: 'imprime-mcp', version: '1.0.0' }, { instructions: MCP_INSTRUCTIONS })
     registerTools(mcp, ownerId)
     await mcp.connect(transport)
 

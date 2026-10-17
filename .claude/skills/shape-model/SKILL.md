@@ -167,11 +167,15 @@ compile errors after you extend the union — which is the point of the union.
    `nextShapeName`; the shape-tree panel icon in `ShapeRow/shapeIcon.tsx`.
 9. `packages/sdk/src/ImprimeClient.ts` — an `addX` helper if it makes sense for
    API users.
-10. No schema migration: `packages/backend/src/models/Page.ts` stores `shapes`
+10. `packages/backend/src/mcp/schemas.ts` — the shape's zod mirror in
+    `shapeSchemas` (the compiler flags the missing key) and in the
+    `discriminatedUnion` list (it does not), so agents can draw it.
+11. No schema migration: `packages/backend/src/models/Page.ts` stores `shapes`
     as `Schema.Types.Mixed`, because Mongoose cannot validate the discriminated
     union. The flip side is that **nothing validates shape payloads at the
-    database boundary** — a malformed shape is persisted happily and only blows
-    up at render time.
+    database boundary** — over REST, a malformed shape is persisted happily and
+    only blows up at render time. The MCP tools parse every shape against
+    `mcp/schemas.ts` first.
 
 ## Related
 
