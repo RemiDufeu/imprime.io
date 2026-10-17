@@ -8,7 +8,7 @@
  * through its own `visibleWhen` and `repeat`.
  */
 
-import type { Page, Paragraph, RepeatBinding, Shape, TextRun, VariableElement, VisibilityCondition } from './types.js'
+import type { Page, Paragraph, RepeatBinding, Shape, TextRun, VariableData, VariableElement, VisibilityCondition } from './types.js'
 import { isContainerShape } from './types.js'
 
 /** Every variable id `shapes` refers to, containers included. */
@@ -110,4 +110,38 @@ function rebindOwnReferences(
     children: shape.children.map(child => rebindVariables(child, rebind, placeholder)),
     repeat: rebindBinding(shape.repeat, rebind),
   }
+}
+
+/**
+ * A shape copied from one template into another — or into the same one — with
+ * its variable references as the target knows them: kept by id, else matched
+ * by name and type (another template's, or one deleted and recreated since),
+ * else dropped, a text run then becoming its name as plain text (see
+ * `rebindVariables`). `dropped` names the variables it lost. The editor's
+ * paste and the MCP's copy_shapes bind alike.
+ */
+export function bindVariables(
+  shape: Shape,
+  from: VariableData[],
+  to: VariableData[]
+): { shape: Shape; dropped: VariableData[] } {
+  const present = new Set(to.map(variable => variable._id))
+  const original = new Map(from.map(variable => [variable._id, variable]))
+  const dropped = new Map<string, VariableData>()
+  const bound = rebindVariables(
+    shape,
+    variableId => {
+      if (present.has(variableId)) return variableId
+      const source = original.get(variableId)
+      const match = source && to.find(variable => variable.name === source.name && variable.type === source.type)
+      if (match) return match._id
+      if (source) dropped.set(source._id, source)
+      return null
+    },
+    run => {
+      const name = original.get(run.variableId)?.name ?? 'variable'
+      return `{${run.itemPath ? `${name}.${run.itemPath}` : name}}`
+    },
+  )
+  return { shape: bound, dropped: [...dropped.values()] }
 }

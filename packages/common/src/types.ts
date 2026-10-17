@@ -426,6 +426,14 @@ export namespace TemplateDTO {
     pages?: Page[]
   }
 
+  // A copy of a template, under new ids, showing the same images. Untitled,
+  // it is the source's title with " (copy)"; with no code, it has none — the
+  // source's is taken.
+  export interface Duplicate {
+    title?: string
+    code?: string
+  }
+
   export interface Response extends Template {}
 
   export interface List {

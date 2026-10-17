@@ -1,5 +1,5 @@
-import type { Shape } from '@imprime/common'
-import { isContainerShape } from '@imprime/common'
+import type { Frame, Shape } from '@imprime/common'
+import { getContentFrame, isContainerShape, PAGE_FRAME, shapeFromPage, shapeToPage } from '@imprime/common'
 import { NotFoundError, ValidationError } from '../services/errors.js'
 
 /**
@@ -57,6 +57,69 @@ export function removeShapes(shapes: Shape[], ids: readonly string[]): Shape[] {
     .filter(shape => !removed.has(shape.id))
     .map(shape => (isContainerShape(shape) ? { ...shape, children: remove(shape.children) } : shape))
   return remove(shapes)
+}
+
+// The frame a shape's own x and y lie in — its parent's content frame, turned
+// by every enclosing group — or null when it is not in the tree.
+function findParentFrame(shapes: Shape[], id: string, frame: Frame = PAGE_FRAME): Frame | null {
+  for (const shape of shapes) {
+    if (shape.id === id) return frame
+    if (isContainerShape(shape)) {
+      const found = findParentFrame(shape.children, id, getContentFrame(frame, shape))
+      if (found) return found
+    }
+  }
+  return null
+}
+
+// The frame the children of group `parentId` lie in; the page's for null.
+function childrenFrame(shapes: Shape[], parentId: string | null): Frame {
+  if (parentId === null) return PAGE_FRAME
+  const parent = getShape(shapes, parentId)
+  if (!isContainerShape(parent)) {
+    throw new ValidationError(`Shape "${parentId}" is a ${parent.type}, not a group`, 'NOT_A_GROUP')
+  }
+  return getContentFrame(findParentFrame(shapes, parentId) ?? PAGE_FRAME, parent)
+}
+
+/**
+ * Shapes `ids`, as they lie on the page — at the place and the turn they have
+ * there, whatever their parents — for a copy or a move to put back there.
+ */
+export function pickOnPage(shapes: Shape[], ids: readonly string[]): Shape[] {
+  return ids.map(id => shapeToPage(getShape(shapes, id), findParentFrame(shapes, id) ?? PAGE_FRAME))
+}
+
+/**
+ * `added`, each as it lies on the page (`pickOnPage`), put among the children
+ * of group `parentId` — the page's for null — before the one at `index`, or
+ * in front when absent, staying where they are on the page. In a group with
+ * a layout, the layout places them anyway.
+ */
+export function placeOnPage(shapes: Shape[], added: Shape[], parentId: string | null, index?: number): Shape[] {
+  const frame = childrenFrame(shapes, parentId)
+  return insertShapes(shapes, parentId, added.map(shape => shapeFromPage(shape, frame)), index)
+}
+
+/**
+ * Shapes `ids` taken out of wherever they are and put, in that order, among
+ * the children of group `parentId` (the page for null) at `index`, staying
+ * where they are on the page. A group cannot go into itself or one of its
+ * own, nor a shape go along with a group that already holds it.
+ */
+export function moveShapes(shapes: Shape[], ids: readonly string[], parentId: string | null, index?: number): Shape[] {
+  const moved = pickOnPage(shapes, ids)
+  for (const shape of moved) {
+    if (!isContainerShape(shape)) continue
+    if (parentId !== null && (shape.id === parentId || findShape(shape.children, parentId))) {
+      throw new ValidationError(`Group "${shape.id}" cannot go into itself or a group of its own`, 'INVALID_MOVE')
+    }
+    const inner = ids.find(id => id !== shape.id && findShape(shape.children, id))
+    if (inner) {
+      throw new ValidationError(`Shape "${inner}" is inside group "${shape.id}", which moves already`, 'INVALID_MOVE')
+    }
+  }
+  return placeOnPage(removeShapes(shapes, ids), moved, parentId, index)
 }
 
 const round = (value: number) => Math.round(value * 10) / 10

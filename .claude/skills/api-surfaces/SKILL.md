@@ -33,7 +33,7 @@ Mounted in `packages/backend/src/server.ts`, all behind `requireAuth`:
 | Mount | Router |
 |---|---|
 | `/api/templates` | `templates.ts`, `pages.ts`, `variables.ts` (three routers, same mount) |
-| `/api/templates` | `templates.ts` also serves `GET /:id/file` and `POST /import` (template files, 50 MB body parsed after auth); `previews.ts`' `templatePreviewsRouter` serves `POST /:id/previews` |
+| `/api/templates` | `templates.ts` also serves `GET /:id/file` and `POST /import` (template files, 50 MB body parsed after auth), and `POST /:id/duplicate` (`TemplateFileService.duplicate`: new ids, the same images, none re-uploaded); `previews.ts`' `templatePreviewsRouter` serves `POST /:id/previews` |
 | `/api/export` | `export.ts` — `/:id/pdf`, and `/code/:code/pdf` by the template's code, looked up among the caller's own |
 | `/api/previews` | `previews.ts` — `GET /:id`, `POST /:id/pdf`, behind `requireOwnsPreview` (the preview's owner and its template's) |
 | `/api/images` | `images.ts` — the uploader's own images (`Image.ownerId`), 500 MB each |
@@ -164,13 +164,18 @@ runs `layoutTree` as the editor's write path does. The page rules live in
 (`LAST_PAGE`, which the editor never offers). The editor does not reload, so a page edited
 over MCP while open in the editor is overwritten by its next save.
 
-Binary results are not returned inline: `preview_template` stores a preview
+The one binary an agent gets inline is a look at its work: `preview_template`
+returns PNG images of the PDF's pages (`seePages`, first 3 by default, 10 at
+most), drawn from the real PDF by pdf.js on `@napi-rs/canvas`
+(`services/pdfRaster.ts`, `ExportService.exportPageImages`, under a render
+slot). The PDF itself is not returned inline: `preview_template` stores a preview
 (`Preview`, a TTL-indexed collection, 24 h) and returns the editor's page for
 it (`getPreviewPath`, under `PUBLIC_APP_URL`). The owner opens it signed in —
 `RequireAuth` sends them back to it after login — and prints from there.
 Template files (export/import) have no tool, deliberately: a file holds its
 images in base64, megabytes in an agent's context, and `get_template` /
-`set_page_shapes` already read and write a whole template.
+`set_page_shapes` already read and write a whole template. `duplicate_template`
+copies one on the server instead, nothing passing through the agent.
 
 ## Adding or changing an endpoint
 

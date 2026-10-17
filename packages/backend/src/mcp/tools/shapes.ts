@@ -1,12 +1,23 @@
 import { z } from 'zod/v3'
 import type { Shape } from '@imprime/common'
+import { bindVariables } from '@imprime/common'
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
-import { pageService } from '../../services/index.js'
-import { withShapeIds } from '../../services/PageService.js'
-import { ValidationError } from '../../services/errors.js'
+import { pageService, templateService } from '../../services/index.js'
+import { withNewShapeIds, withShapeIds } from '../../services/PageService.js'
+import { NotFoundError, ValidationError } from '../../services/errors.js'
 import { assertOwnsTemplate } from '../../middleware/requireOwnsTemplate.js'
 import { formatIssues, isRemovableShapeField, objectIdSchema, shapeSchema } from '../schemas.js'
-import { findShape, getShape, insertShapes, outlineShapes, removeShapes, replaceShape } from '../shapeTree.js'
+import {
+  findShape,
+  getShape,
+  insertShapes,
+  moveShapes,
+  outlineShapes,
+  pickOnPage,
+  placeOnPage,
+  removeShapes,
+  replaceShape,
+} from '../shapeTree.js'
 import { toolError, errorMessage, textResult } from './errors.js'
 
 const templateIdField = objectIdSchema.describe('_id of the template')
@@ -161,6 +172,98 @@ export function registerShapeTools(server: McpServer, ownerId: string): void {
         return textResult(`Deleted ${shapeIds.length} shape(s). Page ${pageId}:\n${outlineShapes(written) || '(empty)'}`)
       } catch (err) {
         return toolError(`Failed to delete the shapes: ${errorMessage(err)}`)
+      }
+    }
+  )
+
+  server.registerTool(
+    'move_shapes',
+    {
+      title: 'Move shapes in the tree',
+      description:
+        'Move shapes into a group, out of one, or to another place among their siblings — which sets their ' +
+        'stacking — on their page, each kept where it is on the page: a group with a layout places it anyway. ' +
+        'To another page, copy_shapes then delete_shapes. Returns the outline of the shapes moved.',
+      inputSchema: {
+        templateId: templateIdField,
+        pageId: pageIdField,
+        shapeIds: z.array(z.string().min(1)).min(1).describe('ids of the shapes, in the order they are to stand'),
+        parentId: z.string().min(1).nullable()
+          .describe('id of the group to put them in; null for the page itself'),
+        index: z.number().int().nonnegative().optional()
+          .describe('0-based place among the parent\'s children once the shapes are taken out. Unset is in front'),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false },
+    },
+    async ({ templateId, pageId, shapeIds, parentId, index }) => {
+      try {
+        await assertOwnsTemplate(templateId, ownerId)
+        const written = await pageService.editShapes(templateId, ownerId, pageId,
+          current => moveShapes(current, shapeIds, parentId, index))
+        return textResult(`Moved:\n${outlineShapes(pickShapes(written, shapeIds))}`)
+      } catch (err) {
+        return toolError(`Failed to move the shapes: ${errorMessage(err)}`)
+      }
+    }
+  )
+
+  server.registerTool(
+    'copy_shapes',
+    {
+      title: 'Copy shapes',
+      description:
+        'Copy shapes, with all they hold, to a page — the same one, another of the template, or one of another of ' +
+        'your templates. The copies get new ids and keep their place on the page (a group with a layout places ' +
+        'them anyway). Their variables become the target template\'s of the same name and type; one it has none ' +
+        'of is dropped, a text run then showing its name. Returns the outline of the copies.',
+      inputSchema: {
+        templateId: objectIdSchema.describe('_id of the template the shapes are on'),
+        pageId: objectIdSchema.describe('_id of the page they are on'),
+        shapeIds: z.array(z.string().min(1)).min(1).describe('ids of the shapes to copy, in the order they are to stand'),
+        toTemplateId: objectIdSchema.optional().describe('_id of the template to copy them to. Unset is the same one'),
+        toPageId: objectIdSchema.describe('_id of the page to copy them to, which may be their own'),
+        parentId: z.string().min(1).optional()
+          .describe('id of a group of the target page to put them in. Unset is the page itself'),
+        index: z.number().int().nonnegative().optional()
+          .describe('0-based place among the parent\'s children. Unset is in front'),
+      },
+      outputSchema: {
+        shapeIds: z.array(z.string()).describe('ids of the copies, in order (not those of their children)'),
+        droppedVariables: z.array(z.string()).describe('Names of the variables the target template has none of'),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false },
+    },
+    async ({ templateId, pageId, shapeIds, toTemplateId, toPageId, parentId, index }) => {
+      try {
+        const targetId = toTemplateId ?? templateId
+        await assertOwnsTemplate(templateId, ownerId)
+        if (targetId !== templateId) await assertOwnsTemplate(targetId, ownerId)
+
+        const source = await templateService.getById(templateId)
+        const page = source.pages.find(candidate => candidate._id === pageId)
+        if (!page) throw new NotFoundError('Page not found', 'PAGE_NOT_FOUND')
+        const target = targetId === templateId ? source : await templateService.getById(targetId)
+
+        const dropped = new Set<string>()
+        const copies = pickOnPage(page.shapes, shapeIds).map(shape => {
+          const bound = bindVariables(shape, source.variableData, target.variableData)
+          for (const variable of bound.dropped) dropped.add(variable.name)
+          return withNewShapeIds(bound.shape)
+        })
+        const copyIds = copies.map(copy => copy.id)
+        const written = await pageService.editShapes(targetId, ownerId, toPageId,
+          current => placeOnPage(current, copies, parentId ?? null, index))
+
+        const droppedText = dropped.size > 0
+          ? `\nThe target template has no variable ${[...dropped].map(name => `"${name}"`).join(', ')}: ` +
+            'the references to it were dropped.'
+          : ''
+        return {
+          ...textResult(`Copied:\n${outlineShapes(pickShapes(written, copyIds))}${droppedText}`),
+          structuredContent: { shapeIds: copyIds, droppedVariables: [...dropped] },
+        }
+      } catch (err) {
+        return toolError(`Failed to copy the shapes: ${errorMessage(err)}`)
       }
     }
   )

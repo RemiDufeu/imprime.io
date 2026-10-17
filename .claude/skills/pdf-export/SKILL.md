@@ -16,7 +16,10 @@ buffer back with download headers (`routes/attachments.ts`, `sendPdf`):
 - `POST /api/previews/:id/pdf`, the PDF a preview shows.
 
 The MCP returns no PDF: `preview_template` makes a preview and links to the
-editor's page for it, from which the owner prints. The resolution half of the
+editor's page for it, from which the owner prints — and returns PNG images of
+the PDF's pages for the agent, drawn by pdf.js on `@napi-rs/canvas`
+(`services/pdfRaster.ts`): react-pdf writes PDF only. The images show the PDF
+as pdf.js reads it, so they are also a quick way to look at an export here. The resolution half of the
 pipeline — `resolveTemplate`, public as `resolve` — is what the preview shows,
 so a preview fails exactly where the PDF would.
 

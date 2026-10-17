@@ -14,7 +14,15 @@ Imprime turns a template — pages of shapes, some bound to variables — into a
 1. create_template (or list_templates / get_template to work on an existing one).
 2. create_variable for every value that changes from one PDF to the next. Note each _id: shapes refer to variables by _id, while values are given by name, to preview_template or to the print API.
 3. Draw each page with set_page_shapes, built from groups with a layout (see Layout); touch it up with add_shapes, update_shape, delete_shapes.
-4. preview_template, with sample values, to check the result, and hand its link to the user: they see the document and print it from there. Its warnings say what did not fit on a page.
+4. Number the pages, when they are to be, with set_page_numbering (see Page numbers).
+5. preview_template, with sample values: it returns images of the PDF's pages. Look at them — shapes overlapping, text cut off or running out of its box, an empty box, a misaligned column — fix what is wrong, and preview again. Then hand its link to the user: they see the document and print it from there. Its warnings say what did not fit on a page.
+
+# Working on what exists
+- duplicate_template copies a whole template, to start a variant without touching it; duplicate_page copies a page right after it, to reuse its layout.
+- get_page reads one page — lighter than get_template on a long document.
+- move_shapes puts shapes into a group, takes them out, or restacks them, each kept where it is on the page: rather than rewriting a group's children.
+- copy_shapes copies shapes to another page, or another template, under new ids; their variables become the target's of the same name and type.
+- get_image gives an uploaded image's natural size: give its box the same proportions, or fit "contain".
 
 # Geometry
 - Every page of a template has the template's page size, in its own units: ${formats}. The PDF page is the same numbers in points.
@@ -44,8 +52,13 @@ Lay content out with groups rather than with x and y: a layout still holds when 
 - fontSize is a CSS length string: "24px". Unset is ${DEFAULT_FONT_SIZE}px; unset fontFamily is ${DEFAULT_FONT}. list_fonts names the families.
 - Text wraps to the box's width and is not measured: make the box tall enough for its longest value, and use a variable's maxLength to bound it.
 - A line break is a new paragraph, never "\\n" in a run.
-- A run { "type": "page-number", "kind": "current" } writes the number of the page it is on, "kind": "total" how many pages there are — both counted in the PDF, after repeated pages are copied and pages whose condition fails are left out: [{ "text": "Page " }, { "type": "page-number", "kind": "current" }, { "text": " of " }, { "type": "page-number", "kind": "total" }]. It takes formatting as text does.
-- To number every page, as a slide number, use set_page_numbering rather than a box on each page: one text box, drawn over every page at the same place. skipFirstPage leaves it off the first page; update_page's hidePageNumber off any other.
+- A run { "type": "page-number", "kind": "current" } writes the number of the page it is on, "kind": "total" how many pages there are, both counted in the PDF (see Page numbers). It takes formatting as text does.
+
+# Page numbers
+- To number the pages — pagination, a number in the footer, "page X of Y" — call set_page_numbering with { "pageNumbering": {} }: the number shows at the bottom right of every page. Never type the numbers, nor draw a box on each page: how many pages a PDF has depends on its data — a repeated page makes one per item, a page whose condition fails is left out — and a typed number is wrong as soon as it does.
+- The numbering is one text box, the template's, drawn over every page at the same place. Change it with set_page_numbering too, the fields you leave out kept: { "box": { "paragraphes": […] } } rewords it, { "box": { "x": …, "y": … } } moves it, fontSize and color go on its runs. "Page 2 of 5" is [{ "text": "Page " }, { "type": "page-number", "kind": "current" }, { "text": " of " }, { "type": "page-number", "kind": "total" }].
+- skipFirstPage: true leaves it off the first page — a cover — which still counts: the next one shows 2. update_page with hidePageNumber: true leaves it off any other page, and off every copy of a repeated one.
+- A page-number run works in any text too — "Page 3" in a heading — counted the same way.
 
 # Variables
 - string: text. boolean: conditions. image: a PNG or JPEG data URL, drawn by an image shape's imageVariable. object-list: a list of objects, whose properties itemFields declares.

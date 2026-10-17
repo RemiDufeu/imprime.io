@@ -96,8 +96,41 @@ export class TemplateFileService {
         formatIssues(parsed.error)
       )
     }
-    const file = parsed.data
+    return await this.build(parsed.data, ownerId, 'upload')
+  }
 
+  /**
+   * A copy of `ownerId`'s template `id` — a template of its own, every
+   * variable and page under a new id — showing the same uploaded images, which
+   * the owner already has: none is uploaded again. Titled `title`, or the
+   * source's with " (copy)"; with `code`, or none, the source's being taken.
+   */
+  public async duplicate(id: string, ownerId: string, options: { title?: string; code?: string }): Promise<Template> {
+    const source = await this.templateService.getById(id)
+    return await this.build({
+      format: TEMPLATE_FILE_FORMAT,
+      version: TEMPLATE_FILE_VERSION,
+      title: options.title ?? `${source.title} (copy)`,
+      ...(options.code !== undefined ? { code: options.code } : {}),
+      pageSize: source.pageSize,
+      ...(source.pageNumbering ? { pageNumbering: source.pageNumbering } : {}),
+      variables: source.variableData,
+      pages: source.pages.map(page => ({
+        shapes: page.shapes,
+        ...(page.visibleWhen ? { visibleWhen: page.visibleWhen } : {}),
+        ...(page.repeat ? { repeat: page.repeat } : {}),
+        ...(page.hidePageNumber ? { hidePageNumber: true } : {}),
+      })),
+      images: {},
+    }, ownerId, 'shared')
+  }
+
+  /**
+   * The template `file` describes, created for `ownerId`. Its images are
+   * uploaded from the file ('upload'), or are the owner's already ('shared'):
+   * a box whose image is neither — deleted since — is left empty.
+   */
+  private async build(file: TemplateFileDTO.File, ownerId: string, images: 'upload' | 'shared'): Promise<Template> {
     // Refused, before anything is written, when the code is taken.
     const template = await this.templateService.create(
       { title: file.title, pageSize: file.pageSize, code: file.code },
@@ -106,10 +139,16 @@ export class TemplateFileService {
     const uploadedImageIds: string[] = []
     try {
       const imageIds = new Map<string, string>()
-      for (const [fileId, image] of Object.entries(file.images)) {
-        const uploaded = await this.imageService.upload(image, ownerId)
-        uploadedImageIds.push(uploaded._id)
-        imageIds.set(fileId, uploaded._id)
+      if (images === 'upload') {
+        for (const [fileId, image] of Object.entries(file.images)) {
+          const uploaded = await this.imageService.upload(image, ownerId)
+          uploadedImageIds.push(uploaded._id)
+          imageIds.set(fileId, uploaded._id)
+        }
+      } else {
+        const shown = [...new Set(file.pages.flatMap(page => collectImageIds(page.shapes)))]
+        const missing = new Set(await this.imageService.findMissing(shown, ownerId))
+        for (const imageId of shown) if (!missing.has(imageId)) imageIds.set(imageId, imageId)
       }
 
       // Created under the ids the pages are rebound to. A reference to a

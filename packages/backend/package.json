@@ -19,6 +19,7 @@
     "@better-auth/api-key": "^1.6.25",
     "@imprime/common": "*",
     "@modelcontextprotocol/sdk": "^1.0.4",
+    "@napi-rs/canvas": "1.0.10",
     "@react-pdf/renderer": "^4.3.2",
     "better-auth": "^1.6.25",
     "cors": "^2.8.5",
@@ -30,6 +31,7 @@
     "mongodb": "^6.20.0",
     "mongoose": "^8.9.5",
     "nodemailer": "^10.0.14",
+    "pdfjs-dist": "6.3.289",
     "zod": "^4.4.3"
   },
   "devDependencies": {

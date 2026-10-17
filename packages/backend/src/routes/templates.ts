@@ -34,6 +34,16 @@ router.post('/import', express.json({ limit: TEMPLATE_FILE_LIMIT }), async (req,
   res.status(201).json(template)
 })
 
+router.post('/:id/duplicate', requireOwnsTemplate, async (req, res) => {
+  const data: TemplateDTO.Duplicate = req.body ?? {}
+  const template = await templateFileService.duplicate(req.params.id, req.user!.id, {
+    // Typed, not checked: a title or a code that is not a string is ignored.
+    title: typeof data.title === 'string' ? data.title : undefined,
+    code: typeof data.code === 'string' ? data.code : undefined,
+  })
+  res.status(201).json(template)
+})
+
 router.get('/:id/file', requireOwnsTemplate, async (req, res) => {
   const file = await templateFileService.exportFile(req.params.id, req.user!.id)
   setAttachmentHeader(res, `${file.title || 'template'}.imprime.json`)

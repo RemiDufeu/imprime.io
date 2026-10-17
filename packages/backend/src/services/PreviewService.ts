@@ -8,7 +8,8 @@ import {
 } from '../models/mappers.js'
 import type { PreviewDTO, VariableValueType } from '@imprime/common'
 import type { TemplateService } from './TemplateService.js'
-import type { ExportResult, ExportService } from './ExportService.js'
+import type { ExportResult, ExportService, PageImagesResult } from './ExportService.js'
+import type { RasterOptions } from './pdfRaster.js'
 import { NotFoundError } from './errors.js'
 
 // How long a preview can be opened: a day, so that a link an agent hands over
@@ -71,6 +72,18 @@ export class PreviewService {
       variableValues: previewValuesFromModel(preview),
     })
     return { ...result, title: template.title }
+  }
+
+  /** Pages of the PDF the preview shows, as PNG images (see `exportPageImages`). */
+  public async getPageImages(id: string, ownerId: string, raster: RasterOptions): Promise<PageImagesResult> {
+    const preview = await this.findLive(id)
+    const template = await this.templateService.getById(preview.templateId.toString())
+    return this.exportService.exportPageImages(
+      template,
+      ownerId,
+      { variableValues: previewValuesFromModel(preview) },
+      raster
+    )
   }
 
   // Not past its date: the TTL monitor deletes an expired preview only on its

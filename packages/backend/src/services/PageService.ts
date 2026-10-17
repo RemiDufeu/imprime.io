@@ -76,6 +76,16 @@ export function withShapeIds(shapes: Shape[]): Shape[] {
   })
 }
 
+// `shape` and every shape inside it under new ids: a copy, which must not
+// share ids with what it was copied from — the editor finds a shape's page by
+// its id.
+export function withNewShapeIds(shape: Shape): Shape {
+  const id = randomUUID()
+  return isContainerShape(shape)
+    ? { ...shape, id, children: shape.children.map(withNewShapeIds) }
+    : { ...shape, id }
+}
+
 function duplicateShapeIds(shapes: Shape[]): string[] {
   const seen = new Set<string>()
   const duplicates = new Set<string>()
@@ -270,6 +280,26 @@ export class PageService {
 
     await this.update(templateId, ownerId, pageId, { shapes })
     return shapes
+  }
+
+  /**
+   * A copy of the page right after it — its shapes under new ids, its
+   * condition, repeat and page number as they are — as the editor duplicates
+   * one.
+   */
+  async duplicate(templateId: string, ownerId: string, pageId: string): Promise<Page> {
+    const page = await PageModel.findOne({ _id: toObjectId(pageId), templateId: toObjectId(templateId) })
+    if (!page) {
+      throw new NotFoundError('Page not found', 'PAGE_NOT_FOUND')
+    }
+    const source = pageToDTO(page)
+    return this.create(templateId, ownerId, {
+      order: source.order + 1,
+      shapes: source.shapes.map(withNewShapeIds),
+      visibleWhen: source.visibleWhen,
+      repeat: source.repeat,
+      hidePageNumber: source.hidePageNumber,
+    })
   }
 
   // The template's page ids in their new order.

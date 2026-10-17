@@ -1,5 +1,5 @@
 import type { Shape, VariableData } from '@imprime/sdk'
-import { rebindVariables, shapeToPage } from '@imprime/sdk'
+import { bindVariables, shapeToPage } from '@imprime/sdk'
 import type { StateCreator } from 'zustand'
 import type { TemplateSlice } from './TemplateSlice'
 import type { PageSlice } from './PageSlice'
@@ -25,29 +25,6 @@ export interface Clipboard {
     // The variables of the template it was copied from, to bind its
     // references in the one it is pasted into.
     variables: VariableData[]
-}
-
-// A copied shape's variable references, as the template it is pasted into
-// knows them: kept by id, else matched by name and type (a copy from another
-// template, or a variable deleted and recreated since), else dropped — a
-// text run then becomes its name as plain text. The server refuses every save
-// of a page holding an unknown reference, so none may get through.
-function bindVariables(shape: Shape, from: VariableData[], to: VariableData[]): Shape {
-    const present = new Set(to.map(variable => variable._id))
-    const original = new Map(from.map(variable => [variable._id, variable]))
-    return rebindVariables(
-        shape,
-        variableId => {
-            if (present.has(variableId)) return variableId
-            const source = original.get(variableId)
-            if (!source) return null
-            return to.find(variable => variable.name === source.name && variable.type === source.type)?._id ?? null
-        },
-        run => {
-            const name = original.get(run.variableId)?.name ?? 'variable'
-            return `{${run.itemPath ? `${name}.${run.itemPath}` : name}}`
-        },
-    )
 }
 
 /** The editor's own clipboard of shapes; the system clipboard only marks it (see useEditorShortcuts). */
@@ -99,7 +76,9 @@ export const createClipboardSlice: StateCreator<
         pasteShape: () => {
             const { clipboard, selectedShapeId, template } = get()
             if (!clipboard || !template) return
-            const copy = cloneShapeWithNewIds(bindVariables(clipboard.shape, clipboard.variables, template.variableData ?? []))
+            // Bound to this template's variables (see `bindVariables`): the server
+            // refuses every save of a page holding an unknown reference.
+            const copy = cloneShapeWithNewIds(bindVariables(clipboard.shape, clipboard.variables, template.variableData ?? []).shape)
             get()._editPage(shapes => insertNear(shapes, { ...copy, x: clipboard.x, y: clipboard.y }, selectedShapeId))
             get().selectShape(copy.id)
             // The next paste lands one step further, not on top of this one.

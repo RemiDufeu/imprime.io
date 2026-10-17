@@ -2,6 +2,7 @@ import { z } from 'zod/v3'
 import { createFontCatalog, splitDataUrl } from '@imprime/common'
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { fontService, imageService } from '../../services/index.js'
+import { objectIdSchema } from '../schemas.js'
 import { toolError, errorMessage, textResult } from './errors.js'
 
 export function registerAssetTools(server: McpServer, ownerId: string): void {
@@ -57,6 +58,46 @@ export function registerAssetTools(server: McpServer, ownerId: string): void {
         }
       } catch (err) {
         return toolError(`Failed to upload the image: ${errorMessage(err)}`)
+      }
+    }
+  )
+
+  server.registerTool(
+    'get_image',
+    {
+      title: 'Get an image\'s size',
+      description:
+        'The natural size of one of your uploaded images — an image shape\'s imageId — and its type: what an image ' +
+        'box needs to keep the image\'s proportions. Not its data.',
+      inputSchema: { imageId: objectIdSchema.describe('_id of the image') },
+      outputSchema: {
+        imageId: z.string(),
+        width: z.number().describe('Width in pixels'),
+        height: z.number().describe('Height in pixels'),
+        mimeType: z.string(),
+        size: z.number().describe('Size in bytes'),
+        name: z.string().optional().describe('File name it was uploaded with'),
+      },
+      annotations: { readOnlyHint: true },
+    },
+    async ({ imageId }) => {
+      try {
+        // Someone else's image is not found, as one that does not exist.
+        const image = await imageService.getById(imageId, ownerId)
+        const info = {
+          imageId: image._id,
+          width: image.width,
+          height: image.height,
+          mimeType: image.mimeType,
+          size: image.size,
+          ...(image.originalName ? { name: image.originalName } : {}),
+        }
+        return {
+          ...textResult(`Image ${image._id}: ${image.width}×${image.height} px, ${image.mimeType}.`),
+          structuredContent: info,
+        }
+      } catch (err) {
+        return toolError(`Failed to read the image: ${errorMessage(err)}`)
       }
     }
   )

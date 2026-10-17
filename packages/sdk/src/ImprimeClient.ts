@@ -209,6 +209,18 @@ export class ImprimeClient {
   }
 
   /**
+   * A copy of a template, every variable and page under a new id, showing the
+   * same images. Untitled, it is the source's title with " (copy)"; with no
+   * code, it has none. 409 `TEMPLATE_CODE_TAKEN` when one of yours has `code`.
+   */
+  async duplicateTemplate(id: string, options: TemplateDTO.Duplicate = {}): Promise<Template> {
+    return this.request<Template>(`/templates/${id}/duplicate`, {
+      method: 'POST',
+      body: JSON.stringify(options),
+    })
+  }
+
+  /**
    * A template as a file — its pages, variables and images — which
    * `importTemplate` turns back into a template, on this instance or another.
    */

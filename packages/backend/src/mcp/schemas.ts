@@ -374,6 +374,23 @@ export const pageNumberingSchema = z.object({
     .describe('Leave the box off the first page of the PDF, which still counts: the next one shows 2'),
 } satisfies SchemaShape<PageNumbering>).strict()
 
+// The numbering as set_page_numbering takes it: a change to the template's —
+// or to the default box when it has none — rather than a whole numbering, so
+// that turning it on takes nothing. A field of the box left out keeps its value.
+export const pageNumberingChangeSchema = z.object({
+  box: shapeSchemas.text.partial().optional().describe(
+    'Fields of the text box to change, the rest kept: give paragraphes alone to change the text, x and y alone to ' +
+    'move it. Unset keeps the box — or, when the pages are not numbered yet, puts the number alone at the bottom ' +
+    'right corner. Number the page with page-number runs: { "type": "page-number", "kind": "current" } and ' +
+    '{ "type": "page-number", "kind": "total" }'
+  ),
+  skipFirstPage: z.boolean().optional()
+    .describe('Leave the box off the first page of the PDF, which still counts: the next one shows 2. Unset keeps it'),
+}).strict()
+
+// A whole text shape, to check a box once its changes are applied.
+export const textShapeSchema = shapeSchemas.text
+
 // ============================================
 // Template files
 // ============================================

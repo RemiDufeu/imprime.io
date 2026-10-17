@@ -82,12 +82,12 @@ Both paths land on the same server and expose the same tools — plug Imprime in
 
 | | Tools |
 |---|---|
-| Templates | `list_templates`, `get_template`, `create_template`, `update_template` (title, code), `set_page_numbering`, `delete_template` |
-| Pages | `add_page`, `update_page` (condition, repeat, page number), `move_page`, `delete_page` |
+| Templates | `list_templates`, `get_template`, `create_template`, `duplicate_template`, `update_template` (title, code), `set_page_numbering`, `delete_template` |
+| Pages | `get_page`, `add_page`, `duplicate_page`, `update_page` (condition, repeat, page number), `move_page`, `delete_page` |
 | Variables | `create_variable`, `update_variable`, `delete_variable` |
-| Shapes | `set_page_shapes`, `add_shapes`, `update_shape`, `delete_shapes` |
-| Assets | `list_fonts`, `upload_image` |
-| Preview | `preview_template` |
+| Shapes | `set_page_shapes`, `add_shapes`, `update_shape`, `move_shapes`, `copy_shapes`, `delete_shapes` |
+| Assets | `list_fonts`, `upload_image`, `get_image` |
+| Preview | `preview_template` — images of the PDF's pages, for the agent to check its work, and a link for you |
 
 Ask *"Create an A4 invoice template with a customer name and a list of lines, then preview it with sample data"* and the agent builds it end to end, and hands you the link to its preview — open it signed in, and print the PDF from there. Every shape it writes is validated, and groups are laid out exactly as the editor would. Reload the editor to see an agent's changes to a template you have open.
 

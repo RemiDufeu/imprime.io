@@ -1,6 +1,7 @@
 import { z } from 'zod/v3'
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
-import { pageService } from '../../services/index.js'
+import { pageService, templateService } from '../../services/index.js'
+import { NotFoundError } from '../../services/errors.js'
 import { assertOwnsTemplate } from '../../middleware/requireOwnsTemplate.js'
 import { objectIdSchema, pageRepeatSchema, visibilityConditionSchema } from '../schemas.js'
 import { toolError, errorMessage, textResult } from './errors.js'
@@ -118,6 +119,63 @@ export function registerPageTools(server: McpServer, ownerId: string): void {
         return textResult(`Page ${pageId} deleted.`)
       } catch (err) {
         return toolError(`Failed to delete the page: ${errorMessage(err)}`)
+      }
+    }
+  )
+
+  server.registerTool(
+    'get_page',
+    {
+      title: 'Get a page',
+      description:
+        'Read one page — its condition, repeat, page number and full shape tree, the JSON set_page_shapes takes ' +
+        'back — and the template\'s variables by _id, name and type: lighter than get_template on a long document.',
+      inputSchema: { templateId: templateIdField, pageId: pageIdField },
+      annotations: { readOnlyHint: true },
+    },
+    async ({ templateId, pageId }) => {
+      try {
+        await assertOwnsTemplate(templateId, ownerId)
+        const template = await templateService.getById(templateId)
+        const position = template.pages.findIndex(page => page._id === pageId)
+        if (position === -1) throw new NotFoundError('Page not found', 'PAGE_NOT_FOUND')
+        const variables = template.variableData.map(({ _id, name, type }) => ({ _id, name, type }))
+        return textResult(JSON.stringify({
+          page: template.pages[position],
+          position,
+          pageCount: template.pages.length,
+          variables,
+        }))
+      } catch (err) {
+        return toolError(`Failed to read the page: ${errorMessage(err)}`)
+      }
+    }
+  )
+
+  server.registerTool(
+    'duplicate_page',
+    {
+      title: 'Duplicate a page',
+      description:
+        'Add a copy of a page right after it: its shapes under new ids, its condition, repeat and page number as ' +
+        'they are. Returns the copy\'s _id.',
+      inputSchema: { templateId: templateIdField, pageId: pageIdField },
+      outputSchema: {
+        pageId: z.string().describe('_id of the copy'),
+        position: z.number().describe('Its 0-based place among the pages'),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false },
+    },
+    async ({ templateId, pageId }) => {
+      try {
+        await assertOwnsTemplate(templateId, ownerId)
+        const copy = await pageService.duplicate(templateId, ownerId, pageId)
+        return {
+          ...textResult(`Page ${pageId} copied: page ${copy._id}, at position ${copy.order}.`),
+          structuredContent: { pageId: copy._id, position: copy.order },
+        }
+      } catch (err) {
+        return toolError(`Failed to duplicate the page: ${errorMessage(err)}`)
       }
     }
   )

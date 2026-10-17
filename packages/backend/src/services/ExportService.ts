@@ -51,6 +51,7 @@ import {
 } from '@imprime/common'
 import { readImageDataUrl, type ImageService } from './ImageService.js'
 import { dataUrlForReactPdf } from './pdfJpeg.js'
+import { rasterizePdf, type PageImage, type RasterOptions } from './pdfRaster.js'
 import type { FontService } from './FontService.js'
 import { AppError, ValidationError } from './errors.js'
 import { isImportedFontRegistered, registerBuiltinFonts, registerImportedFonts } from '../config/fonts.js'
@@ -64,6 +65,13 @@ export interface RenderOptions {
 
 export interface ExportResult {
   pdf: Buffer
+  warnings: ExportDTO.Warning[]
+}
+
+export interface PageImagesResult {
+  images: PageImage[]
+  // How many pages the PDF has, of which `images` holds those asked for.
+  pageCount: number
   warnings: ExportDTO.Warning[]
 }
 
@@ -789,6 +797,27 @@ export class ExportService {
     ])
 
     return { pdf: pdfBuffer, warnings }
+  }
+
+  /**
+   * Pages of the PDF `exportToPDF` makes, as PNG images: the PDF itself, drawn
+   * by pdf.js — what an agent looks at to check its work. Drawing holds a
+   * render slot of its own, as the render does: it holds the CPU too.
+   */
+  public async exportPageImages(
+    template: Template,
+    ownerId: string,
+    options: RenderOptions,
+    raster: RasterOptions
+  ): Promise<PageImagesResult> {
+    const { pdf, warnings } = await this.exportToPDF(template, ownerId, options)
+    const pageCount = this.resolve(template, options.variableValues || {}).pages.length
+    const release = this.acquireRenderSlot(ownerId)
+    try {
+      return { images: await rasterizePdf(pdf, raster), pageCount, warnings }
+    } finally {
+      release()
+    }
   }
 
   // @react-pdf/renderer does not parse 8-digit hex (#RRGGBBAA) or rgba() — alpha
