@@ -88,6 +88,11 @@ export class TemplateFileService {
    * one another of the owner's templates has refuses the import (409).
    */
   public async importFile(input: unknown, ownerId: string): Promise<Template> {
+    return await this.build(this.parseFile(input), ownerId, 'upload')
+  }
+
+  /** `input` as a template file of the current version, or a ValidationError naming every problem. */
+  public parseFile(input: unknown): TemplateFileDTO.File {
     const parsed = templateFileSchema.safeParse(input)
     if (!parsed.success) {
       throw new ValidationError(
@@ -96,7 +101,7 @@ export class TemplateFileService {
         formatIssues(parsed.error)
       )
     }
-    return await this.build(parsed.data, ownerId, 'upload')
+    return parsed.data
   }
 
   /**

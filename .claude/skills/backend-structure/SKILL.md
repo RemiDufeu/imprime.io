@@ -12,6 +12,9 @@ src/
   server.ts              HTTP wiring, middleware order, mounts, shutdown
   loadEnv.ts             dotenv against the monorepo-root .env — imported first
 
+  assets/
+    tutorial.imprime.json  the template file every new account is given (OnboardingService);
+                           imported as JSON, so esbuild inlines it in dist/server.js
   config/
     database.ts          Mongoose connection
     authDb.ts            raw MongoClient for better-auth
@@ -32,7 +35,7 @@ src/
     index.ts             the singletons, wired here
     TemplateService.ts  PageService.ts  VariableService.ts
     ImageService.ts  FontService.ts  ExportService.ts  AuthService.ts  MailerService.ts
-    SettingsService.ts  PreviewService.ts  TemplateFileService.ts
+    SettingsService.ts  PreviewService.ts  TemplateFileService.ts  OnboardingService.ts
     errors.ts            AppError, NotFoundError, ValidationError, ConflictError
   scripts/
     runAdminCommand.ts     shared runner: connects the auth DB, builds AuthService, sets the exit code

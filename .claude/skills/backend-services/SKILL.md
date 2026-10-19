@@ -11,7 +11,7 @@ The service layer holds all the business logic. It is also the persistence
 boundary — there is no repository layer, services talk to Mongoose models
 directly. → skill `backend-structure`
 
-Eight services, wired once in `services/index.ts`:
+The services, wired once in `services/index.ts`:
 
 | Service | Owns |
 |---|---|
@@ -23,6 +23,7 @@ Eight services, wired once in `services/index.ts`:
 | `AuthService` | the better-auth instance (rebuilt when instance settings change), id resolution, admin promotion, encryption with the auth secret |
 | `MailerService` | optional SMTP, self-disabling when unconfigured |
 | `SettingsService` | the instance settings admins manage (email, single sign-on, access): validation, storage, applying them to `MailerService` and `AuthService` |
+| `OnboardingService` | what a new account starts with: the tutorial file imported for it, from better-auth's `user.create.after` |
 
 ## Class shape
 

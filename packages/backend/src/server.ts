@@ -9,7 +9,7 @@ import { oAuthDiscoveryMetadata, oAuthProtectedResourceMetadata } from 'better-a
 import type { Server as HttpServer } from 'http'
 import { connectDatabase } from './config/database.js'
 import { connectAuthDb, closeAuthDb } from './config/authDb.js'
-import { authService, settingsService } from './services/index.js'
+import { authService, onboardingService, settingsService } from './services/index.js'
 import { CLIENT_IP_HEADER } from './services/AuthService.js'
 import { requireAuth } from './middleware/requireAuth.js'
 import { EXPORT_WARNINGS_HEADER } from '@imprime/common'
@@ -238,6 +238,7 @@ async function startServer() {
     await connectAuthDb()
     await settingsService.load()
     await authService.promoteConfiguredAdmin()
+    onboardingService.checkTutorial()
     const httpServer = app.listen(PORT, () => {
       console.log(`Server running on http://localhost:${PORT}`)
     })

@@ -8,6 +8,7 @@ import { apiKey } from '@better-auth/api-key'
 import type { EnabledAuthProviders, OAuthConsentRequest, PasswordPolicy, SsoProvider } from '@imprime/common'
 import { authDb, authMongoClient } from '../config/authDb.js'
 import type { MailerService } from './MailerService.js'
+import type { OnboardingService } from './OnboardingService.js'
 import { NotFoundError } from './errors.js'
 
 function trustedOrigins(): string[] {
@@ -200,12 +201,14 @@ export interface AuthSettings {
 // (`AuthService.applySettings`).
 //
 // `proveAddress` runs when someone shows they hold an account's mailbox
-// (`AuthService.proveAddress`).
+// (`AuthService.proveAddress`), `welcome` once an account is created
+// (`OnboardingService.welcome`).
 function buildAuth(
   mailer: MailerService,
   adminEmail: string | undefined,
   settings: AuthSettings,
   proveAddress: (userId: string) => Promise<void>,
+  welcome: (userId: string) => Promise<void>,
 ) {
   const { google, github } = settings.sso
   const microsoft = settings.sso.microsoft
@@ -339,6 +342,14 @@ function buildAuth(
               throw domainNotAllowed()
             }
           },
+          // However the account was created: a sign-up, a first single
+          // sign-on, an administrator. Run once the transaction is committed,
+          // and awaited, so the account's first page already lists the
+          // tutorial; a throw here would fail the sign-up, which
+          // `welcome` never does.
+          after: async (user) => {
+            await welcome(user.id)
+          },
         },
       },
       session: {
@@ -389,7 +400,12 @@ export class AuthService {
   private readonly adminEmail = configuredAdminEmail()
   private built: BuiltAuth
 
-  constructor(private readonly mailer: MailerService) {
+  // Without `onboarding` — the admin commands, which connect the auth database
+  // only — a new account starts empty.
+  constructor(
+    private readonly mailer: MailerService,
+    private readonly onboarding?: OnboardingService,
+  ) {
     // Replaced at startup by the stored settings (`SettingsService.load`),
     // before the server takes a request.
     this.built = this.build({
@@ -401,7 +417,13 @@ export class AuthService {
   }
 
   private build(settings: AuthSettings): BuiltAuth {
-    return buildAuth(this.mailer, this.adminEmail, settings, (userId) => this.proveAddress(userId))
+    return buildAuth(
+      this.mailer,
+      this.adminEmail,
+      settings,
+      (userId) => this.proveAddress(userId),
+      async (userId) => { await this.onboarding?.welcome(userId) },
+    )
   }
 
   /** The current instance: read it at each use, it is rebuilt when settings change. */

@@ -53,9 +53,11 @@ function rebindBinding<T extends VisibilityCondition | RepeatBinding>(
   if (!binding?.variableId) return binding
   const variableId = rebind(binding.variableId)
   if (variableId === binding.variableId) return binding
-  return variableId !== null
-    ? { ...binding, variableId }
-    : { ...binding, variableId: undefined, itemPath: undefined }
+  if (variableId !== null) return { ...binding, variableId }
+  const unbound = { ...binding }
+  delete unbound.variableId
+  delete unbound.itemPath
+  return unbound
 }
 
 /**
@@ -63,6 +65,11 @@ function rebindBinding<T extends VisibilityCondition | RepeatBinding>(
  * replaces the reference; null drops it: an image box is left unbound, a
  * condition or a repeat is left without a variable (see `rebindBinding`), and
  * a text run becomes plain text, `placeholder(run)`, in the run's formatting.
+ *
+ * A field the shape lacks, or loses, is left out, never set to undefined: the
+ * server stores the tree as it is (template import, duplicate, copy_shapes),
+ * and MongoDB writes an undefined field as null — a group with `repeat: null`
+ * shows in the editor as a repeat.
  */
 export function rebindVariables(
   shape: Shape,
@@ -99,16 +106,17 @@ function rebindOwnReferences(
     if (!shape.imageVariable) return shape
     const imageVariable = rebind(shape.imageVariable)
     if (imageVariable === shape.imageVariable) return shape
-    return imageVariable !== null
-      ? { ...shape, imageVariable }
-      : { ...shape, imageVariable: undefined, itemPath: undefined }
+    if (imageVariable !== null) return { ...shape, imageVariable }
+    const { imageVariable: _variable, itemPath: _path, ...unbound } = shape
+    return unbound
   }
 
   if (!isContainerShape(shape)) return shape
+  const repeat = rebindBinding(shape.repeat, rebind)
   return {
     ...shape,
     children: shape.children.map(child => rebindVariables(child, rebind, placeholder)),
-    repeat: rebindBinding(shape.repeat, rebind),
+    ...(repeat ? { repeat } : {}),
   }
 }
 

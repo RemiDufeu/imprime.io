@@ -106,6 +106,13 @@ database** (`SettingsService`, passed in as `AuthSettings`):
   with the code. Microsoft addresses are verified only on the optional claim
   `xms_edov` (`mapProfileToUser`, any tenant): its `email` claim is whatever
   the directory holds (nOAuth);
+- **onboarding**: `user.create.after` gives every new account (sign-up, first
+  single sign-on, an admin's `/admin/create-user`) a copy of the tutorial,
+  `OnboardingService.welcome` importing `src/assets/tutorial.imprime.json`.
+  better-auth runs it after the transaction commits, and awaits it: a throw
+  would fail a request whose account already exists, so `welcome` never
+  throws. The admin commands build `AuthService` without it — they connect
+  the auth database only;
 - **proving an address** — following a verification link
   (`afterEmailVerification`) or a reset link on an unverified account
   (`onPasswordReset`) — marks it verified and revokes the sessions, API keys
