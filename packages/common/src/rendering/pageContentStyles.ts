@@ -11,7 +11,7 @@
  */
 
 import type { CSSProperties } from 'react'
-import type { FontVariant, Paragraph, TextAlign, TextFormatting, TextVerticalAlign } from '../types.js'
+import type { FontVariant, Paragraph, TextAlign, TextFormatting, TextRun, TextVerticalAlign } from '../types.js'
 import { DEFAULT_FONT, FONT_VARIANT_STYLE, type FontCatalog } from '../fonts.js'
 
 // Font size, in px, of a run with no `fontSize`.
@@ -45,6 +45,18 @@ export function getParagraphStyle(paragraph: Paragraph): ParagraphStyle {
       ? lineHeight
       : DEFAULT_LINE_HEIGHT,
   }
+}
+
+/**
+ * The run that stands for the paragraph's formatting: the first one with
+ * visible content. Slate keeps an empty text leaf before an inline element —
+ * a variable, a page number — and its marks say nothing about how the
+ * paragraph looks, so it is skipped. An empty paragraph falls back to its
+ * first run.
+ */
+export function getParagraphLeadRun(paragraph: Paragraph): TextRun | undefined {
+  const isVisible = (child: TextRun) => !('text' in child) || child.text !== ''
+  return paragraph.children.find(isVisible) ?? paragraph.children[0]
 }
 
 /**
@@ -132,6 +144,45 @@ export function getRunTextStyle(node: TextFormatting, catalog: FontCatalog): Run
     textDecoration: getTextDecoration(node),
     textTransform: getTextTransform(node),
   }
+}
+
+export interface ParagraphLeadFace extends RunFontFace {
+  fontSize: number
+}
+
+/**
+ * Face and size a paragraph's lines are set in: those of its lead run
+ * (`getParagraphLeadRun`). The editor draws the paragraph's strut in them, so
+ * that a line is `lineHeight × fontSize` tall as in react-pdf, and the export
+ * places the glyphs in the line from them (`getHalfLeading`).
+ */
+export function getParagraphLeadFace(paragraph: Paragraph, catalog: FontCatalog): ParagraphLeadFace {
+  const lead = getParagraphLeadRun(paragraph)
+  return {
+    ...resolveFontFace(lead ?? {}, catalog),
+    fontSize: parseFontSize(lead?.fontSize),
+  }
+}
+
+/**
+ * Vertical metrics of a face, in em: how far its glyphs reach above the
+ * baseline and below it (`descent` positive).
+ */
+export interface FontVerticalMetrics {
+  ascent: number
+  descent: number
+}
+
+/**
+ * How much lower CSS draws a line's glyphs than react-pdf does, in px. CSS
+ * centres them in the line: the leading — the line height less the face's
+ * ascent and descent — goes half above, half below. react-pdf puts the
+ * baseline one ascent under the top of the line, all the leading below. The
+ * export moves its text down by this much; negative, when the line is shorter
+ * than the glyphs, it moves it up.
+ */
+export function getHalfLeading(lineHeight: number, fontSize: number, metrics: FontVerticalMetrics): number {
+  return (lineHeight - metrics.ascent - metrics.descent) * fontSize / 2
 }
 
 /**

@@ -18,6 +18,9 @@ import type {
   VariableItemField,
   ResolveContext,
   FontCatalog,
+  FontVerticalMetrics,
+  RunFontFace,
+  ParagraphLeadFace,
   DataUrlImage,
   ExportDTO
 } from '@imprime/common'
@@ -36,6 +39,8 @@ import {
   getImageOpacity,
   toImageDataUrl,
   getParagraphStyle,
+  getParagraphLeadFace,
+  getHalfLeading,
   getRunTextStyle,
   resolveFontFace,
   createFontCatalog,
@@ -54,7 +59,7 @@ import { dataUrlForReactPdf } from './pdfJpeg.js'
 import { rasterizePdf, type PageImage, type RasterOptions } from './pdfRaster.js'
 import type { FontService } from './FontService.js'
 import { AppError, ValidationError } from './errors.js'
-import { isImportedFontRegistered, registerBuiltinFonts, registerImportedFonts } from '../config/fonts.js'
+import { isImportedFontRegistered, loadFaceMetrics, registerBuiltinFonts, registerImportedFonts } from '../config/fonts.js'
 import type { Style } from '@react-pdf/types'
 
 registerBuiltinFonts()
@@ -81,12 +86,16 @@ export interface ResolvedTemplate {
 }
 
 // What one export fetched before drawing: images — by image id for an
-// uploaded one, by the data URL itself for an image variable's value — and the
-// fonts its runs can resolve to.
+// uploaded one, by the data URL itself for an image variable's value — the
+// fonts its runs can resolve to, and the vertical metrics of each face a line
+// is set in, by `faceKey`.
 interface RenderAssets {
   images: Map<string, DataUrlImage>
   fonts: FontCatalog
+  faceMetrics: ReadonlyMap<string, FontVerticalMetrics>
 }
+
+const faceKey = (face: RunFontFace) => `${face.fontFamily}|${face.fontWeight}|${face.fontStyle}`
 
 // A render holds the CPU, and the timeout cannot stop one: it only stops
 // waiting for it. How many run at once is capped, overall and per user, so
@@ -278,22 +287,44 @@ export class ExportService {
    * Registers the imported fonts that the runs ask for, and returns the
    * catalog they resolve against. A family that is not imported (or no longer
    * is) is left out and drawn in the default font, as the editor draws it.
+   *
+   * Then loads the metrics of each face a line is set in: a paragraph's lead
+   * face, and a number marker's. `leadingShift` places the glyphs from them.
    */
-  private async loadFonts(resolvedPages: Page[]): Promise<FontCatalog> {
+  private async loadFonts(resolvedPages: Page[]): Promise<Pick<RenderAssets, 'fonts' | 'faceMetrics'>> {
+    const textBoxes = resolvedPages.flatMap(page => page.shapes.filter(shape => shape.type === 'text'))
+
     const families = new Set<string>()
-    for (const page of resolvedPages) {
-      for (const shape of page.shapes) {
-        if (shape.type !== 'text') continue
-        for (const paragraph of shape.paragraphes) {
-          for (const run of paragraph.children) {
-            if (run.fontFamily) families.add(run.fontFamily)
-          }
+    for (const shape of textBoxes) {
+      for (const paragraph of shape.paragraphes) {
+        for (const run of paragraph.children) {
+          if (run.fontFamily) families.add(run.fontFamily)
         }
       }
     }
 
     const imported = await this.fontService.getForExport([...families], isImportedFontRegistered)
-    return createFontCatalog(registerImportedFonts(imported))
+    const fonts = createFontCatalog(registerImportedFonts(imported))
+
+    const faces = new Map<string, RunFontFace>()
+    const addFace = (face: RunFontFace) => faces.set(faceKey(face), face)
+    for (const shape of textBoxes) {
+      const markers = getListMarkers(shape.paragraphes)
+      shape.paragraphes.forEach((paragraph, index) => {
+        addFace(getParagraphLeadFace(paragraph, fonts))
+        if (markers[index]?.kind === 'number') {
+          addFace(resolveFontFace(getListMarkerFormatting(paragraph), fonts))
+        }
+      })
+    }
+
+    const faceMetrics = new Map<string, FontVerticalMetrics>()
+    await Promise.all([...faces].map(async ([key, face]) => {
+      const metrics = await loadFaceMetrics(face)
+      if (metrics) faceMetrics.set(key, metrics)
+    }))
+
+    return { fonts, faceMetrics }
   }
 
   /**
@@ -428,6 +459,22 @@ export class ExportService {
   }
 
   /**
+   * How far down to move text set in `face` so that its glyphs sit in their
+   * lines where the editor's do (`getHalfLeading`). Given as `top`: an offset
+   * from where the node is laid out, which moves the glyphs and leaves what
+   * follows in place. Every face a line is set in had its metrics loaded with
+   * the fonts.
+   */
+  private leadingShift(
+    face: ParagraphLeadFace,
+    lineHeight: number,
+    faceMetrics: RenderAssets['faceMetrics']
+  ): number {
+    const metrics = faceMetrics.get(faceKey(face))
+    return metrics ? getHalfLeading(lineHeight, face.fontSize, metrics) : 0
+  }
+
+  /**
    * A list item: a box padded to the item's text indent, holding the text and,
    * absolutely positioned in that padding, the marker — the geometry
    * `getListLayout` describes, which the editor builds the same way.
@@ -439,7 +486,7 @@ export class ExportService {
     marker: ListMarker,
     marginBottom: number,
     text: React.ReactElement,
-    fonts: FontCatalog
+    { fonts, faceMetrics }: RenderAssets
   ): React.ReactElement {
     const layout = getListLayout(paragraph, style)
     const formatting = getListMarkerFormatting(paragraph)
@@ -465,15 +512,17 @@ export class ExportService {
         }
       })
     } else {
+      // A bullet is centred on the first line by geometry; a number is text,
+      // placed in that line as its own glyphs are.
+      const face = { ...resolveFontFace(formatting, fonts), fontSize: layout.fontSize }
       markerElement = React.createElement(PDFText, {
         key: 'marker',
         fixed: true,
         style: {
           position: 'absolute',
           left: layout.markerLeft,
-          top: 0,
-          ...resolveFontFace(formatting, fonts),
-          fontSize: layout.fontSize,
+          top: this.leadingShift(face, layout.lineHeight, faceMetrics),
+          ...face,
           lineHeight: layout.lineHeight,
           color: color.color,
           opacity: color.opacity,
@@ -488,11 +537,13 @@ export class ExportService {
     }, [text, markerElement])
   }
 
-  private renderTextBox(shape: TextBoxShape, fonts: FontCatalog): React.ReactElement {
+  private renderTextBox(shape: TextBoxShape, assets: RenderAssets): React.ReactElement {
+    const { fonts, faceMetrics } = assets
     const markers = getListMarkers(shape.paragraphes)
 
     const paragraphElements = shape.paragraphes.map((paragraph, pIndex) => {
       const paragraphStyle = getParagraphStyle(paragraph)
+      const top = this.leadingShift(getParagraphLeadFace(paragraph, fonts), paragraphStyle.lineHeight, faceMetrics)
 
       const textSegments = paragraph.children.map((child, cIndex) => {
         // `resolvePages` has replaced every variable and page number with its
@@ -514,17 +565,18 @@ export class ExportService {
         return React.createElement(PDFText, {
           key: pIndex,
           fixed: true,
-          style: { marginBottom, ...paragraphStyle }
+          style: { marginBottom, ...paragraphStyle, top }
         }, textSegments)
       }
 
+      // The text only: the item's box, and the bullet in it, stay in place.
       const text = React.createElement(PDFText, {
         key: 'text',
         fixed: true,
-        style: { ...paragraphStyle }
+        style: { ...paragraphStyle, top }
       }, textSegments)
 
-      return this.renderListItem(pIndex, paragraph, listStyle, marker, marginBottom, text, fonts)
+      return this.renderListItem(pIndex, paragraph, listStyle, marker, marginBottom, text, assets)
     })
 
     // The outer View is the box and places the text vertically; the inner one
@@ -674,7 +726,7 @@ export class ExportService {
       case 'ellipse':
         return this.renderEllipse(shape, pageSize)
       case 'text':
-        return this.renderTextBox(shape, assets.fonts)
+        return this.renderTextBox(shape, assets)
       case 'image':
         return this.renderImage(shape, pageSize, assets.images)
       default:
@@ -778,7 +830,7 @@ export class ExportService {
     for (const [key, image] of images) {
       images.set(key, { ...image, dataUrl: dataUrlForReactPdf(image.dataUrl) })
     }
-    const assets: RenderAssets = { images, fonts }
+    const assets: RenderAssets = { images, ...fonts }
     const pages = resolvedPages.map(page => this.renderPage(page, pageSize, assets))
 
     const doc = React.createElement(Document, {}, pages)

@@ -7,6 +7,8 @@ import {
   importedFontFamilyName,
   type FontDTO,
   type FontVariant,
+  type FontVerticalMetrics,
+  type RunFontFace,
 } from '@imprime/common'
 import type { FontWithFiles } from '../services/FontService.js'
 import { existsSync } from 'node:fs'
@@ -55,6 +57,19 @@ export function registerBuiltinFonts(): void {
   Font.registerHyphenationCallback(word => [word])
 
   builtinFontsRegistered = true
+}
+
+/**
+ * Vertical metrics of a registered face as react-pdf lays text out with them:
+ * read from the fontkit font its registry loads for that face — the `hhea`
+ * ascent and descent — which the render then reuses.
+ */
+export async function loadFaceMetrics(face: RunFontFace): Promise<FontVerticalMetrics | undefined> {
+  const source = Font.getFont(face)
+  await source.load()
+  const font = source.data
+  if (!font) return undefined
+  return { ascent: font.ascent / font.unitsPerEm, descent: -font.descent / font.unitsPerEm }
 }
 
 // Imported fonts registered so far, by registered family name, each as it was

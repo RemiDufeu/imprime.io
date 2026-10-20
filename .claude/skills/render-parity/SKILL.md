@@ -36,7 +36,7 @@ Anything where "the editor and the PDF must agree" is the requirement:
 | `groupLayout.ts` | `distributeMainAxis`, `crossAxisOffset`, `layoutGroupChildren` — the flexbox subset, padding, `stack` |
 | `shapeResolver.ts` | `resolveShapes` — repeats, conditions, group expansion; `getGroupBox` — a group's background and border as rectangles |
 | `variables.ts` | `resolveVariable`, `isConditionMet`, `isEmptyVariableValue`, `stringifyVariableValue` |
-| `pageContentStyles.ts` | text formatting: `getPageContentWrapperStyles` (box, vertical alignment), `getParagraphStyle` (alignment, line height, sanitised), `getTextDecoration`, `getTextTransform`, `parseFontSize`, `DEFAULT_FONT_SIZE`, `DEFAULT_LINE_HEIGHT`, `PARAGRAPH_SPACING` |
+| `pageContentStyles.ts` | text formatting: `getPageContentWrapperStyles` (box, vertical alignment), `getParagraphStyle` (alignment, line height, sanitised), `getParagraphLeadFace` (the face and size a paragraph's lines are set in), `getHalfLeading` (where CSS puts glyphs in their line), `getTextDecoration`, `getTextTransform`, `parseFontSize`, `DEFAULT_FONT_SIZE`, `DEFAULT_LINE_HEIGHT`, `PARAGRAPH_SPACING` |
 | `listStyles.ts` | lists: `getListStyle` (sanitised), `getListMarkers` (numbering), `getListMarkerFormatting`, `getListLayout` / `getBulletBox` (item and marker geometry) |
 
 Everything exported here is re-exported from `packages/common/src/rendering/index.ts`
@@ -148,6 +148,22 @@ Add a layout rule inside `layoutTree` and both sides have it.
   down, so `ExportService.inlineTextStyle` sets the paragraph's line height on
   every run — CSS inherits the multiplier instead, and that is what keeps the
   two in step with mixed font sizes.
+- **The CSS strut.** A CSS line is the union of the runs and an invisible
+  glyph in the paragraph's own font, each centred on its own ascent and
+  descent; react-pdf's line is the tallest run's `fontSize × lineHeight`.
+  `ParagraphElement` draws each `<p>` in its lead run's face and size
+  (`getParagraphLeadFace`) so the strut coincides with the runs. Left to the
+  box's default (Roboto 24px), it made Courier Prime lines ~3px taller per
+  line than in the PDF. A paragraph mixing sizes across lines can still drift.
+- **Leading placement.** CSS splits a line's leading above and below the
+  glyphs; react-pdf puts the baseline at the line's top + ascent, all leading
+  below. `ExportService` moves each paragraph's text (and a number marker)
+  down by `getHalfLeading` with `top`, from the metrics react-pdf itself loaded
+  for the lead face (`loadFaceMetrics`, `hhea`). Exact wherever the browser
+  reads the same `hhea` values — every bundled family on macOS, all but two on
+  Windows, where Chrome reads `usWin*` or `sTypo*`: Roboto (0.2px at 24px) and
+  Crimson Text (up to ~3px at 24px). A bullet is placed by geometry and not
+  moved.
 - **Never give the PDF text a height.** react-pdf truncates (with an ellipsis)
   text taller than the height it is measured against. The text box is an outer
   View with the box height (for vertical alignment) around an *absolute* inner

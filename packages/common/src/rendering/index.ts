@@ -86,6 +86,8 @@ export type { ResolveContext, VariableScope, VariableScopeFrame, ItemFieldIssue 
 export {
   getPageContentWrapperStyles,
   getParagraphStyle,
+  getParagraphLeadFace,
+  getHalfLeading,
   getTextDecoration,
   getTextTransform,
   getVerticalJustify,
@@ -97,7 +99,13 @@ export {
   DEFAULT_LINE_HEIGHT,
   PARAGRAPH_SPACING,
 } from './pageContentStyles.js'
-export type { ParagraphStyle, RunFontFace, RunTextStyle } from './pageContentStyles.js'
+export type {
+  ParagraphStyle,
+  RunFontFace,
+  RunTextStyle,
+  ParagraphLeadFace,
+  FontVerticalMetrics,
+} from './pageContentStyles.js'
 export {
   getListStyle,
   getListMarkers,
