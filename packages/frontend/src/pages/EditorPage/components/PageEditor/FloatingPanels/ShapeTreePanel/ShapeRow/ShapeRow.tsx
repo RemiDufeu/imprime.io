@@ -125,7 +125,9 @@ export function ShapeRow({
                     ['--depth-offset' as string]: `${depth * INDENT_PX}px`,
                 }}
                 draggable={!isRenaming}
-                onClick={() => selectShape(shape.id)}
+                onClick={() => {
+                    if (!isSelected) selectShape(shape.id)
+                }}
                 onDoubleClick={(e) => {
                     e.stopPropagation()
                     setIsRenaming(true)

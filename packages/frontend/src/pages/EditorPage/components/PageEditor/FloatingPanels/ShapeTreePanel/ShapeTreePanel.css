@@ -1,6 +1,6 @@
 .shape-tree-panel {
   height: 100%;
-  width: 260px;
+  width: 310px;
   display: flex;
   flex-direction: column;
   margin: 0 var(--space-s);
