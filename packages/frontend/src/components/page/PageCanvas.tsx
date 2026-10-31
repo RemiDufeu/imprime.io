@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import type { Page } from '@imprime/sdk'
 import { SVGShape } from './svg/SVGShape'
 import { SVGSelectionWrapper } from './svg/SVGSelectionWrapper'
@@ -28,6 +28,32 @@ export function PageCanvas({
     const isDrawing = useEditorStore(state => state.isDrawing)
     const selectedTool = useEditorStore(state => state.selectedTool)
     const pageSize = useEditorStore(selectPageSize)
+    const isDragging = useEditorStore(state => state.dragData !== null)
+    const onDragMove = useEditorStore(state => state.onMouseMove)
+    const onDragEnd = useEditorStore(state => state.onMouseUp)
+
+    // A drag of the selected shape — move, resize, turn — follows the pointer
+    // over the whole document, past the page's edges. One listener for the
+    // page being edited, not one per shape: each would replay the move.
+    useEffect(() => {
+        if (readonly || !isDragging) return
+
+        const handleDocumentMouseMove = (e: MouseEvent) => {
+            onDragMove(e.clientX, e.clientY, e.shiftKey)
+        }
+
+        const handleDocumentMouseUp = () => {
+            onDragEnd()
+        }
+
+        document.addEventListener('mousemove', handleDocumentMouseMove)
+        document.addEventListener('mouseup', handleDocumentMouseUp)
+
+        return () => {
+            document.removeEventListener('mousemove', handleDocumentMouseMove)
+            document.removeEventListener('mouseup', handleDocumentMouseUp)
+        }
+    }, [readonly, isDragging, onDragMove, onDragEnd])
 
     const scale = Math.min(width / pageSize.width, height / pageSize.height)
 

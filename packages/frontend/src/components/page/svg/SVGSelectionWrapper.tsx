@@ -1,7 +1,7 @@
 import type { Shape } from '@imprime/sdk'
 import { getCenter, getRotation, normalizeRotation } from '@imprime/sdk'
 import { theme } from 'antd'
-import { useCallback, useRef, cloneElement, isValidElement, useEffect } from 'react'
+import { useCallback, useRef, cloneElement, isValidElement } from 'react'
 import { useEditorStore } from '../../../store/editor/EditorStore'
 import type { ResizeHandle } from '../../../store/editor/TransformationSlice'
 import { selectCurrentPage } from '../../../store/editor/selectors'
@@ -85,30 +85,6 @@ export function SVGSelectionWrapper({ shape, readonly, children }: SVGSelectionW
     const startDrag = useEditorStore((s) => s.startDrag)
     const startResize = useEditorStore((s) => s.startResize)
     const startRotate = useEditorStore((s) => s.startRotate)
-
-    const dragData = useEditorStore((s) => s.dragData)
-    const onMouseMove = useEditorStore((s) => s.onMouseMove)
-    const onMouseUp = useEditorStore((s) => s.onMouseUp)
-
-    useEffect(() => {
-        if (!dragData) return
-
-        const handleMouseMove = (e: MouseEvent) => {
-            onMouseMove(e.clientX, e.clientY, e.shiftKey)
-        }
-
-        const handleMouseUp = () => {
-            onMouseUp()
-        }
-
-        document.addEventListener('mousemove', handleMouseMove)
-        document.addEventListener('mouseup', handleMouseUp)
-
-        return () => {
-            document.removeEventListener('mousemove', handleMouseMove)
-            document.removeEventListener('mouseup', handleMouseUp)
-        }
-    }, [dragData, onMouseMove, onMouseUp])
 
     const isSelected = selectedShapeId === shape.id
     const showSelection = isSelected && !readonly
