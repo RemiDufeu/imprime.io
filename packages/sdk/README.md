@@ -53,7 +53,7 @@ new ImprimeClient(options?: ImprimeClientOptions)
 
 **Options:**
 - `baseUrl?: string` - Base URL of the Imprime API
-- `timeout?: number` - Request timeout in milliseconds (default: `30000`)
+- `timeout?: number` - Request timeout in milliseconds (default: `30000`). PDF exports are not bound by it: the server answers `408` itself past its own limit, `PDF_RENDER_TIMEOUT_SECONDS` (30 s by default)
 
 ### Template Methods
 
@@ -503,8 +503,10 @@ Limits worth handling:
   cannot be read. That size (`width`, `height`, EXIF orientation applied)
   comes back with the image: it is what `fit`, `align` and `crop` lay it out
   from.
-- **Exports run a few at a time**: 4 on the server, 2 per user. Beyond, an
-  export fails with `429 EXPORT_BUSY`: retry after a short wait.
+- **Exports run a few at a time**: 4 on the server, 2 per user, by default.
+  Beyond, an export waits its turn on the server, up to 10 s; when the queue
+  is full, or the wait runs out, it fails with `429 EXPORT_BUSY`: retry after
+  a short wait.
 - **Image variables take PNG or JPEG data URLs**, nothing else (no URL, no
   image id). An export fails with `400 INVALID_IMAGE_VALUE`, naming the value
   (`albums[0].photos[1].file`), when one is not; an empty value falls back to

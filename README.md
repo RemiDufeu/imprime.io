@@ -16,6 +16,10 @@ The Apache 2.0 licence legally gives you the right to do pretty much anything yo
 
 If Imprime is useful to you, the best way to support the project is to use it, share it, contribute, or simply use the futur official SaaS version.
 
+# Self-hosting
+
+One image, `ghcr.io/remidufeu/imprime`, and a [`docker-compose.yml`](./docker-compose.yml) that runs it with its MongoDB: `docker compose up -d`, with Docker or Coolify. See [Self-hosting](./doc/self-hosting.md).
+
 # Features
 
 ## A full-featured document editor

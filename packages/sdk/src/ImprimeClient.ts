@@ -58,6 +58,11 @@ function parseExportWarnings(header: string | null): ExportDTO.Warning[] {
 
 export interface ImprimeClientOptions {
   baseUrl?: string
+  /**
+   * How long a request may take, in milliseconds (30 000 by default). Not a
+   * PDF export's: the server bounds those itself, answering 408 past its own
+   * limit (`PDF_RENDER_TIMEOUT_SECONDS`).
+   */
   timeout?: number
   /**
    * Clé d'API pour l'accès programmatique (envoyée dans l'en-tête `x-api-key`).
@@ -743,38 +748,32 @@ export class ImprimeClient {
 
   /**
    * POST `body` to an endpoint answering with a PDF, and read the warnings
-   * its header carries.
+   * its header carries. Without `timeout`: the server bounds a render itself,
+   * answering 408 past `PDF_RENDER_TIMEOUT_SECONDS`, and a shorter limit here
+   * would cut short an export it still allows.
    */
   private async requestPdf(
     endpoint: string,
     body: unknown
   ): Promise<{ pdf: Blob; warnings: ExportDTO.Warning[] }> {
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), this.timeout)
+    const response = await fetch(`${this.baseUrl}${endpoint}`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        ...this.authHeaders(),
+      },
+      body: JSON.stringify(body),
+    })
 
-    try {
-      const response = await fetch(`${this.baseUrl}${endpoint}`, {
-        method: 'POST',
-        signal: controller.signal,
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          ...this.authHeaders(),
-        },
-        body: JSON.stringify(body),
-      })
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`HTTP ${response.status}: ${errorText}`)
+    }
 
-      if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(`HTTP ${response.status}: ${errorText}`)
-      }
-
-      return {
-        pdf: await response.blob(),
-        warnings: parseExportWarnings(response.headers.get(EXPORT_WARNINGS_HEADER)),
-      }
-    } finally {
-      clearTimeout(timeoutId)
+    return {
+      pdf: await response.blob(),
+      warnings: parseExportWarnings(response.headers.get(EXPORT_WARNINGS_HEADER)),
     }
   }
 

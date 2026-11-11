@@ -14,7 +14,7 @@ repository's boundaries. You do not write the implementation.
 
 1. **Decide the package first.** Logic both renderers need goes in
    `packages/common/src/rendering/`. Logic only the PDF needs goes in
-   `ExportService`. Logic only the editor needs stays in the frontend. Getting
+   `pdfDocument.ts` (the drawing) or `ExportService` (validation, data). Logic only the editor needs stays in the frontend. Getting
    this wrong is how the two renderers drift.
 2. **Extend the union, then follow the compiler.** Adding a member to `Shape`
    or a field to a DTO makes the type checker enumerate the sites that must

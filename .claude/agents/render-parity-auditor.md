@@ -32,10 +32,10 @@ to `api-surface-reviewer`.
 
 | Editor | Export |
 |---|---|
-| `frontend/src/components/page/svg/SVGRectangle.tsx` | `ExportService.renderRectangle` |
-| `frontend/src/components/page/svg/SVGEllipse.tsx` | `ExportService.renderEllipse` |
-| `frontend/src/components/page/svg/SVGText.tsx` + `TextEditor/` | `ExportService.renderTextBox` + `inlineTextStyle` |
-| `frontend/src/components/page/svg/SVGImage.tsx` | `ExportService.renderImage` |
+| `frontend/src/components/page/svg/SVGRectangle.tsx` | `pdfDocument.renderRectangle` |
+| `frontend/src/components/page/svg/SVGEllipse.tsx` | `pdfDocument.renderEllipse` |
+| `frontend/src/components/page/svg/SVGText.tsx` + `TextEditor/` | `pdfDocument.renderTextBox` + `inlineTextStyle` |
+| `frontend/src/components/page/svg/SVGImage.tsx` | `pdfDocument.renderImage` |
 | `frontend/src/components/page/svg/SVGGroup.tsx` | `resolveShapes` / `flatten` + `getGroupBox` |
 | `DocumentWriteSlice.updatePageShapes` (`layoutTree` on the authored tree) | `resolveShapes` (`layoutTree` on the instantiated tree) |
 
@@ -57,7 +57,7 @@ to `api-surface-reviewer`.
 
 ### HIGH — likely divergence
 
-- Shared-looking logic added to `ExportService` or a `SVG*` component that
+- Shared-looking logic added to `pdfDocument.ts` or a `SVG*` component that
   belongs in `common/rendering` by the test "would the other side need the same
   formula to match?".
 - A geometry change that ignores the export's page clipping
@@ -84,7 +84,7 @@ to `api-surface-reviewer`.
 ```
 [SEVERITY] <short title>
 Editor:  path/to/file.tsx:NN
-Export:  path/to/ExportService.ts:NN
+Export:  path/to/pdfDocument.ts:NN
 Issue:   <one sentence>
 Effect:  <what the user sees — "PDF shows X, editor shows Y">
 Fix:     <concrete change, naming the file the logic should live in>

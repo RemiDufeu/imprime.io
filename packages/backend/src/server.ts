@@ -30,8 +30,24 @@ const __dirname = path.dirname(__filename)
 
 const app = express()
 const PORT = process.env.PORT || 3001
-const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173'
 const IS_PRODUCTION = process.env.NODE_ENV === 'production'
+
+/**
+ * Origins whose pages may call the API with a user's session (CORS_ORIGIN,
+ * comma-separated). Unset, the app's own: in production the server serves the
+ * editor at PUBLIC_APP_URL — an invalid one stops the start below — and in
+ * development Vite's dev server does.
+ */
+function defaultCorsOrigin(): string {
+  if (!IS_PRODUCTION) return 'http://localhost:5173'
+  try {
+    return new URL(process.env.PUBLIC_APP_URL?.trim() ?? '').origin
+  } catch {
+    return ''
+  }
+}
+
+const CORS_ORIGIN = process.env.CORS_ORIGIN?.trim() || defaultCorsOrigin()
 
 if (IS_PRODUCTION && CORS_ORIGIN === '*') {
   throw new Error(

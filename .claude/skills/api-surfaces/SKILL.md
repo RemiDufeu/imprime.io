@@ -167,8 +167,8 @@ over MCP while open in the editor is overwritten by its next save.
 The one binary an agent gets inline is a look at its work: `preview_template`
 returns PNG images of the PDF's pages (`seePages`, first 3 by default, 10 at
 most), drawn from the real PDF by pdf.js on `@napi-rs/canvas`
-(`services/pdfRaster.ts`, `ExportService.exportPageImages`, under a render
-slot). The PDF itself is not returned inline: `preview_template` stores a preview
+(`services/pdfRaster.ts`, `ExportService.exportPageImages`, in the PDF's own
+job on a worker thread). The PDF itself is not returned inline: `preview_template` stores a preview
 (`Preview`, a TTL-indexed collection, 24 h) and returns the editor's page for
 it (`getPreviewPath`, under `PUBLIC_APP_URL`). The owner opens it signed in —
 `RequireAuth` sends them back to it after login — and prints from there.

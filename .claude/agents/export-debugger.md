@@ -19,7 +19,7 @@ already gone; do not guess at react-pdf.
 3. page-edge filter    s.y < pageSize.height && s.x < pageSize.width
 4. fetchImageData       missing image → red placeholder box, logged, not thrown
 5. renderShape          per type; containers never arrive here
-6. renderToBuffer       30s race → AppError(408)
+6. renderToBuffer       race against PDF_RENDER_TIMEOUT_SECONDS (30s) → AppError(408)
 ```
 
 ## Symptom → first suspect
@@ -30,14 +30,15 @@ already gone; do not guess at react-pdf.
 | Repeated block appears once, or not at all | stage 2 — the `repeat` variable resolves to something other than an item list |
 | Content off-page or clipped | stage 3 — repeat copies overflow their parent's fixed box, or stack down a free-form parent — or `renderInSvgLayer` clamping |
 | Colour flat / opacity lost / shape invisible | `parseColor` — 8-digit hex and `rgba()` must be split into colour + opacity |
-| Wrong or fallback font | family not in the catalog: absent from `BUILTIN_FONTS`, or an imported font since deleted or renamed — see `ExportService.loadFonts`; or the fonts directory probe (two depths, dev vs bundled) |
+| Wrong or fallback font | family not in the catalog: absent from `BUILTIN_FONTS`, or an imported font since deleted or renamed — see `pdfDocument.loadFonts`, on the worker; or the fonts directory path (`config/fonts.ts`, right from `src/config/` and `dist/services/` only) |
 | Bold or italic ignored | the family has no file for that face; `resolveFontVariant` falls back to the closest one by design, and the editor shows the same |
 | `Could not resolve font for …` | a style built from the run's marks instead of `resolveFontFace` asked react-pdf for a face the family never registered |
 | Text wraps differently from the editor | expected — browser vs react-pdf metrics. Confirm the box width, not a bug in the code |
 | Text box overflows | it sets `width` but no `height` by design; a substituted variable got longer than authored |
 | Stroke clipped at an edge | `renderInSvgLayer` clamps the layer to the page; the editor does not |
 | Empty page / nothing at all | stage 1 threw, or every shape was `hidden`, or the page has no shapes |
-| 408 | stage 6 — render exceeded 30s |
+| 408 | stage 6 — render exceeded `PDF_RENDER_TIMEOUT_SECONDS` (30s by default) |
+| Request cut before any 408 | not the server: a proxy's read timeout (nginx: 60 s by default) below `PDF_RENDER_TIMEOUT_SECONDS` |
 | Preview link dead | `PREVIEW_NOT_FOUND`: expired (24 h, TTL index), its template deleted, or opened by another account |
 
 ## Process

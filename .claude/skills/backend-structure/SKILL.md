@@ -36,6 +36,8 @@ src/
     TemplateService.ts  PageService.ts  VariableService.ts
     ImageService.ts  FontService.ts  ExportService.ts  AuthService.ts  MailerService.ts
     SettingsService.ts  PreviewService.ts  TemplateFileService.ts  OnboardingService.ts
+    pdfDocument.ts  pdfWorker.ts  pdfRenderPool.ts   the PDF drawn on worker threads
+    pdfRaster.ts  pdfJpeg.ts
     errors.ts            AppError, NotFoundError, ValidationError, ConflictError
   scripts/
     runAdminCommand.ts     shared runner: connects the auth DB, builds AuthService, sets the exit code

@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "esbuild src/server.ts src/scripts/resetAdminPassword.ts src/scripts/demoteOtherAdmins.ts --bundle --platform=node --target=node18 --format=esm --outdir=dist --packages=external",
+    "build": "esbuild src/server.ts src/services/pdfWorker.ts src/scripts/resetAdminPassword.ts src/scripts/demoteOtherAdmins.ts --bundle --platform=node --target=node18 --format=esm --outdir=dist --packages=external",
     "typecheck": "tsc --noEmit",
     "start": "node dist/server.js",
     "admin:reset-password": "node dist/scripts/resetAdminPassword.js",

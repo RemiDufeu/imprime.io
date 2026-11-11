@@ -58,13 +58,13 @@ the safety net — each one needs a comment saying why: a link to the upstream
 issue and a recheck condition.
 
 The export path has no static safety at all — `@react-pdf/renderer` accepts
-styles it silently ignores. A change to `ExportService` is verified by
+styles it silently ignores. A change to the export (`ExportService`, `pdfDocument.ts`) is verified by
 generating a PDF, never by typecheck alone.
 
 ## Invariants
 
 1. **Render parity.** A visual feature exists in the editor (`packages/frontend/src/components/page/svg/`)
-   *and* in the export (`packages/backend/src/services/ExportService.ts`). Shared
+   *and* in the export (`packages/backend/src/services/pdfDocument.ts`). Shared
    geometry, layout and resolution logic belongs in `packages/common/src/rendering/`
    so the two cannot drift. → skill `render-parity`
 2. **The editor shows the authored tree; the export and the preview show the

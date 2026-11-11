@@ -11,7 +11,6 @@ import {
   type RunFontFace,
 } from '@imprime/common'
 import type { FontWithFiles } from '../services/FontService.js'
-import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -23,15 +22,13 @@ import { fileURLToPath } from 'node:url'
  * sides resolve a run through `resolveFontFace` in common.
  */
 
-// Works both in dev (tsx from src/config/) and when bundled by esbuild into
-// dist/server.js (depth differs by one).
+// The same path from src/config/ (dev, tsx) and from dist/services/ — the
+// bundled PDF worker, pdfWorker.js, the only thread that registers fonts —
+// both one directory below the package's. Moving either breaks font loading
+// at runtime, with no compile error.
 function builtinFontsDirectory(): string {
   const here = path.dirname(fileURLToPath(import.meta.url))
-  const candidates = [
-    path.resolve(here, '../../../common/src/assets/fonts'), // dev: src/config/
-    path.resolve(here, '../../common/src/assets/fonts'),    // bundled: dist/
-  ]
-  return candidates.find(p => existsSync(p)) ?? candidates[0]
+  return path.resolve(here, '../../../common/src/assets/fonts')
 }
 
 let builtinFontsRegistered = false
@@ -74,13 +71,14 @@ export async function loadFaceMetrics(face: RunFontFace): Promise<FontVerticalMe
 
 // Imported fonts registered so far, by registered family name, each as it was
 // registered (without the faces whose file was missing). react-pdf's registry
-// is process-wide and cannot drop one family — only clear them all, which an
-// export running meanwhile would not survive — so each version, once
-// registered, stays for the life of the process.
+// belongs to the thread that loads it — a PDF worker's (`pdfDocument.ts`) —
+// and cannot drop one family, only clear them all, so each version, once
+// registered, stays for the life of that worker.
 const registeredImportedFonts = new Map<string, FontDTO.Response>()
 
-export function isImportedFontRegistered(font: FontDTO.Response): boolean {
-  return registeredImportedFonts.has(importedFontFamilyName(font))
+/** Registered family names of the imported fonts this thread holds. */
+export function registeredImportedFontFamilies(): string[] {
+  return [...registeredImportedFonts.keys()]
 }
 
 /**

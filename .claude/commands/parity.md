@@ -21,8 +21,8 @@ different pictures, so this is the one class of bug the gate cannot see.
 
 | Editor | Export |
 |---|---|
-| `svg/SVGRectangle.tsx` | `ExportService.renderRectangle` |
-| `svg/SVGEllipse.tsx` | `ExportService.renderEllipse` |
+| `svg/SVGRectangle.tsx` | `pdfDocument.renderRectangle` |
+| `svg/SVGEllipse.tsx` | `pdfDocument.renderEllipse` |
 | `svg/SVGText.tsx`, `TextEditor/` | `renderTextBox` + `inlineTextStyle` |
 | `svg/SVGImage.tsx` | `renderImage` |
 | `svg/SVGGroup.tsx` | `resolveShapes` / `flatten` + `getGroupBox` |

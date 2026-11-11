@@ -11,8 +11,8 @@ Imprime draws every document twice:
 
 | | Editor | Export |
 |---|---|---|
-| Entry point | `packages/frontend/src/components/page/PageCanvas.tsx` | `packages/backend/src/services/ExportService.ts` |
-| Dispatch | `svg/SVGShape.tsx` → one component per shape type | `renderShape()` → one method per shape type |
+| Entry point | `packages/frontend/src/components/page/PageCanvas.tsx` | `packages/backend/src/services/pdfDocument.ts` (`renderPdf`, on a worker thread) |
+| Dispatch | `svg/SVGShape.tsx` → one component per shape type | `renderShape()` → one function per shape type |
 | Technology | Browser SVG + Slate for text | `@react-pdf/renderer` (`Svg`/`Rect`/`Ellipse`, `View`, `Text`, `Image`) |
 | Input | the **authored** shape tree | the **resolved** shape tree |
 
@@ -60,7 +60,7 @@ Legitimately asymmetric, and must not be forced into `common`:
   PDF (`stringifyVariableValue`). That difference is the product, not a bug.
 - **`@react-pdf/renderer` workarounds** — alpha parsing, `fixed`, per-shape `Svg`
   layers. These exist because of the PDF library, so they live in
-  `ExportService`. → skill `pdf-export`
+  `pdfDocument.ts`. → skill `pdf-export`
 
 ## The authored/resolved asymmetry
 
@@ -116,7 +116,7 @@ Add a layout rule inside `layoutTree` and both sides have it.
    `packages/common/src/rendering/`, export it from `index.ts`.
 2. Editor side: the component under `packages/frontend/src/components/page/svg/`,
    plus the `SVGShape` switch if it is a new type.
-3. Export side: the `render*` method in `ExportService`, plus the `renderShape`
+3. Export side: the `render*` function in `pdfDocument.ts`, plus the `renderShape`
    switch.
 4. If it is a new container type: `resolveShapes` needs an `expand*` case, and
    the editor needs it in `isContainerShape` (defined in `common/src/types.ts`,
@@ -141,11 +141,11 @@ Add a layout rule inside `layoutTree` and both sides have it.
   a font offered in the editor toolbar must be registered for the PDF or it
   silently falls back.
 - **Colour with alpha.** `@react-pdf/renderer` parses neither `#RRGGBBAA` nor
-  `rgba()`; `ExportService.parseColor` splits them into `color` + `opacity`.
+  `rgba()`; `parseColor` (`pdfDocument.ts`) splits them into `color` + `opacity`.
   Any new colour-carrying property must go through it.
 - **Line height is per run in the PDF.** react-pdf multiplies a unitless
   `lineHeight` by the declaring element's own font size and passes the product
-  down, so `ExportService.inlineTextStyle` sets the paragraph's line height on
+  down, so `inlineTextStyle` (`pdfDocument.ts`) sets the paragraph's line height on
   every run — CSS inherits the multiplier instead, and that is what keeps the
   two in step with mixed font sizes.
 - **The CSS strut.** A CSS line is the union of the runs and an invisible
@@ -157,7 +157,7 @@ Add a layout rule inside `layoutTree` and both sides have it.
   line than in the PDF. A paragraph mixing sizes across lines can still drift.
 - **Leading placement.** CSS splits a line's leading above and below the
   glyphs; react-pdf puts the baseline at the line's top + ascent, all leading
-  below. `ExportService` moves each paragraph's text (and a number marker)
+  below. `pdfDocument.ts` moves each paragraph's text (and a number marker)
   down by `getHalfLeading` with `top`, from the metrics react-pdf itself loaded
   for the lead face (`loadFaceMetrics`, `hhea`). Exact wherever the browser
   reads the same `hhea` values — every bundled family on macOS, all but two on

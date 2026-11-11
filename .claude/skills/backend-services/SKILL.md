@@ -19,7 +19,7 @@ The services, wired once in `services/index.ts`:
 | `PageService` | page create/delete, shape writes and their validation |
 | `VariableService` | variable CRUD, name uniqueness, in-use guard |
 | `ImageService` | base64 image storage |
-| `ExportService` | PDF rendering (→ skill `pdf-export`) |
+| `ExportService` | PDF export: validation, resolution, image and font reads; the drawing, and its bounds, are the worker pool's (`pdfRenderPool.ts`, `pdfDocument.ts`) → skill `pdf-export` |
 | `AuthService` | the better-auth instance (rebuilt when instance settings change), id resolution, admin promotion, encryption with the auth secret |
 | `MailerService` | optional SMTP, self-disabling when unconfigured |
 | `SettingsService` | the instance settings admins manage (email, single sign-on, access): validation, storage, applying them to `MailerService` and `AuthService` |

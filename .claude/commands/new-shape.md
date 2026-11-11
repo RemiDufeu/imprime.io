@@ -31,7 +31,7 @@ only works if nothing suppresses it with `as` or a `default:` case.
 
 ### 2. `packages/backend`
 
-- `src/services/ExportService.ts` — a `render*` method and a `renderShape` case.
+- `src/services/pdfDocument.ts` — a `render*` function and a `renderShape` case.
   Containers need neither: `resolveShapes` has already expanded them.
 - Colour-carrying props go through `parseColor`; vector shapes through
   `renderInSvgLayer`.

@@ -168,7 +168,7 @@ compile errors after you extend the union — which is the point of the union.
    is a container, extend `ContainerShape` **and** `isContainerShape`.
 2. `packages/common/src/rendering/` — any geometry both renderers need; a new
    `expand*` branch in `resolveShapes` for a container.
-3. `packages/backend/src/services/ExportService.ts` — a `render*` method and a
+3. `packages/backend/src/services/pdfDocument.ts` — a `render*` function and a
    `renderShape` case. Containers need no case (they never arrive).
 4. `packages/frontend/src/components/page/svg/` — the component, plus the
    `SVGShape` switch.

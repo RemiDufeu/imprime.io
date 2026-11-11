@@ -59,7 +59,9 @@ request itself.
 `helmet` runs with `contentSecurityPolicy: false` and `crossOriginEmbedderPolicy: false`
 — relaxed because the same server serves the built SPA. HSTS is production-only.
 
-`CORS_ORIGIN` accepts a comma-separated list; `'*'` throws at startup in
+`CORS_ORIGIN` accepts a comma-separated list, and defaults to the app's own
+origin — `PUBLIC_APP_URL`'s in production, Vite's dev server otherwise: the
+editor is served same-origin, so nothing else is needed. `'*'` throws at startup in
 production. That check is deliberate — do not soften it.
 
 ## Mongoose 8
@@ -81,6 +83,16 @@ on failure — the server must not come up half-connected. `MONGODB_URI` is read
 better-auth manages its own collections and needs a native client. Only
 `closeAuthDb()` is closed on shutdown; the Mongoose connection is left to
 process exit.
+
+**A replica set is optional.** `connectAuthDb` asks the server (`hello`) whether
+it is a replica set member or a mongos; better-auth's adapter gets
+`transaction: authDbSupportsTransactions()`, so its multi-write operations
+(a sign-up: user, then account) are atomic there and plain writes on a single
+`mongod`, which refuses transactions outright. The flag is false until the
+connection, so the instance must be (re)built after it — `SettingsService.load`
+does, at startup, and the admin commands build `AuthService` once connected.
+The application's own models use no transactions at all (→ skill
+`backend-persistence`).
 
 ## better-auth
 
@@ -109,7 +121,8 @@ database** (`SettingsService`, passed in as `AuthSettings`):
 - **onboarding**: `user.create.after` gives every new account (sign-up, first
   single sign-on, an admin's `/admin/create-user`) a copy of the tutorial,
   `OnboardingService.welcome` importing `src/assets/tutorial.imprime.json`.
-  better-auth runs it after the transaction commits, and awaits it: a throw
+  better-auth runs it after the transaction commits (after the writes, on a
+  server without transactions), and awaits it: a throw
   would fail a request whose account already exists, so `welcome` never
   throws. The admin commands build `AuthService` without it — they connect
   the auth database only;
@@ -176,7 +189,7 @@ REST routes do **not** use zod. → skill `backend-routes`
 
 | Library | Role |
 |---|---|
-| `@react-pdf/renderer` | PDF export (→ skill `pdf-export`) |
+| `@react-pdf/renderer` | PDF export, loaded on worker threads only — never by the server's thread (→ skill `pdf-export`) |
 | `express-rate-limit` | 20 requests / 15 min on `/api/auth` only, `get-session` excepted; keyed on `req.ip`, so behind a proxy `TRUST_PROXY` must be set |
 | `nodemailer` | v10, typed by itself (no `@types/nodemailer`), needs Node 20+. `MailerService`, entirely optional — configured from the SMTP server stored in the database (Administration → Email), `isConfigured` is false without one, and the features that need it turn themselves off. `requireTLS` whenever credentials are sent; account names are escaped and shortened in emails, since whoever signs up chooses them |
 | `dotenv` | loaded by `src/loadEnv.ts`, imported first in `server.ts` |
@@ -193,7 +206,11 @@ Variables with real startup validation: `CORS_ORIGIN` (no `'*'` in production),
 `PUBLIC_APP_URL` (an absolute http(s) URL, required in production: without
 it better-auth builds email links from the request's Host header, so a reset
 asked for with a forged Host mails the token to another site; a warning when
-it is http, since cookies then lose `Secure`). The request log prints paths
+it is http, since cookies then lose `Secure`), `MAX_PDF_RENDERS` and
+`MAX_PDF_RENDERS_PER_USER` (whole numbers of 1 or more; empty means 4 and 2),
+`PDF_RENDER_TIMEOUT_SECONDS` (1 to 300; empty means 30), `PDF_QUEUE_SIZE`
+(0 or more; 10) and `PDF_QUEUE_WAIT_SECONDS` (1 to 300; 10) — all read by
+`config/pdfRendering.ts` when `ExportService` is built. The request log prints paths
 only, never query strings, which carry tokens. Everything else degrades quietly, which is a reason to check
 `.env.example` when adding one.
 
@@ -213,12 +230,28 @@ every other account after `ADMIN_EMAIL` changed.
 
 - dev: `tsx watch src/server.ts`
 - prod: esbuild bundles to `dist/server.js` with `--packages=external`, so
-  `node_modules` is still required at runtime
+  `node_modules` is still required at runtime. The PDF worker is an entry
+  point of its own, `dist/services/pdfWorker.js`: the server starts it as a
+  file, so it cannot be inlined into `server.js`
 - typecheck: `tsc --noEmit`, and it **needs** `NODE_OPTIONS=--max-old-space-size=6144`
+- image: the root `Dockerfile` builds on the build machine's platform
+  (`--platform=$BUILDPLATFORM`) and installs production dependencies on the
+  target's — `@napi-rs/canvas` is native. It copies `packages/backend/dist`
+  whole (the worker with it), `common/dist`, `frontend/dist` and the fonts;
+  a new runtime file outside those is missing from the image with no error at
+  build time. `.github/workflows/docker.yml` publishes it to GHCR for amd64
+  and arm64; `docker-compose.yml` runs it with MongoDB (→ `doc/self-hosting.md`)
 
-The bundle changes the directory depth at runtime, which is why `config/fonts.ts`
-probes two candidate paths for the font directory. Any new runtime file lookup
-has the same problem. → skill `pdf-export`
+The bundle changes the directory depth at runtime: `pdfRenderPool.ts` probes
+for the worker's entry (`./pdfWorker.ts` in dev, `./services/pdfWorker.js`
+beside `server.js`), and `config/fonts.ts` relies on the bundled worker sitting
+in `dist/services/`, as deep as `src/config/`. Any new runtime file lookup has
+the same problem. → skill `pdf-export`
+
+**Worker threads do not inherit tsx.** Its loader stays on the main thread, so
+in dev a worker started on a `.ts` file cannot resolve its `.js` imports.
+`pdfRenderPool.startWorker` starts it from a two-line bootstrap that registers
+`tsx/esm/api` first; built, the entry is JavaScript and starts directly.
 
 ## Related
 

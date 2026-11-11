@@ -6,7 +6,7 @@ import { toNodeHandler } from 'better-auth/node'
 import { admin, mcp } from 'better-auth/plugins'
 import { apiKey } from '@better-auth/api-key'
 import type { EnabledAuthProviders, OAuthConsentRequest, PasswordPolicy, SsoProvider } from '@imprime/common'
-import { authDb, authMongoClient } from '../config/authDb.js'
+import { authDb, authDbSupportsTransactions, authMongoClient } from '../config/authDb.js'
 import type { MailerService } from './MailerService.js'
 import type { OnboardingService } from './OnboardingService.js'
 import { NotFoundError } from './errors.js'
@@ -245,7 +245,10 @@ function buildAuth(
     baseURL: process.env.PUBLIC_APP_URL,
     secret: process.env.BETTER_AUTH_SECRET,
     trustedOrigins: trustedOrigins(),
-    database: mongodbAdapter(authDb, { client: authMongoClient }),
+    // Transactions only where the server takes them: a single mongod refuses
+    // every write in one ("Transaction numbers are only allowed on a replica
+    // set member or mongos"), so they are off unless it is a replica set.
+    database: mongodbAdapter(authDb, { client: authMongoClient, transaction: authDbSupportsTransactions() }),
     advanced: {
       ipAddress: { ipAddressHeaders: [CLIENT_IP_HEADER] },
     },
@@ -407,7 +410,8 @@ export class AuthService {
     private readonly onboarding?: OnboardingService,
   ) {
     // Replaced at startup by the stored settings (`SettingsService.load`),
-    // before the server takes a request.
+    // before the server takes a request — and once the database is connected,
+    // which is when it is known to take transactions or not.
     this.built = this.build({
       requireEmailVerification: false,
       passwordPolicy: 'open',

@@ -37,7 +37,7 @@ administrator's API key: see *Settings Methods* in the
 | `PUBLIC_APP_URL` | Required in production: the server refuses to start without it. The address users open, e.g. `https://imprime.example.com`. SSO callback URLs and the links in emails are built from it. Without it they would be built from each request's `Host` header, which anyone can forge to have a reset link point at their own site. Use `https://`: with `http://`, session cookies lose the `Secure` flag, and the log warns about it. |
 | `CORS_ORIGIN` | Origins allowed to call the API, comma-separated. `*` is refused in production. |
 | `ADMIN_EMAIL` | The administrator's address: see [The administrator](#the-administrator). |
-| `MONGODB_URI` | Where accounts, sessions and settings live. It must be a replica set: see [MongoDB](#mongodb-must-be-a-replica-set). |
+| `MONGODB_URI` | Where accounts, sessions and settings live. A replica set or a single server: see [MongoDB](#mongodb-a-replica-set-or-a-single-server). |
 | `TRUST_PROXY` | The reverse proxies in front of the server: how many (`1` behind a single nginx, Traefik or load balancer), or their addresses (`loopback`, `10.0.0.0/8`). The client's address, which the rate limits key on, is then read from `X-Forwarded-For` past them. Leave it unset when clients connect to the server directly: the header is then ignored, since anyone can write it. `true` is refused for the same reason. |
 
 ## Setting up a new instance
@@ -361,13 +361,22 @@ themselves. A client's name is therefore whatever its author chose.
   to the backend. Test them against a build that the backend serves.
 - There is no change-password screen and no user-management screen yet.
 
-### MongoDB must be a replica set
+### MongoDB: a replica set, or a single server
 
-Account creation runs in a transaction, and MongoDB only allows transactions on
-a replica set. Atlas is one. A single `mongod` must run as a one-member replica
-set: start it with `--replSet rs0`, then run `rs.initiate()` once. Otherwise
-every sign-up fails with
-"Transaction numbers are only allowed on a replica set member or mongos".
+Either works. At startup the server asks MongoDB what it is:
+
+- **A replica set** (Atlas is one) or a sharded cluster: account changes — a
+  sign-up writes the user, then their credentials — run in transactions, all
+  or nothing.
+- **A single `mongod`**: MongoDB refuses transactions there, so they are left
+  off, and the log says so at startup. Everything works; the only difference
+  is that a failure between two writes of a sign-up — the database stopping
+  at that instant — can leave an account half made, whose address then cannot
+  sign up again until it is removed.
+
+To have transactions on a single server, run it as a one-member replica set:
+start `mongod` with `--replSet rs0`, run `rs.initiate()` once, and add
+`?replicaSet=rs0` to `MONGODB_URI`. Nothing else changes.
 
 ### Changing the secret
 

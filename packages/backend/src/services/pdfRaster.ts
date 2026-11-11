@@ -2,13 +2,15 @@ import { createRequire } from 'node:module'
 import path from 'node:path'
 import { createCanvas } from '@napi-rs/canvas'
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
-import { AppError } from './errors.js'
 
 /**
  * Pages of an exported PDF as PNG images — so that an agent can look at what
  * it made: the PDF itself, as react-pdf wrote it, drawn by pdf.js (Mozilla's
  * PDF renderer) on a Node canvas (@napi-rs/canvas, prebuilt, no system
  * library). react-pdf writes PDF only; this is the step from it to pixels.
+ *
+ * Runs on a PDF worker thread, in the job that made the PDF (`pdfDocument.ts`):
+ * the job's timeout terminates the worker, a drawing in progress with it.
  */
 
 // pdf.js reads the data it may need — the 14 standard fonts, character maps,
@@ -18,13 +20,11 @@ import { AppError } from './errors.js'
 const pdfjsRoot = path.dirname(createRequire(import.meta.url).resolve('pdfjs-dist/package.json'))
 const dataDirectory = (name: string) => `${path.join(pdfjsRoot, name)}/`
 
-// Bounds on what one image costs, whatever the page: a page may be up to 144
+// A bound on what one image costs, whatever the page: a page may be up to 144
 // times taller than wide (MIN_PAGE_DIMENSION by MAX_PAGE_DIMENSION), and
 // 1600 pixels across would make it a canvas of over a gigabyte. Neither side
-// exceeds MAX_IMAGE_SIDE — about 64 MB of canvas at most — and a page whose
-// drawing outlasts PAGE_RENDER_TIMEOUT_MS is cancelled, freeing its slot.
+// exceeds MAX_IMAGE_SIDE — about 64 MB of canvas at most.
 const MAX_IMAGE_SIDE = 4096
-const PAGE_RENDER_TIMEOUT_MS = 10_000
 
 export interface RasterOptions {
   // 1-based numbers of the pages to draw; those past the last page are skipped.
@@ -70,24 +70,7 @@ export async function rasterizePdf(pdf: Buffer, { pages, width }: RasterOptions)
         // a type this project does not load (lib: ES2022): under Node it
         // takes @napi-rs/canvas's, which its own Node canvas factory makes.
         // `canvas: null` is how it is told to draw through the context alone.
-        const task = page.render({ canvas: null, canvasContext: context, viewport })
-        let timedOut = false
-        const timer = setTimeout(() => {
-          timedOut = true
-          task.cancel()
-        }, PAGE_RENDER_TIMEOUT_MS)
-        try {
-          await task.promise
-        } catch (err) {
-          if (!timedOut) throw err
-          throw new AppError(
-            `Drawing page ${number} took longer than ${PAGE_RENDER_TIMEOUT_MS / 1000}s`,
-            408,
-            'PAGE_IMAGE_TIMEOUT'
-          )
-        } finally {
-          clearTimeout(timer)
-        }
+        await page.render({ canvas: null, canvasContext: context, viewport }).promise
         images.push({ page: number, png: await canvas.encode('png') })
       } finally {
         page.cleanup()

@@ -29,7 +29,7 @@ Your value is finding **all** of them, and naming the ones that are missing.
    projection of it.
 2. **Follow the two render paths.** For anything visual, trace both:
    - editor: `PageCanvas` → `SVGShape` → the per-type component
-   - export: `ExportService.exportToPDF` → `resolveShapes` → `renderShape`
+   - export: `ExportService.exportToPDF` → `resolveShapes` → `PdfRenderPool` → `renderShape` in `pdfDocument.ts`, on a worker thread
    Note explicitly whether shared logic sits in `packages/common/src/rendering/`
    or is duplicated on each side.
 3. **Follow the write path.** Editor interaction → store slice action →

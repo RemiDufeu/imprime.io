@@ -17,7 +17,7 @@ data or resolution, not `@react-pdf/renderer`.
 3. page-edge filter   s.y < pageSize.height && s.x < pageSize.width
 4. fetchImageData      missing image → red placeholder, logged not thrown
 5. renderShape         per type; containers never arrive here
-6. renderToBuffer      30s race → 408
+6. renderToBuffer      race against PDF_RENDER_TIMEOUT_SECONDS (30s) → 408
 ```
 
 ## Before anything else
@@ -49,7 +49,8 @@ speculating down the pipeline.
 | Wrong font, no bold | family not in the catalog (`BUILTIN_FONTS`, the instance's imported fonts) / no file for that face |
 | Text wraps differently | expected: browser vs react-pdf metrics |
 | Stroke clipped at an edge | `renderInSvgLayer` clamps to the page; the editor does not |
-| 408 | render exceeded 30s |
+| 408 | render exceeded `PDF_RENDER_TIMEOUT_SECONDS` (30s by default) |
+| Request cut before any 408 | a proxy's read timeout (nginx: 60 s by default) below `PDF_RENDER_TIMEOUT_SECONDS` |
 | Dead preview link | expired (24 h), template deleted, or another account's |
 
 ## Close with
