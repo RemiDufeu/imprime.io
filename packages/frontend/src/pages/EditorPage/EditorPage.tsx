@@ -1,28 +1,31 @@
 import { useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Alert, Button } from 'antd'
-import SlideEditor from './components/SlideEditor/SlideEditor'
 import FullScreen from '../../components/Layout/FullScreen/FullScreen'
 import SpinnerFullScreen from '../../components/Feedback/SpinnerFullScreen'
-import SlideList from './components/SlideList'
 import './EditorPage.css'
 import { useEditorStore } from '../../store/editor/EditorStore'
+import PageEditor from './components/PageEditor/PageEditor'
 
 export default function EditorPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const presentation = useEditorStore(state => state.presentation)
+  const template = useEditorStore(state => state.template)
   const isLoading = useEditorStore(state => state.isLoading)
   const error = useEditorStore(state => state.error)
-  const loadPresentation = useEditorStore(state => state.loadPresentation)
-  const hasAttemptedLoad = useRef(false)
+  const loadTemplate = useEditorStore(state => state.loadTemplate)
+  const loadFonts = useEditorStore(state => state.loadFonts)
+  // The id loaded last: the route can change template without remounting
+  // the page (history navigation between two editors).
+  const loadedId = useRef<string | null>(null)
 
   useEffect(() => {
-    if (id && !hasAttemptedLoad.current) {
-      hasAttemptedLoad.current = true
-      loadPresentation(id)
+    if (id && loadedId.current !== id) {
+      loadedId.current = id
+      // Fonts after the template: only the ones its text uses are loaded.
+      void loadTemplate(id).then(loadFonts)
     }
-  }, [id, loadPresentation])
+  }, [id, loadTemplate, loadFonts])
 
   if (isLoading) {
     return (<SpinnerFullScreen />)
@@ -43,12 +46,12 @@ export default function EditorPage() {
     )
   }
 
-  if (!presentation) {
+  if (!template) {
     return (
       <FullScreen>
         <div style={{ textAlign: 'center' }}>
           <p style={{ color: '#6b7280', marginBottom: '16px' }}>
-            Presentation not found
+            Template not found
           </p>
           <Button
             type="primary"
@@ -61,10 +64,9 @@ export default function EditorPage() {
     )
   }
 
-  return (<>
+  return (
     <div className='page-container'>
-      <SlideList />
-      <SlideEditor />
+      <PageEditor />
     </div>
-  </>)
+  )
 }

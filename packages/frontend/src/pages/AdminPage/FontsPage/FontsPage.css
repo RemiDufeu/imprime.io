@@ -1,0 +1,17 @@
+.font-family-name {
+  font-size: var(--ant-font-size-lg);
+}
+
+.font-faces {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+/* Label, file, replace/add, remove — aligned across the four faces. */
+.font-face-row {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-s);
+}

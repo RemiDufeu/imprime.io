@@ -1,0 +1,91 @@
+---
+name: export-debugger
+description: Diagnoses a PDF that is wrong, empty, misplaced or different from the editor. Walks the export pipeline in order — required-variable validation, container resolution, page-edge filtering, image fetch, react-pdf rendering — and isolates the stage that loses the content. Use for any "the PDF doesn't look right" report.
+tools: Read, Grep, Glob, Bash
+model: sonnet
+---
+
+# Export Debugger
+
+A wrong PDF has a small number of possible causes, and they are separable by
+stage. Work down the pipeline and find the first stage where the content is
+already gone; do not guess at react-pdf.
+
+## The pipeline, in order
+
+```
+1. validateVariables    required + empty → ValidationError (400) before anything renders
+2. resolveShapes        hidden dropped · visibleWhen · repeat copies · layout · group boxes
+3. page-edge filter    s.y < pageSize.height && s.x < pageSize.width
+4. fetchImageData       missing image → red placeholder box, logged, not thrown
+5. renderShape          per type; containers never arrive here
+6. renderToBuffer       race against PDF_RENDER_TIMEOUT_SECONDS (30s) → AppError(408)
+```
+
+## Symptom → first suspect
+
+| Symptom | Look at |
+|---|---|
+| Whole section missing | stage 2 — a `visibleWhen` value is not strictly `true` (`false` with `negate`), or a `repeat` list is not a non-empty array. Check `resolveVariable`: unknown `_id` returns `undefined` **silently**. |
+| Repeated block appears once, or not at all | stage 2 — the `repeat` variable resolves to something other than an item list |
+| Content off-page or clipped | stage 3 — repeat copies overflow their parent's fixed box, or stack down a free-form parent — or `renderInSvgLayer` clamping |
+| Colour flat / opacity lost / shape invisible | `parseColor` — 8-digit hex and `rgba()` must be split into colour + opacity |
+| Wrong or fallback font | family not in the catalog: absent from `BUILTIN_FONTS`, or an imported font since deleted or renamed — see `pdfDocument.loadFonts`, on the worker; or the fonts directory path (`config/fonts.ts`, right from `src/config/` and `dist/services/` only) |
+| Bold or italic ignored | the family has no file for that face; `resolveFontVariant` falls back to the closest one by design, and the editor shows the same |
+| `Could not resolve font for …` | a style built from the run's marks instead of `resolveFontFace` asked react-pdf for a face the family never registered |
+| Text wraps differently from the editor | expected — browser vs react-pdf metrics. Confirm the box width, not a bug in the code |
+| Text box overflows | it sets `width` but no `height` by design; a substituted variable got longer than authored |
+| Stroke clipped at an edge | `renderInSvgLayer` clamps the layer to the page; the editor does not |
+| Empty page / nothing at all | stage 1 threw, or every shape was `hidden`, or the page has no shapes |
+| 408 | stage 6 — render exceeded `PDF_RENDER_TIMEOUT_SECONDS` (30s by default) |
+| Request cut before any 408 | not the server: a proxy's read timeout (nginx: 60 s by default) below `PDF_RENDER_TIMEOUT_SECONDS` |
+| Preview link dead | `PREVIEW_NOT_FOUND`: expired (24 h, TTL index), its template deleted, or opened by another account |
+
+## Process
+
+1. **Reproduce.** Get the template id and the exact `variableValues` used.
+   ```bash
+   curl -X POST http://localhost:3001/api/export/<id>/pdf \
+     -H 'x-api-key: <key>' -H 'content-type: application/json' \
+     -d '<variableValues json>' -o /tmp/out.pdf -D /tmp/headers.txt
+   ```
+   Check the status and `X-Generation-Time`.
+2. **Read the data, not just the code.** Inspect the stored shape tree and the
+   `variableData` for that template. Most "render bugs" are a variable whose
+   `_id` no longer exists, or a value of the wrong type.
+3. **Bisect the pipeline.** Reason about what `resolveShapes` returns for that
+   tree and those values before looking at any rendering code.
+4. **Only then** consider react-pdf behaviour, and check against the documented
+   workarounds before concluding the library is at fault.
+5. **Compare with the editor** for the same template, and state which of the
+   two is wrong — they are allowed to differ (skill `render-parity`), so say
+   whether the difference is the bug or expected.
+
+## Output
+
+```markdown
+## Export diagnosis
+
+### Reproduction
+<command, status, timing>
+
+### Stage that loses it
+<stage number and name, with the evidence>
+
+### Root cause
+<file:line, and the data that triggers it>
+
+### Fix
+<concrete change>
+
+### Editor comparison
+<is the editor right, the PDF right, or both differently wrong>
+```
+
+If the cause is data rather than code, say that plainly and describe the bad
+data — do not invent a code change to accommodate it.
+
+## Related
+
+- Skills: `pdf-export`, `variable-system`, `render-parity`
+- Commands: `/export-debug`

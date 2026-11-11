@@ -1,33 +1,58 @@
-version: '3.8'
+# Imprime and its database, from the published image.
+#
+#   1. Put this file in a folder with a .env beside it — start from
+#      .env.example: PUBLIC_APP_URL and BETTER_AUTH_SECRET are required.
+#   2. docker compose up -d
+#
+# The app listens on 127.0.0.1:3023, for the reverse proxy that serves it in
+# HTTPS: nginx, Caddy, Traefik, Coolify's. See doc/self-hosting.md.
+#
+# Already have a MongoDB? Delete the `mongodb` service, the `depends_on` below
+# and the `volumes` at the end, and set MONGODB_URI in .env.
 
 services:
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: imprime-app
+    image: ${IMPRIME_IMAGE:-ghcr.io/remidufeu/imprime:latest}
     restart: unless-stopped
     ports:
-      - "3023:3023"
+      # This machine only, where the reverse proxy runs. To open it to the
+      # network, remove "127.0.0.1:" — and empty TRUST_PROXY if no proxy is
+      # left in front, or anyone could choose the address the sign-in rate
+      # limits count.
+      - "127.0.0.1:${HOST_PORT:-3023}:3023"
     environment:
-      - NODE_ENV=production
-      - PORT=3023
-      - MONGODB_URI=${MONGODB_URI}
-      - CORS_ORIGIN=${CORS_ORIGIN:-*}
-      - PUBLIC_APP_URL=${PUBLIC_APP_URL}
-      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
-      - REQUIRE_EMAIL_VERIFICATION=${REQUIRE_EMAIL_VERIFICATION:-false}
-      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
-      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
-      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:-}
-      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET:-}
-      - MICROSOFT_CLIENT_ID=${MICROSOFT_CLIENT_ID:-}
-      - MICROSOFT_CLIENT_SECRET=${MICROSOFT_CLIENT_SECRET:-}
-      - MICROSOFT_TENANT_ID=${MICROSOFT_TENANT_ID:-common}
-      - SMTP_HOST=${SMTP_HOST:-}
-      - SMTP_PORT=${SMTP_PORT:-587}
-      - SMTP_SECURE=${SMTP_SECURE:-false}
-      - SMTP_USER=${SMTP_USER:-}
-      - SMTP_PASS=${SMTP_PASS:-}
-      - SMTP_FROM=${SMTP_FROM:-}
+      NODE_ENV: production
+      PORT: "3023"
+      MONGODB_URI: ${MONGODB_URI:-mongodb://mongodb:27017/imprime}
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:?set PUBLIC_APP_URL to the address users open, e.g. https://imprime.example.com}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET, e.g. from openssl rand -base64 32}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      # One reverse proxy in front, as above.
+      TRUST_PROXY: ${TRUST_PROXY:-1}
+      CORS_ORIGIN: ${CORS_ORIGIN:-}
+      MAX_PDF_RENDERS: ${MAX_PDF_RENDERS:-}
+      MAX_PDF_RENDERS_PER_USER: ${MAX_PDF_RENDERS_PER_USER:-}
+      PDF_RENDER_TIMEOUT_SECONDS: ${PDF_RENDER_TIMEOUT_SECONDS:-}
+      PDF_QUEUE_SIZE: ${PDF_QUEUE_SIZE:-}
+      PDF_QUEUE_WAIT_SECONDS: ${PDF_QUEUE_WAIT_SECONDS:-}
+    depends_on:
+      mongodb:
+        condition: service_healthy
 
+  # A single server: Imprime runs on it without transactions — see
+  # doc/authentication.md, MongoDB. Not published on any port: only the app
+  # reaches it, on the network Compose makes for the two.
+  mongodb:
+    image: mongo:8
+    restart: unless-stopped
+    volumes:
+      - mongodb-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+volumes:
+  mongodb-data:

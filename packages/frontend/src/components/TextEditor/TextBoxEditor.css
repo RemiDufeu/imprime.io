@@ -1,0 +1,29 @@
+/* Paragraph spacing is set here rather than inline because "is the last
+   paragraph" cannot be known at render time: Slate memoises element renders,
+   so a paragraph does not re-render when a sibling is appended after it. The
+   PDF export applies the same rule (spacing between paragraphs only). */
+.text-box-paragraph {
+    margin: 0 0 var(--paragraph-spacing, 0) 0;
+}
+
+.text-box-paragraph:last-child {
+    margin-bottom: 0;
+}
+
+/* A list item's marker sits in the item's left padding (`getListLayout`). */
+.text-box-paragraph--list-item {
+    position: relative;
+}
+
+.text-box-list-marker {
+    position: absolute;
+    box-sizing: border-box; /* a hollow bullet's border is inside its size, as in react-pdf */
+    user-select: none;
+}
+
+/* Top-aligned with the first line; a number wider than its slot overflows onto
+   the text on one line rather than wrapping, as in the PDF. */
+.text-box-list-marker--number {
+    top: 0;
+    white-space: nowrap;
+}

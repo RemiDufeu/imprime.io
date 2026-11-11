@@ -1,0 +1,25 @@
+.sso-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-l);
+}
+
+.sso-page-callback {
+  margin-bottom: var(--space-m);
+}
+
+.sso-page-alert {
+  margin-bottom: var(--space-m);
+}
+
+/* Fields side by side, wrapping when the page is narrow. */
+.sso-page-row {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: var(--space-m);
+}
+
+.sso-page-grow {
+  flex: 1;
+  min-width: 200px;
+}

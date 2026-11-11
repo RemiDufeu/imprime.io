@@ -1,11 +1,21 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Layout from './pages/Layout'
 import HomePage from './pages/HomePage/HomePage'
 import EditorPage from './pages/EditorPage/EditorPage'
+import PreviewPage from './pages/PreviewPage/PreviewPage'
 import LoginPage from './pages/LoginPage/LoginPage'
 import ConsentPage from './pages/LoginPage/ConsentPage'
+import VerifyEmailPage from './pages/LoginPage/VerifyEmailPage'
+import ForgotPasswordPage from './pages/LoginPage/ForgotPasswordPage'
+import ResetPasswordPage from './pages/LoginPage/ResetPasswordPage'
 import ApiKeysPage from './pages/SettingsPage/ApiKeysPage'
+import AdminPage from './pages/AdminPage/AdminPage'
+import FontsPage from './pages/AdminPage/FontsPage/FontsPage'
+import EmailPage from './pages/AdminPage/EmailPage/EmailPage'
+import SsoPage from './pages/AdminPage/SsoPage/SsoPage'
+import AccessPage from './pages/AdminPage/AccessPage/AccessPage'
 import RequireAuth from './components/RequireAuth'
+import RequireAdmin from './components/RequireAdmin'
 
 function App() {
   return (
@@ -14,13 +24,29 @@ function App() {
             {/* Public */}
             <Route path="/login" element={<LoginPage />} />
             <Route path="/oauth/consent" element={<ConsentPage />} />
+            <Route path="/verify-email" element={<VerifyEmailPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
 
             {/* Protégé : redirige vers /login si pas de session */}
             <Route element={<RequireAuth />}>
               <Route path="/" element={<Layout />}>
                 <Route index element={<HomePage />} />
                 <Route path="editor/:id" element={<EditorPage />} />
+                {/* What `getPreviewPath` builds: the MCP links here. */}
+                <Route path="preview/:id" element={<PreviewPage />} />
                 <Route path="settings/api-keys" element={<ApiKeysPage />} />
+
+                {/* Administration de l'instance : rôle admin requis */}
+                <Route element={<RequireAdmin />}>
+                  <Route path="admin" element={<AdminPage />}>
+                    <Route index element={<Navigate to="fonts" replace />} />
+                    <Route path="fonts" element={<FontsPage />} />
+                    <Route path="email" element={<EmailPage />} />
+                    <Route path="sso" element={<SsoPage />} />
+                    <Route path="access" element={<AccessPage />} />
+                  </Route>
+                </Route>
               </Route>
             </Route>
           </Routes>

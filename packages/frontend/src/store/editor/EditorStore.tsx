@@ -1,54 +1,67 @@
 import { create } from "zustand"
-import { createPresentationSlice, type PresentationSlice } from "./PresentationSlice"
-import { createZoomSlice, type ZoomSlice } from "./ZoomSlice"
 import { persist, subscribeWithSelector } from "zustand/middleware"
-import { createToolSlice, type ToolSlice } from "./ToolSlice"
-import { createSlideSlice, type SlideSlice } from "./SlideSlice"
+import { createTemplateSlice, type TemplateSlice } from "./TemplateSlice"
+import { createPageSlice, type PageSlice } from "./PageSlice"
+import { createDocumentWriteSlice, type DocumentWriteSlice } from "./DocumentWriteSlice"
+import { createSelectionSlice, type SelectionSlice } from "./SelectionSlice"
 import { createShapeSlice, type ShapeSlice } from "./ShapeSlice"
+import { createClipboardSlice, type ClipboardSlice } from "./ClipboardSlice"
+import { createToolSlice, type ToolSlice } from "./ToolSlice"
 import { createTransformationSlice, type TransformationSlice } from "./TransformationSlice"
-import { createToolAttributesSlice, type ToolAttributesSlice } from "./ToolAttributeSlice"
-import { createLayeringSlice, type LayeringSlice } from "./LayeringSlice"
-import { createShapeCreationSlice, type ShapeCreationSlice } from "./ShapeCreationSlice"
-import { createRichTextEditorSlice, type RichTextEditorSlice } from "./RichTextEditorSlice"
+import { createTextEditorSlice, type TextEditorSlice } from "./TextEditorSlice"
+import { createHistorySlice, type HistorySlice } from "./HistorySlice"
+import { createImportSlice, type ImportSlice } from "./ImportSlice"
 import { createVariableSlice, type VariableSlice } from "./VariableSlice"
+import { createFontSlice, type FontSlice } from "./FontSlice"
+import { createPreferencesSlice, type PreferencesSlice } from "./PreferencesSlice"
+import { selectCurrentPage } from "./selectors"
 
-type BaseEditorStore = PresentationSlice &
-    ZoomSlice &
-    ToolSlice &
-    SlideSlice &
+type BaseEditorStore = TemplateSlice &
+    PageSlice &
+    DocumentWriteSlice &
+    SelectionSlice &
     ShapeSlice &
+    ClipboardSlice &
+    ToolSlice &
     TransformationSlice &
-    ToolAttributesSlice &
-    LayeringSlice &
-    ShapeCreationSlice &
-    RichTextEditorSlice &
-    VariableSlice
+    TextEditorSlice &
+    HistorySlice &
+    ImportSlice &
+    VariableSlice &
+    FontSlice &
+    PreferencesSlice
 
 export const useEditorStore = create<BaseEditorStore>()(
     subscribeWithSelector(
         persist(
             (...args) => ({
-                ...createPresentationSlice(...args),
-                ...createSlideSlice(...args),
+                ...createTemplateSlice(...args),
+                ...createPageSlice(...args),
+                ...createDocumentWriteSlice(...args),
+                ...createSelectionSlice(...args),
                 ...createShapeSlice(...args),
-                ...createZoomSlice(...args),
+                ...createClipboardSlice(...args),
                 ...createToolSlice(...args),
                 ...createTransformationSlice(...args),
-                ...createToolAttributesSlice(...args),
-                ...createLayeringSlice(...args),
-                ...createShapeCreationSlice(...args),
-                ...createRichTextEditorSlice(...args),
-                ...createVariableSlice(...args)
+                ...createTextEditorSlice(...args),
+                ...createHistorySlice(...args),
+                ...createImportSlice(...args),
+                ...createVariableSlice(...args),
+                ...createFontSlice(...args),
+                ...createPreferencesSlice(...args),
             }),
             {
                 name: 'editor-store',
                 partialize: (state) => ({
                     zoom: state.zoom,
+                    pagesPanelOpen: state.pagesPanelOpen,
+                    layersPanelOpen: state.layersPanelOpen,
+                    // The user's, not a template's: offered in every template.
+                    recentColors: state.recentColors,
                 }),
             }
         ),
     ),
 )
 
-export const useCurrentSlide = () =>
-    useEditorStore((s) => s.presentation?.slides[s.currentSlideIndex] ?? null);
+export const useCurrentPage = () => useEditorStore(selectCurrentPage);

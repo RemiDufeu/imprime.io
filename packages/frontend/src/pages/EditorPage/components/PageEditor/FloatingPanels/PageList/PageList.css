@@ -1,0 +1,172 @@
+.page-list-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  box-sizing: content-box;
+}
+
+.page-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: end;
+  padding: 0 var(--space-s);
+  margin: var(--space-s);
+  margin-bottom: 0;
+}
+
+.page-list-title {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--ant-color-text);
+}
+
+.page-list-content {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  padding: 0 var(--space-s) var(--space-s);
+}
+
+.page-preview-wrapper {
+  padding: var(--space-s);
+  box-sizing: border-box;
+}
+
+.page-preview-shadow {
+  box-shadow: var(--ant-box-shadow);
+}
+
+.page-thumbnail {
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 2px solid transparent;
+  border-radius: var(--space-s);
+  position: relative;
+  box-sizing: border-box;
+}
+
+.page-thumbnail:hover {
+  border: 2px solid var(--ant-color-border);
+}
+
+.page-thumbnail-active {
+  border: 2px solid var(--ant-color-primary) !important;
+}
+
+.page-thumbnail-dragging {
+  opacity: 0.5;
+  transform: scale(0.95);
+}
+
+.page-thumbnail-number {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  background-color: rgba(0, 0, 0, 0.6);
+  color: white;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  z-index: 1;
+}
+
+.insert-page {
+  height: 3px;
+  margin: 4px 0;
+  background-color: transparent;
+  transition: all 0.2s ease;
+}
+
+.insert-page-wrapper {
+  padding: 4px 0;
+}
+
+.insert-page.active {
+  background-color: var(--ant-color-primary);
+  height: 4px;
+  box-shadow: 0 0 4px var(--ant-color-primary);
+}
+
+/* The menu, duplicate and delete buttons, top right, shown on hover — and
+   while the menu is open, which antd marks on its trigger. */
+.page-thumbnail-actions {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: flex;
+  gap: var(--space-xs);
+  z-index: 1;
+}
+
+.page-thumbnail-delete,
+.page-thumbnail-duplicate,
+.page-thumbnail-menu {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  background-color: var(--ant-color-bg-container) !important;
+}
+
+.page-thumbnail:hover .page-thumbnail-delete,
+.page-thumbnail:hover .page-thumbnail-duplicate,
+.page-thumbnail:hover .page-thumbnail-menu,
+.page-thumbnail-menu.ant-dropdown-open {
+  opacity: 1;
+}
+
+/* Left out with the default values — its condition fails, or its list is
+   empty: as faded as a shape is on the canvas. */
+.page-preview-excluded {
+  opacity: 0.35;
+}
+
+/* What the data does to the page, bottom left, over the preview. */
+.page-thumbnail-badges {
+  position: absolute;
+  left: var(--space-s);
+  right: var(--space-s);
+  bottom: var(--space-s);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  z-index: 1;
+  pointer-events: none;
+}
+
+.page-thumbnail-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  max-width: 100%;
+  padding: 0 var(--space-xs);
+  border-radius: var(--ant-border-radius-sm);
+  font-size: var(--ant-font-size-sm);
+  line-height: 1.6;
+  color: var(--ant-color-text-light-solid);
+  pointer-events: auto;
+}
+
+.page-thumbnail-badge-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.page-thumbnail-badge.repeat {
+  background: var(--ant-color-warning);
+}
+
+.page-thumbnail-badge.condition {
+  background: var(--ant-color-info);
+}
+
+.page-thumbnail-badge.muted {
+  background: var(--ant-color-text-tertiary);
+}
+
+.page-thumbnail-delete:hover {
+  background-color: rgba(255, 77, 79, 0.1) !important;
+}

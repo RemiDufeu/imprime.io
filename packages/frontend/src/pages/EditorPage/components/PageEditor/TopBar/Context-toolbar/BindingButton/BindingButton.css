@@ -1,0 +1,9 @@
+/* A long variable path must not stretch the bar. */
+.binding-button-label {
+    display: inline-block;
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: bottom;
+}

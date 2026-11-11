@@ -1,113 +1,114 @@
 import { variablesAPI } from '../../api/api'
 import type { VariableData, VariableDTO } from '@imprime/sdk'
 import type { StateCreator } from 'zustand'
-import type { PresentationSlice } from './PresentationSlice'
+import type { TemplateSlice } from './TemplateSlice'
+import type { HistorySlice } from './HistorySlice'
+import { parseApiError } from '../../utils/apiError'
 import { message } from 'antd'
+
+// Which definition the create/edit form is open on.
+export type VariableFormTarget = { mode: 'create' } | { mode: 'edit'; variableId: string }
 
 export interface VariableSlice {
   isLoadingVariables: boolean
-  variableError: string | null
 
+  // The browse panel and the form are two surfaces, and the form outlives the
+  // panel: it is a modal owned by the header, because rc-dropdown closes its
+  // popup on Tab (`hooks/useAccessibility`) and took a half-typed definition
+  // with it. Both flags live here so neither surface has to be handed a
+  // callback to drive the other.
+  variablesPanelOpen: boolean
+  variableForm: VariableFormTarget | null
+  setVariablesPanelOpen: (open: boolean) => void
+  openVariableForm: (target: VariableFormTarget) => void
+  closeVariableForm: () => void
+
+  // Both reject on failure, so the form can attach a name conflict to its own
+  // field instead of showing it as a detached toast.
   createVariable: (variable: VariableDTO.Create) => Promise<VariableData[]>
-  updateVariable: (variableId: string, updates: VariableDTO.Update) => Promise<void>
+  updateVariable: (variableId: string, updates: VariableDTO.Update) => Promise<VariableData[]>
   deleteVariable: (variableId: string) => Promise<void>
+  // Bring a variable to `snapshot`, unrecorded: what undo and redo replay.
+  // Null deletes it; a variable that is gone is created again under its id.
+  _restoreVariable: (variableId: string, snapshot: VariableData | null) => Promise<void>
+  _setVariables: (variables: VariableData[]) => void
 }
 
-type StoreWithPresentation = VariableSlice & PresentationSlice
+type StoreWithTemplate = VariableSlice & TemplateSlice & HistorySlice
 
 export const createVariableSlice: StateCreator<
-  StoreWithPresentation,
+  StoreWithTemplate,
   [],
   [],
   VariableSlice
 > = (set, get) => ({
   isLoadingVariables: false,
-  variableError: null,
+
+  variablesPanelOpen: false,
+  variableForm: null,
+
+  setVariablesPanelOpen: (open) => set({ variablesPanelOpen: open }),
+
+  // One action for the whole transition, so no caller can open the form and
+  // leave the panel sitting behind the modal's mask.
+  openVariableForm: (target) => set({ variableForm: target, variablesPanelOpen: false }),
+
+  closeVariableForm: () => set({ variableForm: null }),
 
   createVariable: async (variable) => {
-    const { presentation } = get()
-    if (!presentation) return []
+    const { template } = get()
+    if (!template) return []
 
-    set({ isLoadingVariables: true, variableError: null })
+    set({ isLoadingVariables: true })
 
     try {
-      const result = await variablesAPI.create(presentation._id, variable)
+      const result = await variablesAPI.create(template._id, variable)
 
-      set({
-        presentation: {
-          ...presentation,
-          variableData: result.variables,
-        },
-      })
-    } catch (err) {
-      set({ variableError: 'Failed to create variable' })
-      throw err
+      get()._setVariables(result.variables)
+      const created = result.variables.find(v => v.name === variable.name)
+      if (created) get()._recordHistory({ kind: 'variable', variableId: created._id, snapshot: null })
     } finally {
       set({ isLoadingVariables: false })
     }
 
-    const { presentation : presentationAfter } = get()
-    return presentationAfter?.variableData ?? []
+    const { template : templateAfter } = get()
+    return templateAfter?.variableData ?? []
   },
 
   updateVariable: async (variableId: string, updates: VariableDTO.Update) => {
-    const { presentation } = get()
-    if (!presentation) return
+    const { template } = get()
+    if (!template) return []
 
-    set({ isLoadingVariables: true, variableError: null })
+    set({ isLoadingVariables: true })
+    const previous = template.variableData?.find(v => v._id === variableId) ?? null
 
     try {
-      const result = await variablesAPI.update(presentation._id, variableId, updates)
+      const result = await variablesAPI.update(template._id, variableId, updates)
 
-      set({
-        presentation: {
-          ...presentation,
-          variableData: result.variables,
-        },
-      })
-    } catch (err) {
-      set({ variableError: 'Failed to update variable' })
-      throw err
+      get()._setVariables(result.variables)
+      get()._recordHistory({ kind: 'variable', variableId, snapshot: previous })
+      return result.variables
     } finally {
       set({ isLoadingVariables: false })
     }
   },
 
   deleteVariable: async (variableId: string) => {
-    const { presentation } = get()
-    if (!presentation) return
+    const { template } = get()
+    if (!template) return
 
-    set({ isLoadingVariables: true, variableError: null })
+    set({ isLoadingVariables: true })
+    const previous = template.variableData?.find(v => v._id === variableId) ?? null
 
     try {
-      const result = await variablesAPI.delete(presentation._id, variableId)
+      const result = await variablesAPI.delete(template._id, variableId)
 
-      set({
-        presentation: {
-          ...presentation,
-          variableData: result.variables,
-        },
-      })
-    } catch (err : any) {
-      let errorCode: string | undefined
-      let errorMessage = 'Failed to delete variable'
+      get()._setVariables(result.variables)
+      get()._recordHistory({ kind: 'variable', variableId, snapshot: previous })
+    } catch (err) {
+      const { code } = parseApiError(err)
 
-      if (err?.message) {
-        try {
-          const jsonMatch = err.message.match(/\{.*\}/)
-          if (jsonMatch) {
-            const errorData = JSON.parse(jsonMatch[0])
-            errorCode = errorData.code
-            errorMessage = errorData.error || errorMessage
-          }
-        } catch (parseError) {
-          errorMessage = err.message
-        }
-      }
-
-      set({ variableError: errorMessage })
-
-      if (errorCode === 'VARIABLE_IN_USE') {
+      if (code === 'VARIABLE_IN_USE') {
         message.error('Variable used in the template')
       } else {
         message.error('Failed to delete variable')
@@ -115,5 +116,32 @@ export const createVariableSlice: StateCreator<
     } finally {
       set({ isLoadingVariables: false })
     }
+  },
+
+  _restoreVariable: async (variableId, snapshot) => {
+    const { template } = get()
+    if (!template) return
+    const current = template.variableData?.find(v => v._id === variableId)
+
+    let result: VariableDTO.List
+    if (!snapshot) {
+      if (!current) return
+      result = await variablesAPI.delete(template._id, variableId)
+    } else {
+      const { _id, ...definition } = snapshot
+      result = current
+        // Every field, so the update leaves nothing of the newer definition.
+        ? await variablesAPI.update(template._id, variableId, { ...definition, default: definition.default ?? null })
+        : await variablesAPI.create(template._id, { ...definition, _id })
+    }
+
+    get()._setVariables(result.variables)
+  },
+
+  _setVariables: (variables) => {
+    // Read again rather than reuse the template from before the request:
+    // shape edits made meanwhile would be lost.
+    const current = get().template
+    if (current) set({ template: { ...current, variableData: variables } })
   },
 })

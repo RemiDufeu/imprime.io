@@ -1,0 +1,34 @@
+.email-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-l);
+}
+
+/* Fields side by side, wrapping when the page is narrow. */
+.email-page-row {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: var(--space-m);
+}
+
+.email-page-grow {
+  flex: 1;
+  min-width: 200px;
+}
+
+.email-page-test {
+  margin-top: var(--space-l);
+  padding-top: var(--space-m);
+  border-top: var(--ant-line-width) var(--ant-line-type) var(--ant-color-border-secondary);
+}
+
+.email-page-test-input {
+  max-width: 480px;
+}
+
+.email-page-switch {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s);
+  margin-bottom: var(--space-s);
+}

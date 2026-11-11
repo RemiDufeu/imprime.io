@@ -1,0 +1,31 @@
+.selection-size {
+  position: fixed;
+  transform: translateX(-50%);
+  padding: 0 var(--space-xs);
+  border: none;
+  border-radius: var(--ant-border-radius-sm);
+  background: var(--ant-color-primary);
+  color: var(--ant-color-text-light-solid);
+  font-family: var(--ant-font-family);
+  font-size: var(--ant-font-size-sm);
+  line-height: var(--ant-line-height-sm);
+  /* The digits keep their width, so the chip does not shake while dragging. */
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.selection-size:hover {
+  background: var(--ant-color-primary-hover);
+}
+
+/* Under the pointer mid-drag: it is a label then, not a button. */
+.selection-size.dragging {
+  pointer-events: none;
+}
+
+.selection-size-fields {
+  display: flex;
+  gap: var(--space-s);
+}

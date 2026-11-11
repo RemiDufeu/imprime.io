@@ -3,9 +3,115 @@
  * Ensures consistent rendering between frontend and backend
  */
 
-export { SLIDE_WIDTH, SLIDE_HEIGHT } from './constants.js'
+export {
+  DEFAULT_PAGE_SIZE,
+  PAGE_FORMATS,
+  MIN_PAGE_DIMENSION,
+  MAX_PAGE_DIMENSION,
+  isValidPageSize,
+  findPageFormat,
+} from './pageSize.js'
+export type { PageFormat, PageFormatId } from './pageSize.js'
 export { getDashArray } from './strokeUtils.js'
-export { renderRectangleSVG, renderEllipseSVG, renderImageSVG } from './svgRenderers.js'
-export { renderTextSVG } from './textRenderer.js'
-export { generateSlideHTML, generateMultiPageHTML, generateSVGWrapper } from './htmlGenerator.js'
-export { getSlideContentWrapperStyles, convertStylesToString, getSlideContentInternalCSS } from './slideContentStyles.js'
+export { getEllipseGeometry } from './svgRenderers.js'
+export type { EllipseGeometry } from './svgRenderers.js'
+export {
+  getImageLayout,
+  getImageCrop,
+  getImageCornerRadius,
+  getImageOpacity,
+  DEFAULT_IMAGE_FIT,
+  DEFAULT_IMAGE_ALIGN,
+  FULL_IMAGE_CROP,
+} from './imageLayout.js'
+export type { ImageRect } from './imageLayout.js'
+export {
+  layoutTree,
+  layoutGroupChildren,
+  hugGroup,
+  distributeMainAxis,
+  crossAxisOffset,
+  growMainSizes,
+  getGrow,
+  getHugAxis,
+  getImposedAxes,
+} from './groupLayout.js'
+export type { SizeAxis } from './groupLayout.js'
+export {
+  getBoxPaths,
+  getBorderOverhang,
+  getBorderWidths,
+  getCornerRadii,
+  getPadding,
+  areSidesUniform,
+  areCornersUniform,
+  uniformSides,
+  uniformCornerRadii,
+  ZERO_SIDES,
+} from './boxGeometry.js'
+export type { BoxPaths, BoxStroke, BoxRect } from './boxGeometry.js'
+export {
+  getRotation,
+  normalizeRotation,
+  getCenter,
+  rotatePoint,
+  rotateVector,
+  pointToPage,
+  pointFromPage,
+  getContentFrame,
+  shapeToPage,
+  shapeFromPage,
+  getRotatedBounds,
+  PAGE_FRAME,
+} from './rotation.js'
+export type { Point, TurnedBox, Frame } from './rotation.js'
+export { resolveShapes, resolvePages, getGroupBox } from './shapeResolver.js'
+export { PAGE_NUMBER_SHAPE_ID, createPageNumberBox, showsPageNumber } from './pageNumbering.js'
+export type { GroupBox } from './shapeResolver.js'
+export {
+  resolveVariable,
+  isConditionMet,
+  isEmptyVariableValue,
+  stringifyVariableValue,
+  getVariableMaxLength,
+  countCharacters,
+  exceedsMaxLength,
+  getVariableMaxItems,
+  exceedsMaxItems,
+  findItemFieldIssue,
+  joinItemPath,
+  ITEM_PATH_SEPARATOR,
+} from './variables.js'
+export type { ResolveContext, VariableScope, VariableScopeFrame, ItemFieldIssue } from './variables.js'
+export {
+  getPageContentWrapperStyles,
+  getParagraphStyle,
+  getParagraphLeadFace,
+  getHalfLeading,
+  getTextDecoration,
+  getTextTransform,
+  getVerticalJustify,
+  parseFontSize,
+  resolveFontVariant,
+  resolveFontFace,
+  getRunTextStyle,
+  DEFAULT_FONT_SIZE,
+  DEFAULT_LINE_HEIGHT,
+  PARAGRAPH_SPACING,
+} from './pageContentStyles.js'
+export type {
+  ParagraphStyle,
+  RunFontFace,
+  RunTextStyle,
+  ParagraphLeadFace,
+  FontVerticalMetrics,
+} from './pageContentStyles.js'
+export {
+  getListStyle,
+  getListMarkers,
+  getListMarkerFormatting,
+  getListLayout,
+  getBulletBox,
+  MAX_LIST_LEVEL,
+} from './listStyles.js'
+export type { ListStyle, ListMarker, BulletShape, ListLayout, BulletBox } from './listStyles.js'

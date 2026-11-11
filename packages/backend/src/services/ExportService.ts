@@ -1,65 +1,206 @@
-import React from 'react'
-import { Document, Page, View, Text as PDFText, Image, Svg, Rect, Ellipse, renderToBuffer } from '@react-pdf/renderer'
 import type {
-  Presentation,
-  Slide,
-  Shape,
-  RectangleShape,
-  EllipseShape,
-  TextBoxShape,
-  ImageShape,
-  CustomText,
-  VariableElement
+  Template,
+  Page,
+  VariableValueType,
+  VariableItemField,
+  ResolveContext,
+  DataUrlImage,
+  ExportDTO
 } from '@imprime/common'
-import { SLIDE_WIDTH, SLIDE_HEIGHT, getDashArray } from '@imprime/common'
-import type { ImageService } from './ImageService.js'
-import { AppError, ValidationError } from './errors.js'
-import { normalizeFontFamily, getFontStyleProps, initializeFonts } from '../config/fonts.js'
-import type { Style } from '@react-pdf/types'
-
-// Initialize fonts on module load
-initializeFonts()
+import {
+  resolvePages,
+  isEmptyVariableValue,
+  exceedsMaxLength,
+  exceedsMaxItems,
+  findItemFieldIssue,
+  toImageDataUrl,
+  getRotatedBounds,
+} from '@imprime/common'
+import { readImageDataUrl, type ImageService } from './ImageService.js'
+import type { PageImage, RasterOptions } from './pdfRaster.js'
+import { PdfRenderPool, type RenderOutput } from './pdfRenderPool.js'
+import type { FontService } from './FontService.js'
+import { ValidationError } from './errors.js'
+import { readPdfRenderLimits } from '../config/pdfRendering.js'
 
 export interface RenderOptions {
-  variableValues?: Record<string, string>
+  variableValues?: Record<string, VariableValueType>
 }
 
-export class ExportService {
-  constructor(private imageService: ImageService) { }
+export interface ExportResult {
+  pdf: Buffer
+  warnings: ExportDTO.Warning[]
+}
 
-  private validateVariables(presentation: Presentation, variableValues: Record<string, string>): void {
-    const requiredVariables = presentation.variableData?.filter(v => v.required) || []
+export interface PageImagesResult {
+  images: PageImage[]
+  // How many pages the PDF has, of which `images` holds those asked for.
+  pageCount: number
+  warnings: ExportDTO.Warning[]
+}
 
-    for (const variable of requiredVariables) {
-      if (!variableValues[variable.name] || variableValues[variable.name].trim() === '') {
-        throw new ValidationError(`Required variable "${variable.name}" is missing`)
+export interface ResolvedTemplate {
+  pages: Page[]
+  warnings: ExportDTO.Warning[]
+}
+
+// The font families the runs of `pages` ask for: an export fetches the
+// imported ones among them.
+function usedFontFamilies(pages: Page[]): string[] {
+  const families = new Set<string>()
+  for (const page of pages) {
+    for (const shape of page.shapes) {
+      if (shape.type !== 'text') continue
+      for (const paragraph of shape.paragraphes) {
+        for (const run of paragraph.children) {
+          if (run.fontFamily) families.add(run.fontFamily)
+        }
       }
     }
   }
+  return [...families]
+}
 
-  private getVariableValue(variableId: string, presentation: Presentation, variableValues: Record<string, string>): string {
-    const variablePresentation = presentation.variableData.find(v => v._id == variableId)
+/**
+ * Templates made into PDFs: the values checked, the pages resolved, their
+ * images and fonts read — all here, on the server's thread — then the PDF
+ * drawn on a worker thread (`PdfRenderPool`, `pdfDocument.ts`), which never
+ * reads the database. How many are drawn at once, and how long each may
+ * take, is the pool's to bound (`config/pdfRendering.ts`).
+ */
+export class ExportService {
+  private readonly renderPool = new PdfRenderPool(readPdfRenderLimits())
 
-    if (!variablePresentation) return ''
+  constructor(private imageService: ImageService, private fontService: FontService) { }
 
-    if (variableValues[variablePresentation.name]?.length) {
-      return variableValues[variablePresentation.name]
+  /**
+   * Required variables, and the required fields of a list's items, must have a
+   * value; a string, no more characters than its variable's or field's max
+   * length; a list, no more items than its variable's or field's max items;
+   * and every image a value holds — an
+   * image variable's, or an image field's of a list's items, nested lists
+   * included — must be one the export can draw. The error names the value, as
+   * the caller wrote it: `photos[2].file`. An empty one is left to the
+   * variable's default, or to an empty box.
+   *
+   * Returns the images read, by value: the resolved boxes hold the same
+   * strings (`resolvedImage`), so they are not read twice.
+   */
+  private validateVariables(
+    template: Template,
+    variableValues: Record<string, VariableValueType>
+  ): Map<string, DataUrlImage> {
+    const requiredVariables = template.variableData?.filter(v => v.required) || []
+
+    for (const variable of requiredVariables) {
+      if (isEmptyVariableValue(variableValues[variable.name])) {
+        throw new ValidationError(`Required variable "${variable.name}" is missing`, 'REQUIRED_VARIABLE_MISSING')
+      }
     }
 
-    return variablePresentation?.default || ''
+    const tooLong = (label: string, maxLength: number | undefined) => new ValidationError(
+      `Variable "${label}" is longer than its max length of ${maxLength} characters`,
+      'VARIABLE_TOO_LONG'
+    )
+    const tooMany = (label: string, maxItems: number | undefined) => new ValidationError(
+      `Variable "${label}" has more than its max of ${maxItems} items`,
+      'VARIABLE_TOO_MANY_ITEMS'
+    )
+
+    const images = new Map<string, DataUrlImage>()
+    const checkImage = (value: unknown, label: string) => {
+      if (value === undefined || value === null || (typeof value === 'string' && value.trim() === '')) return
+      if (typeof value === 'string' && images.has(value)) return
+      const image = typeof value === 'string' ? readImageDataUrl(value) : undefined
+      if (!image || typeof value !== 'string') {
+        throw new ValidationError(`Variable "${label}" is not a PNG or JPEG data URL`, 'INVALID_IMAGE_VALUE')
+      }
+      images.set(value, image)
+    }
+    const checkItems = (items: unknown, fields: VariableItemField[] | undefined, label: string) => {
+      if (!Array.isArray(items)) return
+      items.forEach((item: unknown, index) => {
+        if (item === null || typeof item !== 'object') return
+        for (const field of fields ?? []) {
+          // Own properties only: a field named like an Object.prototype member
+          // must not read the prototype's.
+          const value: unknown = Object.hasOwn(item, field.name) ? Reflect.get(item, field.name) : undefined
+          const path = `${label}[${index}].${field.name}`
+          if (field.type === 'image') checkImage(value, path)
+          else if (field.type === 'object-list') checkItems(value, field.itemFields, path)
+        }
+      })
+    }
+    for (const variable of template.variableData ?? []) {
+      const value = variableValues[variable.name]
+      if (exceedsMaxLength(variable, value)) throw tooLong(variable.name, variable.maxLength)
+      if (exceedsMaxItems(variable, value)) throw tooMany(variable.name, variable.maxItems)
+      if (variable.type === 'image') checkImage(value, variable.name)
+      else if (variable.type === 'object-list') {
+        const issue = findItemFieldIssue(value, variable.itemFields, variable.name)
+        if (issue?.problem === 'missing') {
+          throw new ValidationError(`Required variable "${issue.path}" is missing`, 'REQUIRED_VARIABLE_MISSING')
+        }
+        if (issue?.problem === 'too-long') throw tooLong(issue.path, issue.field.maxLength)
+        if (issue?.problem === 'too-many') throw tooMany(issue.path, issue.field.maxItems)
+        checkItems(value, variable.itemFields, variable.name)
+      }
+    }
+    return images
   }
 
-  private async fetchImageData(presentation: Presentation): Promise<Map<string, string>> {
-    const imageIds = new Set<string>()
+  /**
+   * Every image a resolved box draws from a variable's value, `variableImages`
+   * (already read by `validateVariables`) included. A value that was not
+   * checked there — a default, or a string variable bound to a box through
+   * the API — is read now, and fails the export the same way.
+   */
+  private readVariableImages(
+    resolvedPages: Page[],
+    variableImages: Map<string, DataUrlImage>
+  ): Map<string, DataUrlImage> {
+    const images = new Map(variableImages)
 
-    for (const slide of presentation.slides) {
-      for (const shape of slide.shapes) {
-        if (shape.type === 'image') {
+    for (const page of resolvedPages) {
+      for (const shape of page.shapes) {
+        if (shape.type !== 'image') continue
+        const value = shape.resolvedImage
+        if (value === undefined || images.has(value)) continue
+        const image = readImageDataUrl(value)
+        if (!image) {
+          throw new ValidationError(
+            'An image variable holds something that is not a PNG or JPEG data URL',
+            'INVALID_IMAGE_VALUE'
+          )
+        }
+        images.set(value, image)
+      }
+    }
+
+    return images
+  }
+
+  /**
+   * `images`, with the uploaded images the resolved boxes draw added by id.
+   *
+   * Only `ownerId`'s uploaded images: a shape's image id is anyone's to write,
+   * and an export must not draw someone else's. One not found is left out.
+   */
+  private async fetchUploadedImages(
+    resolvedPages: Page[],
+    ownerId: string,
+    images: Map<string, DataUrlImage>
+  ): Promise<Map<string, DataUrlImage>> {
+    const imageIds = new Set<string>()
+    const imageDataMap = new Map(images)
+
+    for (const page of resolvedPages) {
+      for (const shape of page.shapes) {
+        if (shape.type === 'image' && shape.resolvedImage === undefined && shape.imageId) {
           imageIds.add(shape.imageId)
         }
       }
     }
-    const imageDataMap = new Map<string, string>()
 
     if (imageIds.size === 0) {
       return imageDataMap
@@ -67,16 +208,9 @@ export class ExportService {
 
     const imagePromises = Array.from(imageIds).map(async (imageId) => {
       try {
-        const image = await this.imageService.getById(imageId)
-        let cleanData = image.data.replace(/[\s\n\r]/g, '')
-        let dataUrl: string
-        if (cleanData.startsWith('data:')) {
-          dataUrl = cleanData
-        } else {
-          dataUrl = `data:${image.mimeType};base64,${cleanData}`
-        }
-
-        return { imageId, dataUrl }
+        const image = await this.imageService.getById(imageId, ownerId)
+        const dataUrl = toImageDataUrl(image.data, image.mimeType)
+        return { imageId, asset: { dataUrl, width: image.width, height: image.height } }
       } catch (error) {
         console.error(`Error fetching image ${imageId}:`, error)
         return null
@@ -87,313 +221,118 @@ export class ExportService {
 
     for (const result of results) {
       if (result) {
-        imageDataMap.set(result.imageId, result.dataUrl)
+        imageDataMap.set(result.imageId, result.asset)
       }
     }
 
     return imageDataMap
   }
 
-  private renderRectangle(shape: RectangleShape): React.ReactElement {
-    const { x, y, width, height, fill, cornerRadius, stroke, strokeWidth, strokeStyle } = shape
-    const sw = strokeWidth || 0
+  /**
+   * What the data makes of `template`: the pages its PDF has, in order, each
+   * shape a leaf placed on its page with its text and image written — what
+   * `exportToPDF` draws, and what a preview shows — and what the caller should
+   * know about them: the content left out because it starts beyond its page,
+   * one warning per page concerned. Fails as the export does: a value its
+   * variable refuses, an image that cannot be drawn, no page left.
+   *
+   * The images read from the values come along, so that they are not read twice.
+   */
+  private resolveTemplate(
+    template: Template,
+    variableValues: Record<string, VariableValueType>
+  ): ResolvedTemplate & { variableImages: Map<string, DataUrlImage> } {
+    const validatedImages = this.validateVariables(template, variableValues)
 
-    const svgLeft = Math.max(0, x - sw / 2)
-    const svgTop = Math.max(0, y - sw / 2)
-    const svgRight = Math.min(SLIDE_WIDTH, x + width + sw / 2)
-    const svgBottom = Math.min(SLIDE_HEIGHT, y + height + sw / 2)
-    const svgWidth = Math.max(0, svgRight - svgLeft)
-    const svgHeight = Math.max(0, svgBottom - svgTop)
-
-    if (svgWidth <= 0 || svgHeight <= 0) {
-      return React.createElement(View, { key: shape.id })
-    }
-
-    return React.createElement(Svg, {
-      key: shape.id,
-      style: {
-        position: 'absolute',
-        left: svgLeft,
-        top: svgTop,
-        width: svgWidth,
-        height: svgHeight
-      }
-    },
-      React.createElement(Rect, {
-        x: x - svgLeft,
-        y: y - svgTop,
-        width,
-        height,
-        fill: this.parseColor(fill, 'none').color,
-        fillOpacity: this.parseColor(fill, 'none').opacity,
-        rx: cornerRadius || 0,
-        ry: cornerRadius || 0,
-        stroke: this.parseColor(stroke, 'none').color,
-        strokeOpacity: this.parseColor(stroke, 'none').opacity,
-        strokeWidth: sw,
-        strokeDasharray: getDashArray(strokeStyle)
-      })
-    )
-  }
-
-  private renderEllipse(shape: EllipseShape): React.ReactElement {
-    const { x, y, width, height, fill, stroke, strokeWidth, strokeStyle } = shape
-    const sw = strokeWidth || 0
-
-    const svgLeft = Math.max(0, x - sw / 2)
-    const svgTop = Math.max(0, y - sw / 2)
-    const svgRight = Math.min(SLIDE_WIDTH, x + width + sw / 2)
-    const svgBottom = Math.min(SLIDE_HEIGHT, y + height + sw / 2)
-    const svgWidth = Math.max(0, svgRight - svgLeft)
-    const svgHeight = Math.max(0, svgBottom - svgTop)
-
-    if (svgWidth <= 0 || svgHeight <= 0) {
-      return React.createElement(View, { key: shape.id })
-    }
-
-    return React.createElement(Svg, {
-      key: shape.id,
-      style: {
-        position: 'absolute',
-        left: svgLeft,
-        top: svgTop,
-        width: svgWidth,
-        height: svgHeight
-      }
-    },
-      React.createElement(Ellipse, {
-        cx: x + width / 2 - svgLeft,
-        cy: y + height / 2 - svgTop,
-        rx: width / 2,
-        ry: height / 2,
-        fill: this.parseColor(fill, 'none').color,
-        fillOpacity: this.parseColor(fill, 'none').opacity,
-        stroke: this.parseColor(stroke, 'none').color,
-        strokeOpacity: this.parseColor(stroke, 'none').opacity,
-        strokeWidth: sw,
-        strokeDasharray: getDashArray(strokeStyle)
-      })
-    )
-  }
-
-  private renderTextBox(
-    shape: TextBoxShape,
-    presentation: Presentation,
-    variableValues: Record<string, string>
-  ): React.ReactElement {
-    const { x, y, width, paragraphes } = shape
-
-    const renderTextSegment = (child: CustomText | VariableElement, pIndex: number, cIndex: number): React.ReactElement => {
-      if ('type' in child && child.type === 'variable') {
-        const varElement = child as VariableElement;
-        const value = this.getVariableValue(varElement.variableId, presentation, variableValues)
-        const fontFamily = normalizeFontFamily(varElement.fontFamily)
-        const styleProps = getFontStyleProps(varElement.bold, varElement.italic)
-
-        const varColor = this.parseColor(varElement.color, '#000000')
-        return React.createElement(PDFText, {
-          key: `${pIndex}-${cIndex}`,
-          fixed: true,
-          style: {
-            fontFamily,
-            fontSize: varElement.fontSize ? parseInt(varElement.fontSize) : 16,
-            color: varColor.color,
-            opacity: varColor.opacity,
-            lineHeight: 1.5,
-            textDecoration: varElement.underline ? 'underline' : undefined,
-            ...styleProps
-          } as Style
-        }, value)
-      } else {
-        const textNode = child as CustomText;
-        const fontFamily = normalizeFontFamily(textNode.fontFamily)
-        const styleProps = getFontStyleProps(textNode.bold, textNode.italic)
-
-        const textColor = this.parseColor(textNode.color, '#000000')
-        return React.createElement(PDFText, {
-          key: `${pIndex}-${cIndex}`,
-          fixed: true,
-          style: {
-            fontFamily,
-            fontSize: textNode.fontSize ? parseInt(textNode.fontSize) : 16,
-            color: textColor.color,
-            opacity: textColor.opacity,
-            lineHeight: 1.5,
-            textDecoration: textNode.underline ? 'underline' : undefined,
-            ...styleProps
-          } as Style
-        }, textNode.text)
-      }
-    }
-
-    const paragraphElements = paragraphes.map((paragraph, pIndex) => {
-      const textSegments = paragraph.children.map((child, cIndex) =>
-        renderTextSegment(child, pIndex, cIndex)
+    const ctx: ResolveContext = { variableValues, template }
+    const { pageSize } = template
+    // Repeated pages copied, pages whose condition fails left out: what is
+    // left is the PDF's pages, and a PDF needs one.
+    const exported = resolvePages(template.pages, ctx, template.pageNumbering)
+    if (exported.length === 0) {
+      throw new ValidationError(
+        'No page to export: every page is left out by its condition, or repeated for an empty list',
+        'NO_PAGE_TO_EXPORT'
       )
-
-      return React.createElement(PDFText, {
-        key: pIndex,
-        fixed: true,
-        style: {
-          marginBottom: pIndex < paragraphes.length - 1 ? 8 : 0,
-          lineHeight: 1.5,
-          ...paragraph.style
-        }
-      }, textSegments)
+    }
+    // A shape starting beyond the page is left out — react-pdf would start a
+    // new page for it — and the caller told, since content that grew with its
+    // data can land there without anyone placing it so. A turned shape starts
+    // where its turned box does.
+    const warnings: ExportDTO.Warning[] = []
+    const pages: Page[] = exported.map((page, index) => {
+      const { shapes } = page
+      const onPage = shapes.filter(s => {
+        const bounds = getRotatedBounds(s)
+        return bounds.y < pageSize.height && bounds.x < pageSize.width
+      })
+      const leftOut = shapes.length - onPage.length
+      if (leftOut > 0) {
+        warnings.push({
+          code: 'CONTENT_OFF_PAGE',
+          page: index + 1,
+          shapes: leftOut,
+          message: `Page ${index + 1}: ${leftOut} shape${leftOut > 1 ? 's' : ''} start beyond the edge of the page and ${leftOut > 1 ? 'are' : 'is'} left out of the PDF.`,
+        })
+      }
+      return { ...page, shapes: onPage }
     })
 
-    return React.createElement(View, {
-      key: shape.id,
-      fixed: true,
-      style: {
-        position: 'absolute',
-        left: x,
-        top: y,
-        width,
-        padding: 8,
-      }
-    }, paragraphElements)
+    return { pages, warnings, variableImages: this.readVariableImages(pages, validatedImages) }
   }
 
-  private renderImage(shape: ImageShape, imageDataMap: Map<string, string>): React.ReactElement {
-    const { x, y, width, height, imageId } = shape
-    const imageData = imageDataMap.get(imageId)
+  /** `resolveTemplate`, without the images it read: what a preview shows. */
+  public resolve(template: Template, variableValues: Record<string, VariableValueType>): ResolvedTemplate {
+    const { pages, warnings } = this.resolveTemplate(template, variableValues)
+    return { pages, warnings }
+  }
 
-    if (!imageData) {
-      console.error(`Image data not found for imageId: ${imageId}`)
+  /**
+   * The PDF, and what the caller should know about it (see `resolveTemplate`).
+   * `ownerId` owns the template: only their images are drawn.
+   *
+   * Drawn on a worker: the export may wait its turn for one, fails with 429
+   * when it may not, and with 408 past PDF_RENDER_TIMEOUT_SECONDS.
+   */
+  public async exportToPDF(template: Template, ownerId: string, options: RenderOptions = {}): Promise<ExportResult> {
+    const { pdf, warnings } = await this.render(template, ownerId, options)
+    return { pdf, warnings }
+  }
 
-      return React.createElement(View, {
-        key: shape.id,
-        style: {
-          position: 'absolute',
-          left: x,
-          top: y,
-          width,
-          height,
-          backgroundColor: '#f0f0f0',
-          border: '2px solid #ff0000',
-          justifyContent: 'center',
-          alignItems: 'center'
-        }
-      },
-        React.createElement(PDFText, {
-          style: { color: '#ff0000', fontSize: 12 }
-        }, `Image not found: ${imageId}`)
-      )
-    }
+  /**
+   * Pages of the PDF `exportToPDF` makes, as PNG images: the PDF itself, drawn
+   * by pdf.js — what an agent looks at to check its work. In the same job as
+   * the PDF, on the same worker, under the same timeout.
+   */
+  public async exportPageImages(
+    template: Template,
+    ownerId: string,
+    options: RenderOptions,
+    raster: RasterOptions
+  ): Promise<PageImagesResult> {
+    const { images, pageCount, warnings } = await this.render(template, ownerId, options, raster)
+    return { images, pageCount, warnings }
+  }
 
-    return React.createElement(Image, {
-      key: shape.id,
-      src: imageData,
-      style: {
-        position: 'absolute',
-        left: x,
-        top: y,
-        width,
-        height,
-        objectFit: 'fill'
-      }
+  // The resolved pages drawn on a worker, with the images and fonts they
+  // need — read while the worker is lent, so that a refused export reads
+  // nothing — and, with `raster`, their PNG images.
+  private async render(
+    template: Template,
+    ownerId: string,
+    options: RenderOptions,
+    raster?: RasterOptions
+  ): Promise<RenderOutput & { pageCount: number; warnings: ExportDTO.Warning[] }> {
+    const { pageSize } = template
+    const { pages, warnings, variableImages } = this.resolveTemplate(template, options.variableValues || {})
+
+    const output = await this.renderPool.render(ownerId, async isRegistered => {
+      const [images, fonts] = await Promise.all([
+        this.fetchUploadedImages(pages, ownerId, variableImages),
+        this.fontService.getForExport(usedFontFamilies(pages), isRegistered),
+      ])
+      return { pages, pageSize, images, fonts, raster }
     })
+    return { ...output, pageCount: pages.length, warnings }
   }
-
-  private renderShape(
-    shape: Shape,
-    imageDataMap: Map<string, string>,
-    presentation: Presentation,
-    variableValues: Record<string, string>
-  ): React.ReactElement {
-    switch (shape.type) {
-      case 'rectangle':
-        return this.renderRectangle(shape)
-      case 'ellipse':
-        return this.renderEllipse(shape)
-      case 'text':
-        return this.renderTextBox(shape, presentation, variableValues)
-      case 'image':
-        return this.renderImage(shape, imageDataMap)
-      default: {
-        return React.createElement(View, {})
-      }
-    }
-  }
-
-  private renderSlide(
-    slide: Slide,
-    imageDataMap: Map<string, string>,
-    presentation: Presentation,
-    variableValues: Record<string, string>
-  ): React.ReactElement {
-    const shapes = slide.shapes.map(shape =>
-      this.renderShape(shape, imageDataMap, presentation, variableValues)
-    )
-
-    return React.createElement(Page, {
-      key: slide._id,
-      size: {
-        width: SLIDE_WIDTH,
-        height: SLIDE_HEIGHT
-      },
-      style: {
-        position: 'relative',
-        backgroundColor: '#ffffff'
-      }
-    }, shapes)
-  }
-
-  public async exportToPDF(presentation: Presentation, options: RenderOptions = {}): Promise<Buffer> {
-    const variableValues = options.variableValues || {}
-
-    this.validateVariables(presentation, variableValues)
-
-    const imageDataMap = await this.fetchImageData(presentation)
-
-    const pages = presentation.slides.map(slide =>
-      this.renderSlide(slide, imageDataMap, presentation, variableValues)
-    )
-
-    const doc = React.createElement(Document, {}, pages)
-
-    const TIMEOUT_MS = 30_000
-    const pdfBuffer = await Promise.race([
-      renderToBuffer(doc),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new AppError('PDF generation timed out after 30s', 408)), TIMEOUT_MS)
-      )
-    ])
-
-    return pdfBuffer
-  }
-
-  // @react-pdf/renderer does not parse 8-digit hex (#RRGGBBAA) or rgba() — alpha
-  private parseColor(input: string | undefined | null, fallback = '#000000'): { color: string; opacity: number } {
-    if (!input) return { color: fallback, opacity: 1 }
-    const value = input.trim()
-
-    if (value === 'none' || value === 'transparent') {
-      return { color: 'none', opacity: 0 }
-    }
-
-    // #RGB / #RGBA / #RRGGBB / #RRGGBBAA
-    if (value.startsWith('#')) {
-      const hex = value.slice(1)
-      if (hex.length === 4) {
-        const r = hex[0], g = hex[1], b = hex[2], a = hex[3]
-        return { color: `#${r}${r}${g}${g}${b}${b}`, opacity: parseInt(a + a, 16) / 255 }
-      }
-      if (hex.length === 8) {
-        return { color: `#${hex.slice(0, 6)}`, opacity: parseInt(hex.slice(6, 8), 16) / 255 }
-      }
-      return { color: value, opacity: 1 }
-    }
-
-    // rgba(r,g,b,a) / rgb(r,g,b)
-    const rgbaMatch = value.match(/^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*(?:,\s*([\d.]+)\s*)?\)$/i)
-    if (rgbaMatch) {
-      const [, r, g, b, a] = rgbaMatch
-      return { color: `rgb(${r}, ${g}, ${b})`, opacity: a !== undefined ? Math.max(0, Math.min(1, parseFloat(a))) : 1 }
-    }
-
-    return { color: value, opacity: 1 }
-  }
-
 }

@@ -1,96 +1,176 @@
-import { DownloadOutlined, LeftOutlined } from "@ant-design/icons";
+import { DownloadOutlined, EyeOutlined, LeftOutlined, RedoOutlined, ThunderboltFilled, UndoOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom"
 import { useState, useEffect } from "react";
-import { presentationsAPI } from "../../api/api";
-import { Button, Input, message, Modal, Form } from "antd";
+import { previewsAPI, templatesAPI } from "../../api/api";
+import { Button, Input, message, Modal, Form, Switch, Dropdown, Space, Tooltip } from "antd";
+import type { VariableValueType } from "@imprime/sdk";
+import { getPreviewPath, getVariableMaxItems, getVariableMaxLength } from "@imprime/sdk";
 import "./EditorHeader.css";
 import { useEditorStore } from "../../store/editor/EditorStore";
+import { MOD_LABEL } from "../../utils/hotkeys";
+import { maxLengthCount } from "../../utils/maxLengthCount";
+import { listValueRule } from "../../utils/listValueRule";
+import { parseApiError } from "../../utils/apiError";
+import { selectCanRedo, selectCanUndo } from "../../store/editor/selectors";
+import { ImageValueInput, ItemListInput } from "../../components/common";
+import { DropdownVariablesContent } from "../EditorPage/components/PageEditor/TopBar/Context-toolbar/DropdownVariablesContent/DropdownVariablesContent";
+import { VariableFormModal } from "../EditorPage/components/PageEditor/TopBar/Context-toolbar/DropdownVariablesContent/VariableFormModal";
+import TemplateCodeInput from "./TemplateCodeInput";
+
+// What the variable values are asked for: a PDF to download, or a preview.
+type ValuesAction = 'download' | 'preview';
+
+// The values the author can fix; the form checks them too, but the server is
+// the one that decides. No page left is theirs to fix too: a condition or a
+// list. `fallback` says what failed, for any other error.
+function showExportError(error: unknown, fallback: string) {
+    console.error('Export error:', error);
+    const apiError = parseApiError(error);
+    if (
+        apiError.code === 'REQUIRED_VARIABLE_MISSING'
+        || apiError.code === 'VARIABLE_TOO_LONG'
+        || apiError.code === 'VARIABLE_TOO_MANY_ITEMS'
+        || apiError.code === 'NO_PAGE_TO_EXPORT'
+    ) {
+        message.error(apiError.message);
+    } else {
+        message.error(fallback);
+    }
+}
 
 export default function EditorHeader() {
     const navigate = useNavigate();
-    const presentation = useEditorStore(state => state.presentation);
-    const updatePresentationTitle = useEditorStore(state => state.updatePresentationTitle);
-    const [localTitle, setLocalTitle] = useState(presentation?.title ?? '');
+    const template = useEditorStore(state => state.template);
+    const updateTemplateTitle = useEditorStore(state => state.updateTemplateTitle);
+    const undo = useEditorStore(state => state.undo);
+    const redo = useEditorStore(state => state.redo);
+    const canUndo = useEditorStore(selectCanUndo);
+    const canRedo = useEditorStore(selectCanRedo);
+    const [localTitle, setLocalTitle] = useState(template?.title ?? '');
+    const endTextSession = useEditorStore(state => state.endTextSession);
+    const whenSaved = useEditorStore(state => state.whenSaved);
     const [isExporting, setIsExporting] = useState(false);
-    const [isVariableModalOpen, setIsVariableModalOpen] = useState(false);
+    const [isPreviewing, setIsPreviewing] = useState(false);
+    // The modal asking for the values is open while set.
+    const [valuesAction, setValuesAction] = useState<ValuesAction | null>(null);
     const [form] = Form.useForm();
 
+    // In the store rather than here: opening the edit form has to close this
+    // panel, and the panel itself is what triggers it.
+    const isVariablesDropdownOpen = useEditorStore(state => state.variablesPanelOpen);
+    const setVariablesPanelOpen = useEditorStore(state => state.setVariablesPanelOpen);
+
     useEffect(() => {
-        if (presentation?.title !== undefined) {
-            setLocalTitle(presentation.title);
+        if (template?.title !== undefined) {
+            setLocalTitle(template.title);
         }
-    }, [presentation?.title]);
+    }, [template?.title]);
 
     useEffect(() => {
-        if (!presentation) return;
+        if (!template) return;
 
-        if (localTitle === presentation.title) return;
+        if (localTitle === template.title) return;
 
         const timeoutId = setTimeout(() => {
             if (localTitle.trim()) {
-                updatePresentationTitle(localTitle);
+                updateTemplateTitle(localTitle);
             }
         }, 500);
 
         return () => clearTimeout(timeoutId);
-    }, [localTitle, presentation, updatePresentationTitle]);
+    }, [localTitle, template, updateTemplateTitle]);
 
-    const handleDownloadClick = () => {
-        if (!presentation) {
-            message.warning('No presentation loaded');
+    const startAction = (action: ValuesAction) => {
+        if (!template) {
+            message.warning('No template loaded');
             return;
         }
 
-        const hasVariables = presentation.variableData && presentation.variableData.length > 0;
+        const hasVariables = template.variableData && template.variableData.length > 0;
 
         if (hasVariables) {
-            setIsVariableModalOpen(true);
-            const initialValues: Record<string, string> = {};
-            presentation.variableData?.forEach(variable => {
-                if (variable.default) {
+            setValuesAction(action);
+            const initialValues: Record<string, VariableValueType> = {};
+            template.variableData?.forEach(variable => {
+                if (variable.default !== undefined && variable.default !== null) {
                     initialValues[variable.name] = variable.default;
                 }
             });
             form.setFieldsValue(initialValues);
         } else {
-            // No variables, download directly
-            handleDownloadPDF({});
+            // No variables, go straight on
+            void runAction(action, {});
         }
     };
 
-    const handleDownloadPDF = async (variableValues: Record<string, string>) => {
-        if (!presentation) return;
+    const closeValues = () => {
+        setValuesAction(null);
+        form.resetFields();
+    };
+
+    const handleDownloadPDF = async (variableValues: Record<string, VariableValueType>) => {
+        if (!template) return;
 
         setIsExporting(true);
         try {
-            await presentationsAPI.downloadPDF(
-                presentation._id,
-                `${presentation.title || 'presentation'}.pdf`,
+            const warnings = await templatesAPI.downloadPDF(
+                template._id,
+                `${template.title || 'template'}.pdf`,
                 variableValues
             );
-            message.success('PDF exported successfully!');
-            setIsVariableModalOpen(false);
-            form.resetFields();
-        } catch (error) {
-            console.error('Export error:', error);
-            if (error instanceof Error && error.message.includes('Required variable')) {
-                message.error(error.message);
+            // The PDF is made, but not all of it: content that grew past its
+            // page with these values was left out.
+            if (warnings.length > 0) {
+                message.warning({
+                    content: `PDF exported, but some content does not fit. ${warnings.map(warning => warning.message).join(' ')}`,
+                    duration: 8,
+                });
             } else {
-                message.error('Failed to export PDF. Please try again.');
+                message.success('PDF exported successfully!');
             }
+            closeValues();
+        } catch (error) {
+            showExportError(error, 'Failed to export PDF. Please try again.');
         } finally {
             setIsExporting(false);
         }
     };
 
+    // The preview reads the template from the server: the typing in progress
+    // is committed, and every save has landed, first.
+    const handlePreview = async (variableValues: Record<string, VariableValueType>) => {
+        if (!template) return;
+
+        setIsPreviewing(true);
+        try {
+            endTextSession();
+            await whenSaved();
+            const preview = await previewsAPI.create(template._id, variableValues);
+            closeValues();
+            navigate(getPreviewPath(preview._id));
+        } catch (error) {
+            showExportError(error, 'Failed to make the preview. Please try again.');
+        } finally {
+            setIsPreviewing(false);
+        }
+    };
+
+    const runAction = (action: ValuesAction, variableValues: Record<string, VariableValueType>) =>
+        action === 'preview' ? handlePreview(variableValues) : handleDownloadPDF(variableValues);
+
     const handleVariableFormSubmit = async () => {
+        if (!valuesAction) return;
         try {
             const values = await form.validateFields();
-            await handleDownloadPDF(values);
+            await runAction(valuesAction, values);
         } catch (error) {
             console.error('Form validation error:', error);
         }
     };
+
+    // How large a vector image picked for an image value is redrawn: as large
+    // as the page, so that it stays sharp across it.
+    const vectorSize = template ? Math.max(template.pageSize.width, template.pageSize.height) : undefined;
 
     return (
     <>
@@ -105,58 +185,121 @@ export default function EditorHeader() {
                 type="text"
                 value={localTitle}
                 onChange={(e) => setLocalTitle(e.target.value)}
-                placeholder="Presentation title"
+                placeholder="Template title"
                 size="large"
                 className="inputBtn"/>
+            <TemplateCodeInput key={template?._id} />
+            <Space>
+                <Tooltip title={`Undo (${MOD_LABEL}+Z)`}>
+                    <Button size="large" icon={<UndoOutlined />} disabled={!canUndo} onClick={undo} />
+                </Tooltip>
+                <Tooltip title={`Redo (${MOD_LABEL}+Shift+Z)`}>
+                    <Button size="large" icon={<RedoOutlined />} disabled={!canRedo} onClick={redo} />
+                </Tooltip>
+            </Space>
         </div>
         <div className="gap-header">
+            <Dropdown
+                menu={{ items: [] }}
+                popupRender={() => <DropdownVariablesContent />}
+                destroyOnHidden
+                trigger={["click"]}
+                placement="bottomRight"
+                open={isVariablesDropdownOpen}
+                onOpenChange={setVariablesPanelOpen}>
+                <Button
+                    size="large"
+                    icon={<ThunderboltFilled />}>
+                    Variables
+                </Button>
+            </Dropdown>
             <Button
-                onClick={handleDownloadClick}
+                onClick={() => startAction('preview')}
+                size="large"
+                loading={isPreviewing}
+                icon={<EyeOutlined/>}>
+                Preview
+            </Button>
+            <Button
+                onClick={() => startAction('download')}
                 color="primary"
                 size="large"
                 loading={isExporting}
                 icon={<DownloadOutlined/>}>
-                Download
+                Imprime
             </Button>
         </div>
     </div>
 
     <Modal
         title="Variable Values"
-        open={isVariableModalOpen}
+        open={valuesAction !== null}
         onOk={handleVariableFormSubmit}
-        onCancel={() => {
-            setIsVariableModalOpen(false);
-            form.resetFields();
-        }}
-        okText="Export PDF"
+        onCancel={closeValues}
+        okText={valuesAction === 'preview' ? 'Preview' : 'Export PDF'}
         cancelText="Cancel"
-        confirmLoading={isExporting}
+        confirmLoading={isExporting || isPreviewing}
     >
         <Form
             form={form}
             layout="vertical"
         >
-            {presentation?.variableData?.map(variable => (
-                <Form.Item
-                    key={variable._id}
-                    label={variable.name}
-                    name={variable.name}
-                    rules={[
-                        {
-                            required: variable.required,
-                            message: `${variable.name} is required`
-                        }
-                    ]}
-                    tooltip={variable.required ? 'Required' : `Default: ${variable.default || 'None'}`}
-                >
-                    <Input
-                        placeholder={variable.default || `Enter ${variable.name}`}
-                    />
-                </Form.Item>
-            ))}
+            {template?.variableData?.map(variable => {
+                let defaultHint = 'None';
+                if (variable.default !== undefined && variable.default !== null) {
+                    // An image's default is a data URL, far too long to print.
+                    if (variable.type === 'image') defaultHint = 'Default: an image';
+                    else if (Array.isArray(variable.default)) defaultHint = `Default: ${variable.default.length} items`;
+                    else defaultHint = `Default: ${String(variable.default)}`;
+                }
+
+                let input: React.ReactNode;
+                let valuePropName: string | undefined;
+                if (variable.type === 'boolean') {
+                    input = <Switch />;
+                    valuePropName = 'checked';
+                } else if (variable.type === 'image') {
+                    input = <ImageValueInput vectorSize={vectorSize} />;
+                } else if (variable.type === 'object-list') {
+                    input = (
+                        <ItemListInput
+                            itemFields={variable.itemFields}
+                            maxItems={getVariableMaxItems(variable)}
+                            vectorSize={vectorSize}
+                        />
+                    );
+                } else {
+                    input = (
+                        <Input
+                            placeholder={typeof variable.default === 'string' ? variable.default : `Enter ${variable.name}`}
+                            count={maxLengthCount(getVariableMaxLength(variable))}
+                        />
+                    );
+                }
+
+                return (
+                    <Form.Item
+                        key={variable._id}
+                        label={variable.name}
+                        name={variable.name}
+                        valuePropName={valuePropName}
+                        rules={[
+                            {
+                                required: variable.required,
+                                message: `${variable.name} is required`
+                            },
+                            ...(variable.type === 'object-list' ? [listValueRule(variable, variable.name)] : []),
+                        ]}
+                        tooltip={variable.required ? 'Required' : defaultHint}
+                    >
+                        {input}
+                    </Form.Item>
+                );
+            })}
         </Form>
     </Modal>
+
+    <VariableFormModal />
     </>
     )
 }

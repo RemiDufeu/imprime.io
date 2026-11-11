@@ -13,6 +13,11 @@
   box-shadow: var(--ant-box-shadow);
 }
 
+.code-input {
+  width: 200px;
+  box-shadow: var(--ant-box-shadow);
+}
+
 .gap-header {
   display: flex;
   align-items: center;

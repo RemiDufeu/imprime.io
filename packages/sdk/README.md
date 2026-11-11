@@ -1,6 +1,6 @@
 # @imprime/sdk
 
-TypeScript SDK for Imprime API - Create and manage presentations programmatically.
+TypeScript SDK for Imprime API - Create and manage templates programmatically.
 
 ## Installation
 
@@ -18,15 +18,15 @@ const client = new ImprimeClient({
   baseUrl: 'http://localhost:3023/api'
 })
 
-// Create a presentation
-const presentation = await client.createPresentation('My Presentation')
+// Create a template
+const template = await client.createTemplate('My Template')
 
-// Add a slide
-const updated = await client.addSlide(presentation._id)
-const slideId = updated.slides[0]._id
+// Add a page
+const page = await client.addPage(template._id)
+const pageId = page._id
 
 // Add shapes
-await client.addRectangle(presentation._id, slideId, {
+await client.addRectangle(template._id, pageId, {
   x: 100,
   y: 100,
   width: 200,
@@ -34,7 +34,7 @@ await client.addRectangle(presentation._id, slideId, {
   fill: '#3b82f6'
 })
 
-await client.addText(presentation._id, slideId, {
+await client.addText(template._id, pageId, {
   x: 120,
   y: 120,
   text: 'Hello World!',
@@ -53,133 +53,428 @@ new ImprimeClient(options?: ImprimeClientOptions)
 
 **Options:**
 - `baseUrl?: string` - Base URL of the Imprime API
-- `timeout?: number` - Request timeout in milliseconds (default: `30000`)
+- `timeout?: number` - Request timeout in milliseconds (default: `30000`). PDF exports are not bound by it: the server answers `408` itself past its own limit, `PDF_RENDER_TIMEOUT_SECONDS` (30 s by default)
 
-### Presentation Methods
+### Template Methods
 
-#### `listPresentations()`
-List all presentations.
+#### `listTemplates()`
+List all templates.
 
 ```typescript
-const presentations = await client.listPresentations()
+const templates = await client.listTemplates()
 ```
 
-#### `getPresentation(id: string)`
-Get a specific presentation by ID.
+#### `getTemplate(id: string)`
+Get a specific template by ID.
 
 ```typescript
-const presentation = await client.getPresentation('674abc123def456')
+const template = await client.getTemplate('674abc123def456')
 ```
 
-#### `createPresentation(title?: string)`
-Create a new presentation.
+#### `createTemplate(title?: string, pageSize?: PageSize)`
+Create a new template with one blank page. `pageSize` is in points, and 1920×1080
+when omitted; `PAGE_FORMATS` lists the presets (A4 portrait, A4 landscape, 16:9).
 
 ```typescript
-const presentation = await client.createPresentation('Q4 Results')
+const template = await client.createTemplate('Q4 Results')
+const invoice = await client.createTemplate('Invoice', PAGE_FORMATS[0].size) // A4 portrait
 ```
 
-#### `updatePresentation(id: string, data: { title?: string; slides?: Slide[] })`
-Update a presentation's title or slides.
+#### `updateTemplate(id: string, data: { title?: string; pages?: Page[] })`
+Update a template's title or pages.
 
 ```typescript
-await client.updatePresentation('674abc123def456', {
+await client.updateTemplate('674abc123def456', {
   title: 'Updated Title'
 })
 ```
 
-#### `deletePresentation(id: string)`
-Delete a presentation.
+#### `deleteTemplate(id: string)`
+Delete a template.
 
 ```typescript
-await client.deletePresentation('674abc123def456')
+await client.deleteTemplate('674abc123def456')
 ```
 
-### Slide Methods
+### Page Methods
 
-#### `addSlide(presentationId: string)`
-Add a new blank slide to a presentation.
+#### `addPage(templateId: string, page?: PageDTO.Create)`
+Add a page to a template and return it. Blank and last by default; `order`
+inserts it at that 0-based position, `shapes` gives it content, `visibleWhen`
+and `repeat` a condition and a repeat (see `updatePage`), and `_id` restores a
+deleted page under its former id (409 if that id is in use).
 
 ```typescript
-const updated = await client.addSlide('674abc123def456')
+const page = await client.addPage('674abc123def456')
+const second = await client.addPage('674abc123def456', { order: 1, shapes: [] })
 ```
 
-#### `updateSlide(presentationId: string, slideId: string, shapes: Shape[])`
-Update all shapes on a slide.
+#### `updatePage(templateId: string, pageId: string, update: PageDTO.Update)`
+Update a page. Each field given replaces the page's, the others are left
+alone: `shapes` replaces all its shapes, `visibleWhen` exports it only while a
+boolean variable is `true` (`false` with `negate`), and `repeat` exports it once
+per item of a list variable, each copy's shapes reading their item's fields
+through `itemPath`. `null` removes a condition or a repeat.
 
 ```typescript
-await client.updateSlide('674abc123def456', 'slide-123', [
-  { id: 'rect-1', type: 'rectangle', x: 0, y: 0, width: 100, height: 100, fill: '#000' }
-])
+await client.updatePage('674abc123def456', 'page-123', {
+  shapes: [
+    { id: 'rect-1', type: 'rectangle', x: 0, y: 0, width: 100, height: 100, fill: '#000' }
+  ]
+})
+
+// One page per item of the `invoices` list, only for the paid ones
+await client.updatePage('674abc123def456', 'page-123', {
+  repeat: { variableId: invoicesVariableId },
+  visibleWhen: { variableId: invoicesVariableId, itemPath: 'paid' }
+})
 ```
 
-#### `deleteSlide(presentationId: string, slideId: string)`
-Delete a slide from a presentation.
+#### `deletePage(templateId: string, pageId: string)`
+Delete a page from a template.
 
 ```typescript
-await client.deleteSlide('674abc123def456', 'slide-123')
+await client.deletePage('674abc123def456', 'page-123')
 ```
 
 ### Shape Methods
 
-#### `addRectangle(presentationId, slideId, options)`
-Add a rectangle to a slide.
+#### `addRectangle(templateId, pageId, options)`
+Add a rectangle to a page.
 
 ```typescript
-await client.addRectangle('674abc123def456', 'slide-123', {
+await client.addRectangle('674abc123def456', 'page-123', {
   x: 100,
   y: 100,
   width: 200,
   height: 100,
-  fill: '#3b82f6' // optional, default: '#3b82f6'
+  fill: '#3b82f6', // optional, default: '#3b82f6'
+  rotation: 15     // optional, degrees clockwise about the centre, default: 0
 })
 ```
 
-#### `addEllipse(presentationId, slideId, options)`
-Add an ellipse/circle to a slide.
+#### `addEllipse(templateId, pageId, options)`
+Add an ellipse/circle to a page.
 
 ```typescript
-await client.addEllipse('674abc123def456', 'slide-123', {
+await client.addEllipse('674abc123def456', 'page-123', {
   x: 100,
   y: 100,
   width: 150,
   height: 150,
-  fill: '#f59e0b' // optional, default: '#f59e0b'
+  fill: '#f59e0b', // optional, default: '#f59e0b'
+  rotation: 15     // optional, degrees clockwise about the centre, default: 0
 })
 ```
 
-#### `addText(presentationId, slideId, options)`
-Add a text box to a slide.
+#### `addText(templateId, pageId, options)`
+Add a text box to a page. Each line of `text` (split on `
+`) becomes a
+paragraph; the formatting options apply to all of them.
 
 ```typescript
-await client.addText('674abc123def456', 'slide-123', {
+await client.addText('674abc123def456', 'page-123', {
   x: 50,
   y: 50,
-  text: 'Hello World',
-  width: 200,         // optional, default: 200
-  height: 50,         // optional, default: 50
-  fontSize: 24,       // optional, default: 16
-  fontFamily: 'Arial', // optional, default: 'Arial, sans-serif'
-  color: '#000000'    // optional, default: '#000000'
+  text: 'Hello World
+Second paragraph',
+  width: 200,              // optional, default: 200
+  height: 50,              // optional, default: 50
+  fontSize: 24,            // optional, default: 24
+  fontFamily: 'Roboto',    // optional, default: 'Roboto'; a built-in or imported font (see listFonts), unknown fonts fall back to Roboto
+  color: '#000000',        // optional, default: '#000000'
+  align: 'center',         // optional: 'left' | 'center' | 'right' | 'justify', default: 'left'
+  lineHeight: 1.15,        // optional, multiplier of the font size, default: 1.5
+  verticalAlign: 'middle', // optional: 'top' | 'middle' | 'bottom', default: 'top'
+  list: 'bullet',          // optional: 'bullet' | 'number', makes each line a list item
+  rotation: -90            // optional, degrees clockwise about the centre, default: 0
 })
 ```
 
-#### `updateShape(presentationId, slideId, shapeId, updates)`
+#### `addImage(templateId, pageId, options)`
+Add an image box to a page. The image (see `uploadImage`) is drawn inside the
+box and clipped to it, whatever the box's proportions; without `imageId` the
+box is empty and draws nothing but its border.
+
+```typescript
+const image = await client.uploadImage(base64Png, 'image/png', 'logo.png')
+
+await client.addImage('674abc123def456', 'page-123', {
+  imageId: image._id,      // optional: omit for an empty box
+  x: 50,
+  y: 50,
+  width: 300,
+  height: 200,
+  fit: 'cover',            // optional: 'fill' | 'contain' | 'cover', default: 'contain'
+  align: { horizontal: 'left', vertical: 'top' }, // optional, where the image sits when it does not match the box; default: centred
+  crop: { x: 0.25, y: 0, width: 0.5, height: 1 }, // optional, the part shown, in fractions of the image's size; default: all of it
+  opacity: 0.8,            // optional, 0 to 1, default: 1
+  cornerRadius: 12,        // optional, at most half the box's shorter side, default: 0
+  rotation: 15,            // optional, degrees clockwise about the centre, default: 0
+})
+```
+
+A border is set like any shape's, with `updateShape` (`stroke`, `strokeWidth`,
+`strokeStyle`).
+
+Instead of `imageId`, a box can show an **image variable**, resolved at
+export: `imageVariable` is the variable's `_id`, and `itemPath` a field of the
+item an enclosing repeated group iterates (`'photo'`, or `'photos.file'` in a
+nested one). The variable's value — and its `default`, used when an export gives
+none — is a PNG or JPEG data URL; an `object-list` declares image fields with
+`{ name: 'photo', type: 'image' }` in its `itemFields`.
+
+```typescript
+await client.addImage('674abc123def456', 'page-123', {
+  imageVariable: logoVariable._id,
+  x: 50, y: 50, width: 300, height: 200,
+})
+
+await client.exportToPDF('674abc123def456', {
+  logo: 'data:image/png;base64,iVBORw0KGgo…',
+})
+```
+
+`exportPDF` returns the PDF with its `warnings`: one per page whose content
+starts beyond the page's edge and is left out — typically a repeated list
+longer than the page, since pages never overflow onto new ones. `downloadPDF`
+returns them too.
+
+```typescript
+const { pdf, warnings } = await client.exportPDF('674abc123def456', { orders })
+for (const warning of warnings) console.warn(warning.message)
+```
+
+#### Groups, conditions and repeats
+
+A `group` holds `children`, positioned relative to the group. With a `layout`
+(`'horizontal'`, `'vertical'` or `'stack'`, where children sit over each
+other), the group places them itself, inside its `padding`, using `justify`,
+`align` and `gap`. A group can paint its own box: `fill`, a border (`stroke`,
+`strokeStyle`, and `strokeWidth` or one width per side in `strokeWidths`) and
+`cornerRadius` — one number, or one per corner. Rectangles take the same
+`strokeWidths` and `cornerRadius`. In a `'horizontal'` or `'vertical'` group,
+a child with `grow` (CSS's flex-grow: `grow: 1` is `flex: 1`) takes a share of
+the free space along that axis instead of keeping its own size, so fixed and
+relative children can share one row. With `hug: true`, a row's width — a
+column's height — is its children's, gaps and padding included: a column of
+repeated rows grows with them and pushes down what follows it in its own
+parent column.
+
+Any shape can be made conditional with `visibleWhen`: it is drawn only when the
+boolean variable `variableId` is exactly `true` (`false` with `negate: true`).
+A group with `repeat` is drawn once per item of the `object-list` variable
+`variableId`; its copies are laid out by the parent group's layout, or stacked
+downwards outside one. Inside a repeated group, `itemPath` reads a field of the
+current item — in a text run, an image box, a condition or a nested repeat.
+
+```typescript
+await client.addShape('674abc123def456', 'page-123', {
+  id: 'rows', type: 'group', x: 40, y: 200, width: 515, height: 200,
+  layout: 'vertical', gap: 0,
+  children: [{
+    id: 'row', type: 'group', x: 0, y: 0, width: 515, height: 28,
+    layout: 'horizontal', align: 'center', padding: { top: 0, right: 8, bottom: 0, left: 8 },
+    stroke: '#d9d9d9', strokeWidths: { top: 0, right: 0, bottom: 1, left: 0 },
+    repeat: { variableId: productsVariable._id },
+    visibleWhen: { variableId: productsVariable._id, itemPath: 'inStock' },
+    children: [/* text boxes reading itemPath 'name', 'price'… */],
+  }],
+})
+```
+
+#### Rotation
+
+Every shape — groups included — takes a `rotation`: degrees, clockwise, about
+the centre of its box. `x`, `y`, `width` and `height` stay those of the
+unrotated box. A rotated group turns its children with it. Rotation is drawn
+only, as CSS's `transform` is: a group's layout places and sizes its children
+by their unrotated boxes, and a hugging group is as large as those.
+
+```typescript
+await client.updateShape('674abc123def456', 'page-123', 'stamp', { rotation: -12 })
+```
+
+#### `updateShape(templateId, pageId, shapeId, updates)`
 Update a shape's properties.
 
 ```typescript
-await client.updateShape('674abc123def456', 'slide-123', 'rect-1', {
+await client.updateShape('674abc123def456', 'page-123', 'rect-1', {
   x: 150,
   y: 150,
   fill: '#ff0000'
 })
 ```
 
-#### `deleteShape(presentationId, slideId, shapeId)`
-Delete a shape from a slide.
+#### `deleteShape(templateId, pageId, shapeId)`
+Delete a shape from a page.
 
 ```typescript
-await client.deleteShape('674abc123def456', 'slide-123', 'rect-1')
+await client.deleteShape('674abc123def456', 'page-123', 'rect-1')
 ```
+
+### Font Methods
+
+Built-in fonts (all open source):
+
+- **Sans serif** — Roboto (default), Open Sans, Inter, Lato, Montserrat, Noto
+  Sans, Nunito, Poppins, Raleway, Roboto Condensed, Source Sans 3, Work Sans,
+  Oswald
+- **Serif** — Merriweather, Crimson Text, EB Garamond, Lora, Noto Serif,
+  Playfair Display, Roboto Slab
+- **Monospace** — Courier Prime, Roboto Mono, Source Code Pro
+- **Display** — Anton, Bebas Neue
+- **Handwriting** — Comic Neue, Dancing Script, Pacifico
+
+The list is exported as `BUILTIN_FONT_FAMILIES`. Imported fonts belong to the instance: every user can use
+them, by setting a text run's `fontFamily` to their `family`, and only admins
+can import, change or delete them (other users get `403 ADMIN_REQUIRED`).
+Files must be TrueType (`.ttf`) or OpenType (`.otf`), 5 MB at most, sent
+base64-encoded.
+
+A run marked bold or italic is drawn with the matching face; when the family
+does not have it, the closest face it has is used instead (bold italic → bold →
+italic → regular). Nothing is synthesised, so the editor and the PDF agree.
+
+#### `listFonts()`
+List the font families imported into the instance.
+
+#### `createFont(family, regular)` — admin
+Import a family with its regular face. `family` must be unique in the instance
+and differ from the built-in fonts.
+
+```typescript
+import { readFileSync } from 'node:fs'
+
+const font = await client.createFont('Brand Sans', {
+  data: readFileSync('BrandSans-Regular.ttf').toString('base64'),
+  originalName: 'BrandSans-Regular.ttf',
+})
+```
+
+#### `setFontFace(fontId, variant, face)` — admin
+Add or replace one face: `'regular' | 'bold' | 'italic' | 'boldItalic'`.
+
+```typescript
+await client.setFontFace(font._id, 'bold', {
+  data: readFileSync('BrandSans-Bold.ttf').toString('base64'),
+  originalName: 'BrandSans-Bold.ttf',
+})
+```
+
+#### `getFontFace(fontId, variant)`
+Get one face's file, base64-encoded.
+
+#### `deleteFontFace(fontId, variant)` — admin
+Remove an optional face (not `'regular'`).
+
+#### `deleteFont(fontId)` — admin
+Delete a family. Text that uses it, in every template, is drawn in Roboto.
+
+### Settings Methods
+
+Email and single sign-on are set by the instance's admins, not by the
+environment, and apply at once, without a restart. Every method is admin only
+(other users get `403 ADMIN_REQUIRED`).
+
+Email covers the SMTP server, and whether accounts must verify their address.
+
+#### `getEmailSettings()` — admin
+The SMTP server (`null` when there is none) and `requireEmailVerification`.
+The password is never returned: `smtp.hasPassword` says whether one is stored.
+
+#### `updateEmailSettings(settings)` — admin
+Replace both settings. Omit `smtp.password` to keep the stored one (as long as
+`smtp.host`, `smtp.port` and `smtp.user` are unchanged: it is never sent to
+another server); send `smtp: null` to remove the server. With a user and
+password but `secure: false`, the server must offer STARTTLS, or no email is
+sent. Turning `requireEmailVerification` on signs out the users whose address
+is unverified.
+
+```typescript
+await client.updateEmailSettings({
+  smtp: {
+    host: 'smtp.example.com',
+    port: 587,
+    secure: false,          // TLS from the start; always on for port 465
+    user: 'imprime@example.com',
+    password: '…',
+    from: 'Imprime <no-reply@example.com>',
+  },
+  requireEmailVerification: true,
+})
+```
+
+Fails with `400 EMAIL_VERIFICATION_REQUIRES_SMTP` when verification is required
+without a server, and `400 EMAIL_SETTINGS_INVALID` (with `details`) for a
+malformed server.
+
+#### `sendTestEmail({ to, smtp? })` — admin
+Send one email through `smtp`, or through the stored server when it is
+omitted, without saving anything — to check a configuration before saving it.
+Fails with `502 SMTP_TEST_FAILED`, carrying the SMTP server's own error, or
+`400 SMTP_NOT_CONFIGURED` when there is no server to test.
+
+Single sign-on is set the same way: one OAuth application per provider,
+`'google' | 'github' | 'microsoft'` (the list is exported as `SSO_PROVIDERS`).
+A provider appears on the sign-in page as soon as it is saved.
+
+#### `getSsoSettings()` — admin
+For each provider: `callbackUrl`, the redirect URI to register with it;
+`config`, the stored application (`null` when there is none) without its
+secret; and `active`, whether it is offered on the sign-in page — false for a
+stored application whose secret no longer decrypts, after `BETTER_AUTH_SECRET`
+changed.
+
+#### `updateSsoProvider(provider, data)` — admin
+Store a provider's application. Omit `clientSecret` to keep the stored one (as
+long as `clientId` is unchanged). `tenantId` is for Microsoft only:
+`'common'` (the default), `'organizations'`, `'consumers'`, or a tenant ID.
+
+```typescript
+await client.updateSsoProvider('github', {
+  clientId: 'Iv1.0123456789abcdef',
+  clientSecret: '…',
+})
+```
+
+Fails with `400 SSO_SETTINGS_INVALID` (with `details`) for a malformed
+application or a missing secret, and `400 SSO_PROVIDER_INVALID` for an unknown
+provider.
+
+#### `removeSsoProvider(provider)` — admin
+Remove a provider's application: it leaves the sign-in page at once. Accounts
+that only signed in with it can still set a password through password reset,
+when the instance sends email.
+
+#### `getAccessSettings()` / `updateAccessSettings(settings)` — admin
+Who may get into the instance:
+
+- `passwordPolicy` — `'open'` (default): anyone signs up and signs in with an
+  email and a password; `'existing'`: no new password accounts, existing ones
+  keep signing in; `'admins'`: single sign-on only, administrators keep their
+  password as the way back in.
+- `allowedDomains` — e.g. `['example.com']`, exact domains: only addresses in
+  them may have an account, and only once verified, by their provider or by
+  email. Empty (default): any. The administrator is exempt. Google and GitHub
+  say whether an address is verified; Microsoft does only when it sends the
+  optional claim `xms_edov`, which its app registration must add to the ID
+  token.
+
+```typescript
+await client.updateAccessSettings({ passwordPolicy: 'admins', allowedDomains: ['example.com'] })
+```
+
+Users the new settings shut out are signed out at once: everyone but
+administrators when `'admins'` is turned on, those outside the domains when the
+list changes. API keys and MCP tokens are not revoked, but stop working while
+their owner is outside the domains. Fails with `400 ACCESS_SETTINGS_INVALID`
+(with `details`). Nothing else is refused: single sign-on only without an
+active provider leaves the administrator as the only one who can sign in.
+
+Refused sign-ins answer `403` with `PASSWORD_SIGN_IN_DISABLED`,
+`EMAIL_DOMAIN_NOT_ALLOWED` or `ADDRESS_NOT_VERIFIED`; a refused single sign-on
+redirects to the sign-in page with the code in its `error` parameter.
 
 ## Error Handling
 
@@ -187,30 +482,87 @@ The SDK throws errors for failed requests:
 
 ```typescript
 try {
-  await client.getPresentation('invalid-id')
+  await client.getTemplate('invalid-id')
 } catch (error) {
-  console.error('Failed to get presentation:', error.message)
+  console.error('Failed to get template:', error.message)
 }
 ```
+
+Limits worth handling:
+
+- **Images are their uploader's.** `getImage` answers 404 for another user's
+  image, as for a missing one, and an export draws only the template
+  owner's images. A user stores up to 500 MB of images: beyond,
+  `uploadImage` fails with `413 IMAGE_QUOTA_EXCEEDED`.
+- **Images are PNG or JPEG**, the formats the PDF export draws. The format
+  is read from the data, not from `mimeType`: `uploadImage` fails with
+  `400 IMAGE_TYPE_UNSUPPORTED` for any other format, `400 IMAGE_TYPE_MISMATCH`
+  when `mimeType` (or the data URL's type) names another one,
+  `400 IMAGE_DATA_INVALID` when `data` is not base64, and
+  `400 IMAGE_SIZE_UNREADABLE` when the file is damaged and its pixel size
+  cannot be read. That size (`width`, `height`, EXIF orientation applied)
+  comes back with the image: it is what `fit`, `align` and `crop` lay it out
+  from.
+- **Exports run a few at a time**: 4 on the server, 2 per user, by default.
+  Beyond, an export waits its turn on the server, up to 10 s; when the queue
+  is full, or the wait runs out, it fails with `429 EXPORT_BUSY`: retry after
+  a short wait.
+- **Image variables take PNG or JPEG data URLs**, nothing else (no URL, no
+  image id). An export fails with `400 INVALID_IMAGE_VALUE`, naming the value
+  (`albums[0].photos[1].file`), when one is not; an empty value falls back to
+  the variable's default. The request body, images included, is capped at
+  10 MB. An image variable's `default` is checked when it is saved:
+  `400 INVALID_VARIABLE_DEFAULT`.
+- **A string variable can set a `maxLength`**, in characters (an emoji counts
+  as one). An export fails with `400 VARIABLE_TOO_LONG` when a value has more;
+  an empty value falls back to the default, which is checked against the limit
+  when saved: `400 INVALID_VARIABLE_DEFAULT`. A limit that is not a positive
+  whole number fails with `400 INVALID_VARIABLE_MAX_LENGTH`; `maxLength: null`
+  in an update removes it.
+- **A list's item fields can be `required`, and a string one can set a
+  `maxLength`**, in its `itemFields` entry:
+  `{ name: 'title', type: 'string', required: true, maxLength: 40 }`. An export
+  fails, naming the value (`albums[0].tracks[2].title`), with
+  `400 REQUIRED_VARIABLE_MISSING` when an item leaves a required field empty,
+  and with `400 VARIABLE_TOO_LONG` when a value has more characters than its
+  field allows. A required variable left empty fails with the same
+  `REQUIRED_VARIABLE_MISSING`. Item fields have no default, but the list's
+  own default must keep to them when saved: `400 INVALID_VARIABLE_DEFAULT`.
+- **A list variable can set a `maxItems`**, and so can a list field of its
+  items (`{ name: 'tracks', type: 'object-list', maxItems: 12, itemFields: […] }`).
+  An export fails with `400 VARIABLE_TOO_MANY_ITEMS` when a list has more
+  items, naming it (`albums[0].tracks`); the list's default is checked against
+  the limits when saved: `400 INVALID_VARIABLE_DEFAULT`. A limit that is not a
+  positive whole number fails with `400 INVALID_VARIABLE_MAX_ITEMS`;
+  `maxItems: null` in an update removes it.
+- **A page can be conditional or repeated** (`visibleWhen`, `repeat`: see
+  `updatePage`). An export that leaves no page at all — every condition false,
+  every repeated list empty — fails with `400 NO_PAGE_TO_EXPORT`. A
+  `CONTENT_OFF_PAGE` warning's `page` counts the PDF's pages, copies included.
+  `addPage` and `updatePage` fail with `400 INVALID_PAGE_CONDITION` when
+  `visibleWhen` is not an object of an optional string `variableId` and
+  `itemPath` and boolean `negate`, with `400 INVALID_PAGE_REPEAT` when `repeat`
+  is not an object of an optional string `variableId`, and with `400` naming
+  each reference when a variable id is not one of the template's.
 
 ## TypeScript Support
 
 The SDK is written in TypeScript and includes full type definitions:
 
 ```typescript
-import type { Presentation, Slide, Shape } from '@imprime/sdk'
+import type { Template, Page, Shape } from '@imprime/sdk'
 
-const presentation: Presentation = await client.getPresentation(id)
-const slide: Slide = presentation.slides[0]
-const shape: Shape = slide.shapes[0]
+const template: Template = await client.getTemplate(id)
+const page: Page = template.pages[0]
+const shape: Shape = page.shapes[0]
 ```
 
 ## Use Cases
 
-- **Automation**: Generate presentations from data
-- **CLI tools**: Build command-line tools for slide management
-- **Testing**: Automated testing of presentation features
-- **MCP Servers**: Build AI-accessible presentation tools
+- **Automation**: Generate templates from data
+- **CLI tools**: Build command-line tools for page management
+- **Testing**: Automated testing of template features
+- **MCP Servers**: Build AI-accessible template tools
 - **Integrations**: Connect Imprime to other services
 
 ## Requirements

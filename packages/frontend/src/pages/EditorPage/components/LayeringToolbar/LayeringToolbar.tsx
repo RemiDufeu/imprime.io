@@ -1,33 +1,47 @@
 import { useState, useEffect } from 'react'
-import { Button, Tooltip, Popconfirm } from 'antd'
+import { Button, Tooltip } from 'antd'
 import {
   VerticalAlignTopOutlined,
   VerticalAlignBottomOutlined,
   UpOutlined,
   DownOutlined,
   DeleteFilled,
+  UngroupOutlined,
 } from '@ant-design/icons'
+import { shapeToPage } from '@imprime/sdk'
 import './LayeringToolbar.css'
-import { useCurrentSlide, useEditorStore } from '../../../../store/editor/EditorStore'
+import { useCurrentPage, useEditorStore } from '../../../../store/editor/EditorStore'
+import { findShapeById, getSiblingList } from '../../../../utils/shapeTree'
+import { MOD_LABEL } from '../../../../utils/hotkeys'
 
 const TOOLBAR_OFFSET = 12
 
 export default function LayeringToolbar() {
-  const selectShape = useEditorStore(state => state.selectShape)
   const isDragging = useEditorStore(state => !!state.dragData)
-  const selectedShapeId = useEditorStore(state => state.selectedShape?.id)
+  const selectedShapeId = useEditorStore(state => state.selectedShapeId)
   const isTransforming = useEditorStore(state => !!state.transformationData)
 
   const zoom = useEditorStore(state => state.zoom)
-  const currentSlide = useCurrentSlide()
+  const currentPage = useCurrentPage()
   const deleteShape = useEditorStore(state => state.deleteShape)
 
   const bringToFront = useEditorStore(state => state.bringToFront)
   const sendToBack = useEditorStore(state => state.sendToBack)
   const bringForward = useEditorStore(state => state.bringForward)
   const sendBackward = useEditorStore(state => state.sendBackward)
+  const ungroupShape = useEditorStore(state => state.ungroupShape)
 
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null)
+
+  const loc = currentPage && selectedShapeId ? findShapeById(currentPage.shapes, selectedShapeId) : null
+  // The selection's box moves without the selection changing — an undo, a
+  // nudge, a group reflowing — and the toolbar has to follow it.
+  const box = loc ? shapeToPage(loc.shape, loc.parentFrame) : null
+  const boxX = box?.x
+  const boxY = box?.y
+  const boxWidth = box?.width
+  const boxHeight = box?.height
+  const boxRotation = box?.rotation
 
   useEffect(() => {
     if (!selectedShapeId || isDragging || isTransforming) {
@@ -45,8 +59,12 @@ export default function LayeringToolbar() {
 
     const updatePosition = () => {
       const rect = selectionRect.getBoundingClientRect()
+      // A shape turned on its side puts its rotation handle to its right:
+      // clear that too.
+      const handle = document.querySelector(`[data-rotation-handle="${selectedShapeId}"]`)
+      const handleRight = handle?.getBoundingClientRect().right ?? -Infinity
       setPosition({
-        left: rect.right + TOOLBAR_OFFSET,
+        left: Math.max(rect.right, handleRight) + TOOLBAR_OFFSET,
         top: rect.top,
       })
     }
@@ -61,15 +79,14 @@ export default function LayeringToolbar() {
       window.removeEventListener('scroll', handleUpdate, true)
       window.removeEventListener('resize', handleUpdate)
     }
-  }, [selectedShapeId, isDragging, isTransforming, zoom])
+  }, [selectedShapeId, isDragging, isTransforming, zoom, boxX, boxY, boxWidth, boxHeight, boxRotation])
 
   if (!position) return null
+  if (!loc) return null
 
-  const selectedShape = currentSlide?.shapes.find(s => s.id === selectedShapeId)
-  if (!selectedShape) return null
-
-  const shapeIndex = currentSlide!.shapes.findIndex(s => s.id === selectedShapeId)
-  const isAtFront = shapeIndex === currentSlide!.shapes.length - 1
+  const siblings = getSiblingList(currentPage!.shapes, loc.parentGroupId)
+  const shapeIndex = siblings.findIndex(s => s.id === selectedShapeId)
+  const isAtFront = shapeIndex === siblings.length - 1
   const isAtBack = shapeIndex === 0
   const { left, top } = position
 
@@ -80,29 +97,33 @@ export default function LayeringToolbar() {
         top: `${top}px`,
       }}
     >
-      <Popconfirm
-        title="Delete this shape?"
-        description="This action is irreversible."
-        onConfirm={(e) => {
-          e?.stopPropagation()
-          deleteShape(selectedShapeId!)
-          selectShape(null)
-        }}
-        okText="Delete"
-        cancelText="Cancel"
-        okButtonProps={{ danger: true }}
-      >
-        <Tooltip title="Delete shape" placement="left">
-          <Button
-            danger
-            size='small'
-            color='danger'
-            icon={<DeleteFilled />}
-          />
-        </Tooltip>
-      </Popconfirm>
+      {/* No confirmation: a deletion is one undo away. */}
+      <Tooltip title="Delete shape (Del)" placement="left">
+        <Button
+          danger
+          size='small'
+          color='danger'
+          icon={<DeleteFilled />}
+          onClick={(e) => {
+            e.stopPropagation()
+            deleteShape(selectedShapeId!)
+          }}
+        />
+      </Tooltip>
+      {loc.parentGroupId !== null && (
+        <div className='layering-toolbar'>
+          <Tooltip title="Remove from group" placement="left">
+            <Button
+              type="text"
+              size="small"
+              icon={<UngroupOutlined />}
+              onClick={() => ungroupShape(selectedShapeId!)}
+            />
+          </Tooltip>
+        </div>
+        )}
       <div className="layering-toolbar">
-        <Tooltip title="Bring to front" placement="left">
+        <Tooltip title={`Bring to front (${MOD_LABEL}+Shift+↑)`} placement="left">
           <Button
             type="text"
             size="small"
@@ -112,7 +133,7 @@ export default function LayeringToolbar() {
           />
         </Tooltip>
 
-        <Tooltip title="Bring forward" placement="left">
+        <Tooltip title={`Bring forward (${MOD_LABEL}+↑)`} placement="left">
           <Button
             type="text"
             size="small"
@@ -122,7 +143,7 @@ export default function LayeringToolbar() {
           />
         </Tooltip>
 
-        <Tooltip title="Send backward" placement="left">
+        <Tooltip title={`Send backward (${MOD_LABEL}+↓)`} placement="left">
           <Button
             type="text"
             size="small"
@@ -132,7 +153,7 @@ export default function LayeringToolbar() {
           />
         </Tooltip>
 
-        <Tooltip title="Send to back" placement="left">
+        <Tooltip title={`Send to back (${MOD_LABEL}+Shift+↓)`} placement="left">
           <Button
             type="text"
             size="small"

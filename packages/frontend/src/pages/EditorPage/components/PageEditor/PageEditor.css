@@ -1,0 +1,29 @@
+.editor-container {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    min-width: 0;
+}
+
+/* Overlay that stacks the top bar and the floating panels row on top of the
+   canvas. Empty areas fall through to the canvas via pointer-events: none,
+   while individual controls re-enable interaction. */
+.actions-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+}
+.editor-header-row {
+    display: flex;
+    padding: var(--space-m);
+    padding-bottom: var(--space-s);
+    align-items: center;
+    gap: var(--space-m);
+    padding-right: var(--space-l);
+    pointer-events: auto;
+}

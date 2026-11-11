@@ -1,79 +1,186 @@
 import type { Shape } from '@imprime/sdk'
-import type { SlideSlice } from './SlideSlice'
-import type { PresentationSlice } from './PresentationSlice'
-import type { ToolSlice } from './ToolSlice'
-import type { ToolAttributesSlice } from './ToolAttributeSlice'
-import { shapeToAttributesHelper } from './ToolAttributeSlice'
+import { rotateVector, shapeToPage } from '@imprime/sdk'
 import type { StateCreator } from 'zustand'
-import type { RichTextEditorSlice } from './RichTextEditorSlice'
+import type { TemplateSlice } from './TemplateSlice'
+import type { PageSlice } from './PageSlice'
+import type { DocumentWriteSlice } from './DocumentWriteSlice'
+import type { SelectionSlice } from './SelectionSlice'
+import {
+    findShapeById,
+    updateShapeById,
+    deleteShapeById,
+    extractShapeById,
+    insertShapeAt,
+    insertNear,
+    findContentFrame,
+    relocateShape,
+    cloneShapeWithNewIds,
+    isDescendantOf,
+    getSiblingList,
+    replaceSiblingList,
+    isContainerShape,
+} from '../../utils/shapeTree'
+import { selectCurrentPage } from './selectors'
+import { isPageNumberBox } from '../../utils/pageNumbering'
 
+// Offset between a copy and what it was copied from, so it reads as new.
+export const COPY_OFFSET = 20
+
+export const copyName = (shape: Shape) => shape.name ? `${shape.name} copy` : undefined
+
+/** Edits of the shapes on a page: their properties, place in the tree and z-order. */
 export interface ShapeSlice {
-    selectedShape: Shape | null
-    selectShape: (id: string | null) => void
+    // Writes to the page holding the shape, not only the one on screen: a
+    // text box commits its typing as it unmounts, after its page was left.
+    // A shape found nowhere is a no-op.
     updateShape: (id: string, updates: Partial<Shape>) => void
+    // Move a shape by (dx, dy) along the page's axes, whatever its parent's
+    // turn: the arrow keys.
+    nudgeShape: (id: string, dx: number, dy: number) => void
+    // Deselects too, when the selection was the shape or inside it.
     deleteShape: (id: string) => void
+    // Duplicate a shape (recursively for groups, with fresh IDs) and insert
+    // the copy immediately after the source in its own parent.
+    duplicateShape: (id: string) => void
+    // Move a shape to a new parent + index in the tree. `targetGroupId === null`
+    // means the page root. Rejects moves that would put a group inside itself.
+    moveShape: (id: string, targetGroupId: string | null, index: number) => void
+    // Move a shape into a group, appended at the end of its children — i.e. the
+    // top of the group's visual stack (highest z-order among its children).
+    moveShapeIntoGroup: (id: string, targetGroupId: string) => void
+    // Pull a shape out of its parent group into the group's own parent (or
+    // the page root), keeping its absolute position. No-op if the shape
+    // isn't inside a group.
+    ungroupShape: (id: string) => void
+    // Z-order within the shape's own container.
+    bringToFront: (id: string) => void
+    sendToBack: (id: string) => void
+    bringForward: (id: string) => void
+    sendBackward: (id: string) => void
 }
 
-export const createShapeSlice : StateCreator<
-  ShapeSlice & SlideSlice & PresentationSlice & ToolSlice & ToolAttributesSlice & RichTextEditorSlice,
-  [],
+export const createShapeSlice: StateCreator<
+    ShapeSlice & TemplateSlice & PageSlice & DocumentWriteSlice & SelectionSlice,
+    [],
     [],
     ShapeSlice
-> = (set, get) => ({
-    selectedShape: null,
-    selectShape: (id) => {
-        // Retrieve with Id
-        let selectedShape: Shape | null = null
-         try {
-            const state = get()
-            const currentSlide = state.presentation?.slides[state.currentSlideIndex]
-            if (!currentSlide) return
-            selectedShape = currentSlide.shapes.find(s => s.id === id) ?? null
-        } catch {
-            return
-        }
+> = (_, get) => {
+    // Move a shape within its own container's list, to the index `target`
+    // computes from its current one (clamped).
+    const reorder = (id: string, target: (index: number, length: number) => number) => {
+        get()._editPage(shapes => {
+            const loc = findShapeById(shapes, id)
+            if (!loc) return null
+            const siblings = getSiblingList(shapes, loc.parentGroupId)
+            const from = siblings.findIndex(s => s.id === id)
+            const to = Math.max(0, Math.min(siblings.length - 1, target(from, siblings.length)))
+            if (from === -1 || from === to) return null
+            const next = siblings.filter(s => s.id !== id)
+            next.splice(to, 0, siblings[from])
+            return replaceSiblingList(shapes, loc.parentGroupId, next)
+        })
+    }
 
-        const selectedTool = get().selectedTool
-        let contextBarType = get().contextBarType
+    return {
+        updateShape: (id, updates) => {
+            const { template, _editPage } = get()
+            if (!template) return
+            const current = selectCurrentPage(get())
+            const page = current && findShapeById(current.shapes, id)
+                ? current
+                : template.pages.find(s => findShapeById(s.shapes, id) !== null)
+            if (!page) return
+            _editPage(shapes => updateShapeById(shapes, id, updates), {
+                pageId: page._id,
+                // Successive edits of the same fields of one shape undo as one step.
+                mergeKey: `${id}:${Object.keys(updates).sort().join(',')}`,
+                selection: id,
+            })
+        },
 
-        // Update context bar type based on selected shape and tool
-        if (selectedTool === 'move') {
-            if(selectedShape) {
-                 if (selectedShape.type === 'rectangle' || selectedShape.type === 'ellipse') {
-                    contextBarType = 'shape'
-                } else if (selectedShape.type === 'text') {
-                    contextBarType = 'text'
-                }
-            } else {
-                contextBarType = 'none'
-            }
-        }
+        nudgeShape: (id, dx, dy) => {
+            const page = selectCurrentPage(get())
+            const loc = page ? findShapeById(page.shapes, id) : null
+            if (!loc) return
+            // Along the page's axes, which a turned group's are not.
+            const step = rotateVector({ x: dx, y: dy }, -loc.parentFrame.rotation)
+            get().updateShape(id, { x: loc.shape.x + step.x, y: loc.shape.y + step.y })
+        },
 
-        // Sync attributes with selected shape properties
-        const shapeAttributes = selectedShape ? shapeToAttributesHelper(selectedShape) : {}
-        const updatedAttributes = { ...get().attributes, ...shapeAttributes }
+        deleteShape: (id) => {
+            get()._editPage(shapes => deleteShapeById(shapes, id))
+            const { selectedShapeId, selectShape } = get()
+            const page = selectCurrentPage(get())
+            if (selectedShapeId && page && !findShapeById(page.shapes, selectedShapeId)) selectShape(null)
+        },
 
-        // Update store
-         // Unselect editor when we change selection
-        set({ selectedShape, contextBarType, attributes: updatedAttributes, editor : null })
-    },
-    updateShape: (id: string, updates: Partial<Shape>) => {
-        const { presentation, currentSlideIndex, updateSlideShapes } = get()
-        if (!presentation) return
-        const currentSlide = presentation.slides[currentSlideIndex]
-        if (!currentSlide) return
-        const updatedShapes = currentSlide.shapes.map((shape) =>
-            shape.id === id ? { ...shape, ...updates } as Shape : shape
-        )
-        updateSlideShapes(currentSlide._id, updatedShapes)
-    },
-    deleteShape: (id: string) => {
-        const { presentation, currentSlideIndex, updateSlideShapes } = get()   
-        if (!presentation) return
-        const currentSlide = presentation.slides[currentSlideIndex]
-        if (!currentSlide) return
+        // The page-number box has no copy: it is the template's one.
+        duplicateShape: (id) => {
+            if (isPageNumberBox({ id })) return
+            const page = selectCurrentPage(get())
+            const loc = page ? findShapeById(page.shapes, id) : null
+            if (!loc) return
+            const copy = cloneShapeWithNewIds({ ...loc.shape, name: copyName(loc.shape) })
+            const onPage = shapeToPage(copy, loc.parentFrame)
+            const offset = { ...onPage, x: onPage.x + COPY_OFFSET, y: onPage.y + COPY_OFFSET }
+            get()._editPage(shapes => insertNear(shapes, offset, id))
+            get().selectShape(copy.id)
+        },
 
-        const updatedShapes = currentSlide.shapes.filter((shape) => shape.id !== id)
-        updateSlideShapes(currentSlide._id, updatedShapes)
-    },
-})
+        moveShape: (id, targetGroupId, index) => {
+            get()._editPage(shapes => {
+                // Reject moves into own subtree (would make a group its own descendant).
+                if (targetGroupId !== null && isDescendantOf(shapes, targetGroupId, id)) return null
+                // The page-number box stays at the root: it is drawn over the page.
+                if (targetGroupId !== null && isPageNumberBox({ id })) return null
+
+                const source = findShapeById(shapes, id)
+                const target = findContentFrame(shapes, targetGroupId)
+                if (!source || !target) return null
+
+                const { removed, remaining } = extractShapeById(shapes, id)
+                if (!removed) return null
+                const repositioned = relocateShape(removed, source.parentFrame, target)
+
+                // The caller's index is in the pre-removal tree: moving down
+                // within the same container shifts it by one.
+                const sourceIndex = getSiblingList(shapes, targetGroupId).findIndex(s => s.id === id)
+                const adjusted = sourceIndex !== -1 && sourceIndex < index ? index - 1 : index
+                return insertShapeAt(remaining, targetGroupId, adjusted, repositioned)
+            })
+            get().selectShape(id)
+        },
+
+        moveShapeIntoGroup: (id, targetGroupId) => {
+            const page = selectCurrentPage(get())
+            const target = page ? findShapeById(page.shapes, targetGroupId)?.shape : undefined
+            if (!target || !isContainerShape(target)) return
+            get().moveShape(id, targetGroupId, target.children.length)
+        },
+
+        ungroupShape: (id) => {
+            get()._editPage(shapes => {
+                const loc = findShapeById(shapes, id)
+                if (!loc || loc.parentGroupId === null) return null
+                const parentLoc = findShapeById(shapes, loc.parentGroupId)
+                if (!parentLoc || !isContainerShape(parentLoc.shape)) return null
+
+                const relocated = relocateShape(loc.shape, loc.parentFrame, parentLoc.parentFrame)
+                const { remaining } = extractShapeById(shapes, id)
+
+                // Right after the (former) group in its own container, so the
+                // shape stays visually close to where it came from.
+                const grandSiblings = getSiblingList(remaining, parentLoc.parentGroupId)
+                const groupIndex = grandSiblings.findIndex(s => s.id === loc.parentGroupId)
+                const insertIndex = groupIndex === -1 ? grandSiblings.length : groupIndex + 1
+                return insertShapeAt(remaining, parentLoc.parentGroupId, insertIndex, relocated)
+            })
+            get().selectShape(id)
+        },
+
+        bringToFront: (id) => reorder(id, (_index, length) => length - 1),
+        sendToBack: (id) => reorder(id, () => 0),
+        bringForward: (id) => reorder(id, index => index + 1),
+        sendBackward: (id) => reorder(id, index => index - 1),
+    }
+}

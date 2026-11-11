@@ -1,0 +1,13 @@
+.variable-impact-warning {
+  margin-bottom: var(--ant-margin-xs);
+}
+
+.variable-impact-warning .ant-alert-message {
+  font-size: 12px;
+}
+
+.variable-impact-list {
+  margin: 0;
+  padding-left: var(--ant-padding);
+  font-size: 11px;
+}

@@ -1,0 +1,21 @@
+.page-numbering-control {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s);
+  width: 260px;
+}
+
+.page-numbering-switch {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s);
+  cursor: pointer;
+}
+
+.page-numbering-hint {
+  font-size: var(--ant-font-size-sm);
+}
+
+.page-numbering-control .ant-checkbox-wrapper {
+  margin-inline-start: 0;
+}

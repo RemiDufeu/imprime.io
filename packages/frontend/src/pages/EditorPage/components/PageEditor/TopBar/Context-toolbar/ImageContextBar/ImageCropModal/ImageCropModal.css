@@ -1,0 +1,60 @@
+.image-crop-stage {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: var(--space-xxl);
+    padding: var(--space-s) 0;
+}
+
+/* Handles straddle the frame's edges: it does not clip, its mask does. */
+.image-crop-frame {
+    position: relative;
+    user-select: none;
+    touch-action: none;
+}
+
+.image-crop-image {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.image-crop-mask {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+/* Darkens everything around it, up to the mask's edges. */
+.image-crop-hole {
+    position: absolute;
+    box-shadow: 0 0 0 100vmax var(--ant-color-bg-mask);
+}
+
+.image-crop-selection {
+    position: absolute;
+    box-sizing: border-box;
+    border: var(--ant-line-width-bold) var(--ant-line-type) var(--ant-color-primary);
+    cursor: move;
+}
+
+.image-crop-handle {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    box-sizing: border-box;
+    background-color: var(--ant-color-bg-container);
+    border: var(--ant-line-width) var(--ant-line-type) var(--ant-color-primary);
+    border-radius: var(--ant-border-radius-xs);
+    transform: translate(-50%, -50%);
+}
+
+.image-crop-handle-nw { left: 0; top: 0; cursor: nwse-resize; }
+.image-crop-handle-n { left: 50%; top: 0; cursor: ns-resize; }
+.image-crop-handle-ne { left: 100%; top: 0; cursor: nesw-resize; }
+.image-crop-handle-e { left: 100%; top: 50%; cursor: ew-resize; }
+.image-crop-handle-se { left: 100%; top: 100%; cursor: nwse-resize; }
+.image-crop-handle-s { left: 50%; top: 100%; cursor: ns-resize; }
+.image-crop-handle-sw { left: 0; top: 100%; cursor: nesw-resize; }
+.image-crop-handle-w { left: 0; top: 50%; cursor: ew-resize; }

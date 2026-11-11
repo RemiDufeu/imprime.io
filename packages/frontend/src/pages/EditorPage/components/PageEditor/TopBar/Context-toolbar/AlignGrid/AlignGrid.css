@@ -1,0 +1,34 @@
+.align-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 8px);
+    grid-template-rows: repeat(3, 8px);
+    gap: 2px;
+    padding: 2px;
+    border: var(--ant-line-width) var(--ant-line-type) var(--ant-color-border);
+    border-radius: var(--ant-border-radius-sm);
+}
+
+.align-grid-cell {
+    padding: 0;
+    border: none;
+    border-radius: var(--ant-border-radius-xs);
+    background-color: var(--ant-color-fill-secondary);
+    cursor: pointer;
+}
+
+.align-grid-cell:hover:not(:disabled) {
+    background-color: var(--ant-color-primary-hover);
+}
+
+.align-grid-cell.active {
+    background-color: var(--ant-color-primary);
+}
+
+.align-grid-cell:disabled {
+    background-color: var(--ant-color-fill-quaternary);
+    cursor: not-allowed;
+}
+
+.align-grid-cell.active:disabled {
+    background-color: var(--ant-color-text-disabled);
+}

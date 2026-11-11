@@ -1,0 +1,20 @@
+.sides-input {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.sides-input-grid {
+    display: grid;
+    grid-template-columns: repeat(2, auto);
+    gap: var(--space-s);
+}
+
+.sides-input-field {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-xs);
+    font-size: 12px;
+    color: var(--ant-color-text-secondary);
+}

@@ -16,32 +16,53 @@ The Apache 2.0 licence legally gives you the right to do pretty much anything yo
 
 If Imprime is useful to you, the best way to support the project is to use it, share it, contribute, or simply use the futur official SaaS version.
 
+# Self-hosting
+
+One image, `ghcr.io/remidufeu/imprime`, and a [`docker-compose.yml`](./docker-compose.yml) that runs it with its MongoDB: `docker compose up -d`, with Docker or Coolify. See [Self-hosting](./doc/self-hosting.md).
+
 # Features
 
 ## A full-featured document editor
-At its core, Imprime is a powerful document editor. It ships with everything you'd expect from a modern editing experience: rich text formatting, shapes, images, and more — all in an intuitive visual interface.
+At its core, Imprime is a powerful document editor. It ships with everything you'd expect from a modern editing experience: rich text formatting, shapes, images, groups with auto-layout, copy / paste / duplicate shortcuts, and more — all in an intuitive visual interface.
+
+Each template picks its page format when it is created: A4 portrait, A4 landscape, 16:9, or any custom size.
 ![editor](./doc/editor.png)
 
 ## Dynamic variables
 Turn any document into a reusable template. Drop variables anywhere in your design, then generate finished documents on demand by injecting the data of your choice — perfect for invoices, contracts, reports, and any document you produce more than once.
+
+Number the pages as slide numbers are: switch **Page numbers** on from the page bar, and one text box shows up at the same place on every page — move it, restyle it or reword it on any page, and every page follows. Leave it off the first page, or off any other. Its text, like any text, takes the automatic variables **Page number** and **Page count** — *Page 2 of 5* — counted in the PDF, once repeated pages are copied and conditional ones left out.
+
+Go further with **conditional** blocks (`if`) that only show a section when a boolean is true, and **iteration** blocks (`for`) that repeat their content for each item of a list — lists can be nested to build tables and sub-lists. Whole pages work the same way: a page can be left out on a condition, or generated once per item of a list — one invoice per customer, one sheet per product.
 ![variable](./doc/variable.png)
 
 ## Built for automation
 Imprime is designed from the ground up for developers. Build your template once, then programmatically generate polished, data-driven documents at scale — through a clean REST API or directly from your AI agents via MCP.
 
 ### API
-To print a presentation, you only need its ID. The easiest way to grab it is straight from the presentation's URL.
+To print a template, you only need its ID. The easiest way to grab it is straight from the template's URL.
 
-![alt text](./doc/presentationId.png)
+![alt text](./doc/templateId.png)
 
-Then fire a POST request to the endpoint below, with a JSON body matching your presentation's variables — and get back a ready-to-ship PDF.
+Then fire a POST request to the endpoint below, with a JSON body matching your template's variables — and get back a ready-to-ship PDF.
 ```
-https://imprime.io/api/export/{{presentationId}}/pdf
+https://imprime.io/api/export/{{templateId}}/pdf
 ```
 
 Authenticate the call by passing an API key generated from **Settings → API Keys** in the `x-api-key` header.
 
 ![alt text](./doc/api.png)
+
+Rather than an ID, give the template a **code** — `INVOICE_FR`, in the field next to its title in the editor — and print it by that code. A code is letters, digits, `-` and `_`, unique among your templates:
+```
+https://imprime.io/api/export/code/{{code}}/pdf
+```
+
+### Preview
+Before printing, see the document as it will come out: **Preview** in the editor asks for the variable values and shows every page of the PDF — repeated pages copied, conditions applied, page numbers counted — with a button to print it. A preview stays open for 24 hours, to its owner only, and reads the template as it is when opened: edit, then refresh. Through the API, `POST /api/templates/{{templateId}}/previews` with the variable values makes one, shown at `/preview/{{previewId}}`.
+
+### Export and import
+**Export** on a template's card saves it as a `.imprime.json` file — pages, variables and images included — and **Import** on the home page turns such a file back into a template, on this instance or another — as many times as you like: when another of your templates already has its code, you are asked for another one. Through the API: `GET /api/templates/{{templateId}}/file` and `POST /api/templates/import`.
 
 ### MCP
 Imprime exposes an MCP server at `https://imprime.io/api/mcp` (Streamable HTTP transport). Two authentication modes are supported depending on the client:
@@ -61,27 +82,37 @@ Imprime exposes an MCP server at `https://imprime.io/api/mcp` (Streamable HTTP t
 }
 ```
 
-Both paths land on the same server and expose the same tools — plug Imprime into your AI agents or chat interfaces and let them generate PDFs on your behalf.
+Both paths land on the same server and expose the same tools — plug Imprime into your AI agents or chat interfaces and let them design templates and generate PDFs on your behalf:
+
+| | Tools |
+|---|---|
+| Templates | `list_templates`, `get_template`, `create_template`, `duplicate_template`, `update_template` (title, code), `set_page_numbering`, `delete_template` |
+| Pages | `get_page`, `add_page`, `duplicate_page`, `update_page` (condition, repeat, page number), `move_page`, `delete_page` |
+| Variables | `create_variable`, `update_variable`, `delete_variable` |
+| Shapes | `set_page_shapes`, `add_shapes`, `update_shape`, `move_shapes`, `copy_shapes`, `delete_shapes` |
+| Assets | `list_fonts`, `upload_image`, `get_image` |
+| Preview | `preview_template` — images of the PDF's pages, for the agent to check its work, and a link for you |
+
+Ask *"Create an A4 invoice template with a customer name and a list of lines, then preview it with sample data"* and the agent builds it end to end, and hands you the link to its preview — open it signed in, and print the PDF from there. Every shape it writes is validated, and groups are laid out exactly as the editor would. Reload the editor to see an agent's changes to a template you have open.
 
 ![MCP](./doc/mcp.png)
+
+## Sign-in and access control
+Sign in with an email and a password, or with Google, GitHub or Microsoft. The administrator sets everything up from the app — SMTP server, single sign-on providers, who may sign in and from which domains — and a single `ADMIN_EMAIL` in the environment is all it takes to get started. See [Authentication and access](./doc/authentication.md).
 
 # Roadmap
 
 Imprime is currently under active development. Here are the main planned updates:
 
-## Block enhancements
-- **Conditional logic** blocks (`if / else`) to dynamically display sections based on the data provided
-- **Iteration** blocks (`for`) to generate lists, tables or repetitions from a data array
-- **Rich media** blocks (dynamic images, QR codes...)
-
-## Editor usability
-- Comprehensive keyboard shortcuts: **copy / paste / cut / duplicate / undo / redo**
-- Multiple block selection and grouped operations
+## Improve shape
+- Add arrow
 
 ## Document format
-- Change the resolution
-- Add text document format in addition to current presentation format
-- Add code on presentation
+- Add default style (font and bg color)
+
+## Automation
+- MCP edition
+- test API
 
 ---
 

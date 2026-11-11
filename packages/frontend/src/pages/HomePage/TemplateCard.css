@@ -1,0 +1,10 @@
+.template-card-body {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-s);
+}
+
+.template-card-meta {
+  flex: 1;
+  min-width: 0;
+}

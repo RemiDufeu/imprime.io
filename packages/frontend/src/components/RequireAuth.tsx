@@ -14,8 +14,11 @@ export default function RequireAuth() {
     return <SpinnerFullScreen />
   }
 
+  // Back here once signed in: the login page follows `redirect` — a preview
+  // link opened from an agent's answer lands on the preview.
   if (!data) {
-    return <Navigate to="/login" replace state={{ from: location.pathname }} />
+    const redirect = encodeURIComponent(`${location.pathname}${location.search}`)
+    return <Navigate to={`/login?redirect=${redirect}`} replace />
   }
 
   return <Outlet />

@@ -1,0 +1,102 @@
+import { theme } from 'antd'
+import { getDashArray } from '@imprime/sdk'
+import { useEditorStore } from '../../../store/editor/EditorStore'
+import { ContainerFrame } from './ContainerFrame'
+import { ImagePlaceholder } from './ImagePlaceholder'
+
+export function SVGDrawingPreview() {
+    const drawingData = useEditorStore(state => state.drawingData)
+    const drawStyle = useEditorStore(state => state.drawStyle)
+    const selectedTool = useEditorStore(state => state.selectedTool)
+    const { token } = theme.useToken()
+
+    if (!drawingData) return null
+
+    const { startX, startY, currentX, currentY } = drawingData
+    const rect = {
+        x: Math.min(startX, currentX),
+        y: Math.min(startY, currentY),
+        width: Math.abs(currentX - startX),
+        height: Math.abs(currentY - startY),
+    }
+
+    const { x, y, width, height } = rect
+    const type = selectedTool
+
+    // Don't show preview if width or height is too small
+    if (Math.abs(width) < 1 || Math.abs(height) < 1) return null
+
+    switch (type) {
+        case 'rectangle':
+            return (
+                <rect
+                    x={x}
+                    y={y}
+                    width={width}
+                    height={height}
+                    fill={drawStyle.fill ?? 'none'}
+                    stroke={drawStyle.stroke}
+                    strokeWidth={drawStyle.strokeWidth}
+                    strokeDasharray={getDashArray(drawStyle.strokeStyle)}
+                    rx={drawStyle.cornerRadius}
+                    ry={drawStyle.cornerRadius}
+                    pointerEvents="none"
+                />
+            )
+
+        case 'ellipse': {
+            const cx = x + width / 2
+            const cy = y + height / 2
+            const rx = Math.abs(width) / 2
+            const ry = Math.abs(height) / 2
+
+            return (
+                <ellipse
+                    cx={cx}
+                    cy={cy}
+                    rx={rx}
+                    ry={ry}
+                    fill={drawStyle.fill ?? 'none'}
+                    stroke={drawStyle.stroke}
+                    strokeWidth={drawStyle.strokeWidth}
+                    strokeDasharray={getDashArray(drawStyle.strokeStyle)}
+                    pointerEvents="none"
+                />
+            )
+        }
+
+        case 'text':
+            return (
+                <rect
+                    x={x}
+                    y={y}
+                    width={width}
+                    height={height}
+                    fill="none"
+                    // Outlined even when the drawing style has no stroke.
+                    stroke={drawStyle.stroke ?? token.colorBorder}
+                    strokeWidth={2}
+                    strokeDasharray="5,5"
+                    pointerEvents="none"
+                />
+            )
+
+        case 'image':
+            return <ImagePlaceholder status="empty" x={x} y={y} width={width} height={height} />
+
+        case 'group':
+            return (
+                <ContainerFrame
+                    repeat={false}
+                    x={x}
+                    y={y}
+                    width={width}
+                    height={height}
+                    pointerEvents="none"
+                />
+            )
+
+        default:
+            return null
+    }
+}

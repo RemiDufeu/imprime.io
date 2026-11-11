@@ -1,0 +1,43 @@
+/* Each option stacks a preview, a name and a size: taller than antd's one line. */
+.create-template-format .ant-segmented-item-label {
+  line-height: var(--ant-line-height);
+  padding: var(--space-s) var(--space-xs);
+}
+
+.create-template-format-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.create-template-format-preview {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.create-template-format-page {
+  box-sizing: border-box;
+  border: var(--ant-line-width) var(--ant-line-type) var(--ant-color-text-tertiary);
+  border-radius: var(--ant-border-radius-xs);
+  background: var(--ant-color-bg-container);
+}
+
+.create-template-format-page.unknown {
+  width: 28px;
+  height: 28px;
+  border-style: dashed;
+}
+
+.create-template-format-size {
+  font-size: var(--ant-font-size-sm);
+  color: var(--ant-color-text-tertiary);
+}
+
+.create-template-custom-size {
+  display: flex;
+  gap: var(--space-m);
+}

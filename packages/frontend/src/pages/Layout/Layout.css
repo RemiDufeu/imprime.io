@@ -6,7 +6,6 @@
     gap: var(--space-s);
 }
 
-/* Aligner le contenu du header */
 .layout .ant-layout-header {
     display: flex;
     align-items: center;
