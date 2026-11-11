@@ -54,6 +54,15 @@ new ImprimeClient(options?: ImprimeClientOptions)
 **Options:**
 - `baseUrl?: string` - Base URL of the Imprime API
 - `timeout?: number` - Request timeout in milliseconds (default: `30000`). PDF exports are not bound by it: the server answers `408` itself past its own limit, `PDF_RENDER_TIMEOUT_SECONDS` (30 s by default)
+- `apiKey?: string` - An API key from **Settings → API Keys**, sent in the `x-api-key` header. Leave it out in the browser, where the session cookie authenticates
+
+**What an API key opens.** With `apiKey`, only these methods work:
+`listTemplates`, `getTemplate`, `exportPDF`, `exportPDFByCode`, `exportToPDF`,
+`createPreview`, `getPreview` and `exportPreviewPDF`. Every other method —
+building templates, pages, variables and images, fonts, settings, template
+files — fails with `403 API_KEY_NOT_ALLOWED`: it needs a signed-in session, as
+in the editor. To build templates from a script or an agent, use the MCP
+server, where an API key reaches every tool.
 
 ### Template Methods
 
@@ -375,7 +384,8 @@ Delete a family. Text that uses it, in every template, is drawn in Roboto.
 
 Email and single sign-on are set by the instance's admins, not by the
 environment, and apply at once, without a restart. Every method is admin only
-(other users get `403 ADMIN_REQUIRED`).
+(other users get `403 ADMIN_REQUIRED`), and needs a signed-in session: an API
+key gets `403 API_KEY_NOT_ALLOWED`.
 
 Email covers the SMTP server, and whether accounts must verify their address.
 

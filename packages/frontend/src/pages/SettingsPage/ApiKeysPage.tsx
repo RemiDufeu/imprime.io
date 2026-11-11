@@ -68,8 +68,9 @@ export default function ApiKeysPage() {
         }
       >
         <Typography.Paragraph type="secondary">
-          Use an API key to access the API outside the browser
-          (<code>x-api-key</code> header).
+          Use an API key outside the browser (<code>x-api-key</code> header):
+          on the REST API to list, read, export and preview your templates,
+          or to connect an MCP client, which can also edit them.
         </Typography.Paragraph>
 
         {revealedKey && (

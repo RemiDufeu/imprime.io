@@ -20,7 +20,7 @@ src/
     authDb.ts            raw MongoClient for better-auth
     fonts.ts             react-pdf font registration
   middleware/
-    requireAuth.ts       session cookie or x-api-key → req.user
+    requireAuth.ts       session cookie or x-api-key → req.user; API_KEY_ROUTES
     requireOwnsTemplate.ts  ownership guard + assertOwnsTemplate()
     requireAdmin.ts      admin-role guard for instance-wide resources
     errorHandler.ts      AppError subclasses → HTTP responses

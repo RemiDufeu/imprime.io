@@ -51,6 +51,8 @@ https://imprime.io/api/export/{{templateId}}/pdf
 
 Authenticate the call by passing an API key generated from **Settings → API Keys** in the `x-api-key` header.
 
+An API key opens the REST API to printing and nothing that changes a template: listing your templates (`GET /api/templates`), reading one (`GET /api/templates/{{templateId}}`), exporting it to PDF (the two endpoints of this section) and previewing it (see [Preview](#preview)). Anything else answers `403 API_KEY_NOT_ALLOWED`: templates are built in the editor, or by an agent over [MCP](#mcp), where an API key reaches every tool.
+
 ![alt text](./doc/api.png)
 
 Rather than an ID, give the template a **code** — `INVOICE_FR`, in the field next to its title in the editor — and print it by that code. A code is letters, digits, `-` and `_`, unique among your templates:
@@ -59,10 +61,10 @@ https://imprime.io/api/export/code/{{code}}/pdf
 ```
 
 ### Preview
-Before printing, see the document as it will come out: **Preview** in the editor asks for the variable values and shows every page of the PDF — repeated pages copied, conditions applied, page numbers counted — with a button to print it. A preview stays open for 24 hours, to its owner only, and reads the template as it is when opened: edit, then refresh. Through the API, `POST /api/templates/{{templateId}}/previews` with the variable values makes one, shown at `/preview/{{previewId}}`.
+Before printing, see the document as it will come out: **Preview** in the editor asks for the variable values and shows every page of the PDF — repeated pages copied, conditions applied, page numbers counted — with a button to print it. A preview stays open for 24 hours, to its owner only, and reads the template as it is when opened: edit, then refresh. Through the API, `POST /api/templates/{{templateId}}/previews` with the variable values makes one, shown at `/preview/{{previewId}}`; `GET /api/previews/{{previewId}}` reads its pages and `POST /api/previews/{{previewId}}/pdf` prints it.
 
 ### Export and import
-**Export** on a template's card saves it as a `.imprime.json` file — pages, variables and images included — and **Import** on the home page turns such a file back into a template, on this instance or another — as many times as you like: when another of your templates already has its code, you are asked for another one. Through the API: `GET /api/templates/{{templateId}}/file` and `POST /api/templates/import`.
+**Export** on a template's card saves it as a `.imprime.json` file — pages, variables and images included — and **Import** on the home page turns such a file back into a template, on this instance or another — as many times as you like: when another of your templates already has its code, you are asked for another one. Both are in the editor only: an API key cannot reach them.
 
 ### MCP
 Imprime exposes an MCP server at `https://imprime.io/api/mcp` (Streamable HTTP transport). Two authentication modes are supported depending on the client:

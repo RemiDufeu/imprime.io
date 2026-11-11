@@ -339,7 +339,7 @@ function buildAuth(
       },
     },
     plugins: [
-      apiKey(),
+      apiKey({ rateLimit: { enabled: false } }),
       admin(),
       mcp({
         loginPage: '/login',

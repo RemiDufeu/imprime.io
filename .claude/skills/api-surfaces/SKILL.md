@@ -59,6 +59,14 @@ Two mechanisms, both resolving to `req.user.id`:
 - **`x-api-key` header**, resolved by `authService.resolveApiKeyOwner`
   (SDK, Claude Code, scripts).
 
+**An API key opens only the routes of `API_KEY_ROUTES`** (`middleware/requireAuth.ts`):
+listing and reading templates, the two exports, and the preview routes. Any
+other route answers it **403 `API_KEY_NOT_ALLOWED`** — the editor's session is
+the only way to build a template over REST. Closed by default: a new route is
+out of a key's reach until listed there, so listing it is a decision, made
+with the user. The MCP server is outside `requireAuth` and keeps every tool
+for an API key.
+
 Authentication is not authorization. Every template-scoped operation must
 also call the ownership check:
 

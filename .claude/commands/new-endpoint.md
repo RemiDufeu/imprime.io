@@ -38,7 +38,9 @@ machine-readable `code`; never build an error response by hand.
 A thin handler: parse params, call one service, respond. No try/catch — Express 5
 forwards rejections to `errorHandler`. Add `requireOwnsTemplate` if scoped.
 If it needs a new mount, add it in `server.ts` **inside** the `requireAuth`
-pipeline.
+pipeline. An API key cannot call it (403 `API_KEY_NOT_ALLOWED`) unless it is
+added to `API_KEY_ROUTES` in `middleware/requireAuth.ts` — ask the user
+before opening one: the REST API is for printing, not for building templates.
 
 ### 5. `packages/sdk/src/ImprimeClient.ts`
 The typed method, in the matching `// ===` section.

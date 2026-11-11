@@ -10,7 +10,7 @@ are easy to miss.
 |---|---|---|---|
 | Email and password | People, in the browser | Always available; who may use it: **Administration → Access** | Password reset and email verification need an SMTP server |
 | Single sign-on: Google, GitHub, Microsoft | People, in the browser | **Administration → Single sign-on** | The first sign-in creates the account |
-| API key | Scripts, the SDK, headless MCP clients | Each user, in **Settings → API Keys** | Sent in the `x-api-key` header. The domain list applies to it, the password policy does not |
+| API key | Scripts, the SDK, headless MCP clients | Each user, in **Settings → API Keys** | Sent in the `x-api-key` header. On the REST API it only lists, reads, exports and previews templates (`403 API_KEY_NOT_ALLOWED` elsewhere); on the MCP server it reaches every tool. The domain list applies to it, the password policy does not |
 | MCP OAuth | Interactive AI clients, such as the Claude connector | Nothing to set up | The user signs in on the usual sign-in page and allows the client on a consent page, then the client holds a token. See [MCP clients](#mcp-clients) |
 
 ## Where things are configured
@@ -26,9 +26,10 @@ are easy to miss.
 | Giving or taking the admin role | `npm run admin grant <email>` / `npm run admin demote <email>`, on the server | At once |
 | A password, when locked out | `npm run admin reset-password <email>`, on the server | At once |
 
-The Administration pages are also available through the API, with an
-administrator's API key: see *Settings Methods* in the
-[SDK README](../packages/sdk/README.md).
+The Administration pages are the only way to change these settings once the
+instance runs: the settings API (*Settings Methods* in the
+[SDK README](../packages/sdk/README.md)) takes an administrator's session, and
+answers an API key with `403 API_KEY_NOT_ALLOWED`.
 
 ### Environment variables
 

@@ -48,7 +48,8 @@ goes inside that pipeline; putting one outside it needs a stated reason
 ## Guard order
 
 ```
-mount:    requireAuth               → sets req.user, or 401
+mount:    requireAuth               → sets req.user, or 401; 403 API_KEY_NOT_ALLOWED
+                                      for an API key outside API_KEY_ROUTES
 handler:  requireOwnsTemplate   → 404 if req.user does not own :id
 handler:  requireAdmin              → 403 unless req.user has the admin role
 ```
