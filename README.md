@@ -18,7 +18,7 @@ If Imprime is useful to you, the best way to support the project is to use it, s
 
 # Self-hosting
 
-One image, `ghcr.io/remidufeu/imprime`, and a [`docker-compose.yml`](./docker-compose.yml) that runs it with its MongoDB: `docker compose up -d`, with Docker or Coolify. See [Self-hosting](./doc/self-hosting.md).
+One image, `ghcr.io/remidufeu/imprime`, and two Compose files: [`docker-compose.yml`](./docker-compose.yml) runs it with its own MongoDB, [`docker-compose.external-mongodb.yml`](./docker-compose.external-mongodb.yml) on yours (Atlas, a server elsewhere). With Docker or Coolify: see [Self-hosting](./doc/self-hosting.md).
 
 # Features
 

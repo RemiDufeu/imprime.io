@@ -1,14 +1,4 @@
 # Imprime and its database, from the published image.
-#
-#   1. Put this file in a folder with a .env beside it — start from
-#      .env.example: PUBLIC_APP_URL and BETTER_AUTH_SECRET are required.
-#   2. docker compose up -d
-#
-# The app listens on 127.0.0.1:3023, for the reverse proxy that serves it in
-# HTTPS: nginx, Caddy, Traefik, Coolify's. See doc/self-hosting.md.
-#
-# Already have a MongoDB? Delete the `mongodb` service, the `depends_on` below
-# and the `volumes` at the end, and set MONGODB_URI in .env.
 
 services:
   app:
