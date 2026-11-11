@@ -50,4 +50,7 @@ export interface EnabledAuthProviders {
   microsoft: boolean
   requireEmailVerification: boolean
   passwordReset: boolean
+  // No account exists yet: the next sign-up creates the administrator, and
+  // the sign-in page offers just that.
+  firstAccount: boolean
 }

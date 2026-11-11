@@ -98,7 +98,7 @@ Ask *"Create an A4 invoice template with a customer name and a list of lines, th
 ![MCP](./doc/mcp.png)
 
 ## Sign-in and access control
-Sign in with an email and a password, or with Google, GitHub or Microsoft. The administrator sets everything up from the app — SMTP server, single sign-on providers, who may sign in and from which domains — and a single `ADMIN_EMAIL` in the environment is all it takes to get started. See [Authentication and access](./doc/authentication.md).
+Sign in with an email and a password, or with Google, GitHub or Microsoft. The administrator sets everything up from the app — SMTP server, single sign-on providers, who may sign in and from which domains — and is simply the first account created on a new instance; after that, `npm run admin grant <email>` on the server gives the role. See [Authentication and access](./doc/authentication.md).
 
 # Roadmap
 

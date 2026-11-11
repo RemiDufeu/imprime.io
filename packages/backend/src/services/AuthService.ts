@@ -25,11 +25,6 @@ const DEFAULT_ROLE = 'user'
 // better-auth returns 100 users at most when not told otherwise.
 const USER_PAGE_SIZE = 200
 
-// The administrator's address, from ADMIN_EMAIL, lower-cased.
-function configuredAdminEmail(): string | undefined {
-  return process.env.ADMIN_EMAIL?.trim().toLowerCase() || undefined
-}
-
 function hasAdminRole(user: User | null): boolean {
   return user !== null && 'role' in user && user.role === ADMIN_ROLE
 }
@@ -42,39 +37,13 @@ function isBanned(user: User): boolean {
   return !(expires instanceof Date) || expires.getTime() > Date.now()
 }
 
-// The part of better-auth's internal adapter promotion needs.
-interface UserStore {
-  updateUser(userId: string, data: { role: string }): Promise<unknown>
+// An address as better-auth stores it, lower-cased: what the server commands
+// look accounts up by.
+function normalizedEmail(email: string): string {
+  return email.trim().toLowerCase()
 }
 
-/**
- * Makes the account of ADMIN_EMAIL the administrator once its address is
- * verified: at each sign-in, with a password or through single sign-on, and
- * at startup. An unverified one is only a claim to the address — whoever
- * typed it at sign-up — and is never promoted.
- *
- * The account is created by the server (`resetAdminPassword`, which marks the
- * address verified: the operator vouches for it) or by a provider vouching for
- * the address; a password sign-up with it is refused (`user.create.before`).
- *
- * The role then lives in the database: changing ADMIN_EMAIL demotes no one,
- * `demoteOtherAdmins` does (`npm run admin:demote-others`).
- */
-async function promoteIfAdminAddress(store: UserStore, user: User, adminEmail: string | undefined): Promise<boolean> {
-  if (!adminEmail || user.email.toLowerCase() !== adminEmail || !user.emailVerified) return false
-  if (!hasAdminRole(user)) await store.updateUser(user.id, { role: ADMIN_ROLE })
-  return true
-}
-
-// A failed promotion does not fail the sign-in: the next one retries.
-async function isOrBecomesAdmin(store: UserStore, user: User, adminEmail: string | undefined): Promise<boolean> {
-  try {
-    if (await promoteIfAdminAddress(store, user, adminEmail)) return true
-  } catch (error) {
-    console.error('Failed to give ADMIN_EMAIL its role on sign-in:', error)
-  }
-  return hasAdminRole(user)
-}
+const noAccount = (email: string) => new Error(`No account uses ${email}: its owner signs up first.`)
 
 function domainOf(email: string): string {
   return email.slice(email.lastIndexOf('@') + 1).toLowerCase()
@@ -127,8 +96,6 @@ const domainNotAllowed = () =>
   new APIError('FORBIDDEN', { code: 'EMAIL_DOMAIN_NOT_ALLOWED', message: 'Email domain not allowed' })
 const addressNotVerified = () =>
   new APIError('FORBIDDEN', { code: 'ADDRESS_NOT_VERIFIED', message: 'Address not verified' })
-const adminAddressReserved = () =>
-  new APIError('FORBIDDEN', { code: 'ADMIN_ADDRESS_RESERVED', message: 'This address is reserved for the administrator' })
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -201,14 +168,13 @@ export interface AuthSettings {
 // (`AuthService.applySettings`).
 //
 // `proveAddress` runs when someone shows they hold an account's mailbox
-// (`AuthService.proveAddress`), `welcome` once an account is created
-// (`OnboardingService.welcome`).
+// (`AuthService.proveAddress`), `accountCreated` once an account is created
+// (`AuthService.accountCreated`).
 function buildAuth(
   mailer: MailerService,
-  adminEmail: string | undefined,
   settings: AuthSettings,
   proveAddress: (userId: string) => Promise<void>,
-  welcome: (userId: string) => Promise<void>,
+  accountCreated: (userId: string) => Promise<void>,
 ) {
   const { google, github } = settings.sso
   const microsoft = settings.sso.microsoft
@@ -231,7 +197,9 @@ function buildAuth(
   const requireEmailVerification = settings.requireEmailVerification && mailerConfigured
   const passwordResetEnabled = mailerConfigured
 
-  const enabledProviders: EnabledAuthProviders = {
+  // `firstAccount` changes with the accounts, not the settings: added per
+  // request (`AuthService.authProviders`).
+  const enabledProviders: Omit<EnabledAuthProviders, 'firstAccount'> = {
     emailPassword: true,
     passwordPolicy,
     google: Boolean(google),
@@ -328,16 +296,6 @@ function buildAuth(
           before: async (user, ctx) => {
             if (ctx && isAdminRoute(ctx.path)) return
             const fromProvider = Boolean(ctx && isSingleSignOn(ctx.path))
-            if (user.email.toLowerCase() === adminEmail) {
-              // Created by the server itself (`resetAdminPassword`), without
-              // a request; otherwise only by a provider vouching for the
-              // address. A password sign-up is anyone's claim to it, and
-              // would be promoted once a verification link — sent to the
-              // administrator, who might follow it — verifies it.
-              if (ctx && !fromProvider) throw adminAddressReserved()
-              if (fromProvider && !user.emailVerified) throw addressNotVerified()
-              return
-            }
             if (allowedDomains.length === 0) return
             // A provider's unverified address is refused at once; an email
             // sign-up is verified by email afterwards, before it may sign in.
@@ -347,11 +305,12 @@ function buildAuth(
           },
           // However the account was created: a sign-up, a first single
           // sign-on, an administrator. Run once the transaction is committed,
-          // and awaited, so the account's first page already lists the
-          // tutorial; a throw here would fail the sign-up, which
-          // `welcome` never does.
+          // and awaited, so the first account is administrator and the
+          // account's first page lists the tutorial by the time the sign-up
+          // answers; a throw here would fail the sign-up, which
+          // `accountCreated` never does.
           after: async (user) => {
-            await welcome(user.id)
+            await accountCreated(user.id)
           },
         },
       },
@@ -361,9 +320,8 @@ function buildAuth(
           // nothing about an account to whoever does not hold them.
           before: async (session, ctx) => {
             if (!ctx || isAdminRoute(ctx.path)) return
-            const store = ctx.context.internalAdapter
-            const user = await store.findUserById(session.userId)
-            if (!user || (await isOrBecomesAdmin(store, user, adminEmail))) return
+            const user = await ctx.context.internalAdapter.findUserById(session.userId)
+            if (!user || hasAdminRole(user)) return
 
             if (passwordPolicy === 'admins' && !isSingleSignOn(ctx.path)) {
               throw new APIError('FORBIDDEN', {
@@ -400,7 +358,6 @@ type BuiltAuth = ReturnType<typeof buildAuth>
 type BetterAuthInstance = BuiltAuth['instance']
 
 export class AuthService {
-  private readonly adminEmail = configuredAdminEmail()
   private built: BuiltAuth
 
   // Without `onboarding` — the admin commands, which connect the auth database
@@ -423,10 +380,9 @@ export class AuthService {
   private build(settings: AuthSettings): BuiltAuth {
     return buildAuth(
       this.mailer,
-      this.adminEmail,
       settings,
       (userId) => this.proveAddress(userId),
-      async (userId) => { await this.onboarding?.welcome(userId) },
+      (userId) => this.accountCreated(userId),
     )
   }
 
@@ -435,8 +391,42 @@ export class AuthService {
     return this.built.instance
   }
 
-  public get enabledProviders(): EnabledAuthProviders {
+  /** The providers the current settings enable. */
+  public get enabledProviders(): Omit<EnabledAuthProviders, 'firstAccount'> {
     return this.built.enabledProviders
+  }
+
+  /** What the sign-in page offers: the settings' providers, and whether no account exists yet. */
+  public async authProviders(): Promise<EnabledAuthProviders> {
+    return { ...this.built.enabledProviders, firstAccount: await this.hasNoAccount() }
+  }
+
+  private async hasNoAccount(): Promise<boolean> {
+    const { internalAdapter } = await this.instance.$context
+    return (await internalAdapter.countTotalUsers()) === 0
+  }
+
+  /**
+   * A new account: the first of the instance is its administrator — whoever
+   * signs up first on a new instance, as the sign-in page says. After that,
+   * the role is given and taken by whoever runs the server (`grantAdmin`,
+   * `demoteAdmin`). Then the onboarding copy. Never throws: the account
+   * exists already, and a failure here would fail its sign-up.
+   */
+  private async accountCreated(userId: string): Promise<void> {
+    try {
+      const { internalAdapter } = await this.instance.$context
+      // The only account, this one: two sign-ups at once on a new instance
+      // both see two, and neither is made administrator — `npm run admin
+      // grant` settles it.
+      if ((await internalAdapter.countTotalUsers()) === 1) {
+        await internalAdapter.updateUser(userId, { role: ADMIN_ROLE })
+        console.log('The first account was made administrator.')
+      }
+    } catch (error) {
+      console.error('Failed to make the first account administrator:', error)
+    }
+    await this.onboarding?.welcome(userId)
   }
 
   /** Serves `/api/auth/*` with whichever instance is current. */
@@ -524,80 +514,69 @@ export class AuthService {
   }
 
   /**
-   * Break-glass access, for whoever runs the server (`scripts/resetAdminPassword.ts`),
-   * and the way the administrator's account is first created: gives the
-   * account of ADMIN_EMAIL this password — creating the account if there is
-   * none — with its role and a verified address, since the operator vouches
-   * for it. Everything else that opened the account is revoked (sessions, API
-   * keys, MCP tokens): it may be someone else's way in, the reason the
-   * command was run.
+   * Gives the admin role to the account with `email`, for whoever runs the
+   * server (`npm run admin grant`). The account must exist: its owner signs
+   * up first.
    */
-  public async resetAdminPassword(password: string): Promise<{ email: string; outcome: 'created' | 'updated' }> {
-    const email = this.adminEmail
-    if (!email) throw new Error('ADMIN_EMAIL is not set')
+  public async grantAdmin(email: string): Promise<{ email: string; changed: boolean }> {
+    const { internalAdapter } = await this.instance.$context
+    const user = await this.findAccount(email)
+    if (hasAdminRole(user)) return { email: user.email, changed: false }
+    await internalAdapter.updateUser(user.id, { role: ADMIN_ROLE })
+    return { email: user.email, changed: true }
+  }
+
+  /**
+   * Takes the admin role from the account with `email`, for whoever runs the
+   * server (`npm run admin demote`), and signs it out, so the access rules
+   * apply to it from its next sign-in. Its API keys keep working, as a user's.
+   * Says how many administrators are left: none is allowed, and
+   * `grantAdmin` gives the role back.
+   */
+  public async demoteAdmin(email: string): Promise<{ email: string; changed: boolean; adminsLeft: number }> {
+    const { internalAdapter } = await this.instance.$context
+    const user = await this.findAccount(email)
+    const changed = hasAdminRole(user)
+    if (changed) {
+      await internalAdapter.updateUser(user.id, { role: DEFAULT_ROLE })
+      await internalAdapter.deleteUserSessions(user.id)
+    }
+    const adminsLeft = await internalAdapter.countTotalUsers([{ field: 'role', value: ADMIN_ROLE }])
+    return { email: user.email, changed, adminsLeft }
+  }
+
+  /**
+   * Gives the account with `email` this password, for whoever runs the server
+   * (`npm run admin reset-password`): the way back in without email. Its
+   * address is marked verified — the operator vouches for it, and an
+   * unverified one could not sign in where verification is required — and
+   * everything else that opened the account is revoked: sessions, API keys,
+   * MCP tokens, which may be someone else's way in, the reason the command was
+   * run. An account made through single sign-on gets a password too.
+   */
+  public async resetPassword(email: string, password: string): Promise<{ email: string }> {
     const context = await this.instance.$context
     const { internalAdapter } = context
-    const hash = await context.password.hash(password)
-
-    const found = await internalAdapter.findUserByEmail(email, { includeAccounts: true })
-    if (!found) {
-      const user = await internalAdapter.createUser({ email, name: email.split('@')[0], emailVerified: true })
-      await internalAdapter.updateUser(user.id, { role: ADMIN_ROLE })
-      await internalAdapter.linkAccount({ userId: user.id, providerId: 'credential', accountId: user.id, password: hash })
-      return { email, outcome: 'created' }
-    }
+    const found = await internalAdapter.findUserByEmail(normalizedEmail(email), { includeAccounts: true })
+    if (!found) throw noAccount(email)
 
     const { user, accounts } = found
-    await internalAdapter.updateUser(user.id, { role: ADMIN_ROLE, emailVerified: true })
+    const hash = await context.password.hash(password)
     if (accounts.some(account => account.providerId === 'credential')) {
       await internalAdapter.updatePassword(user.id, hash)
     } else {
       await internalAdapter.linkAccount({ userId: user.id, providerId: 'credential', accountId: user.id, password: hash })
     }
+    await internalAdapter.updateUser(user.id, { emailVerified: true })
     await this.revokeAccess(user.id)
-    return { email, outcome: 'updated' }
+    return { email: user.email }
   }
 
-  /**
-   * Makes the account of ADMIN_EMAIL the only administrator, for whoever runs
-   * the server (`scripts/demoteOtherAdmins.ts`): the role stays in the
-   * database, so a former ADMIN_EMAIL keeps it until this runs. The accounts
-   * demoted are signed out, so the access rules apply to them from their next
-   * sign-in. API keys are left alone.
-   */
-  public async demoteOtherAdmins(): Promise<{
-    adminEmail: string
-    adminExists: boolean
-    // False while the account's address is unverified: nobody is administrator.
-    adminPromoted: boolean
-    demoted: string[]
-  }> {
-    const adminEmail = this.adminEmail
-    if (!adminEmail) throw new Error('ADMIN_EMAIL is not set: nobody would remain administrator')
+  private async findAccount(email: string): Promise<User> {
     const { internalAdapter } = await this.instance.$context
-
-    // All of them before any change: demoting one takes it out of the query
-    // being paged through.
-    const admins: User[] = []
-    for (let offset = 0; ; offset += USER_PAGE_SIZE) {
-      const page = await internalAdapter.listUsers(
-        USER_PAGE_SIZE, offset, { field: 'createdAt', direction: 'asc' }, [{ field: 'role', value: ADMIN_ROLE }],
-      )
-      admins.push(...page)
-      if (page.length < USER_PAGE_SIZE) break
-    }
-
-    const demoted: string[] = []
-    for (const admin of admins) {
-      if (admin.email.toLowerCase() === adminEmail) continue
-      await internalAdapter.updateUser(admin.id, { role: DEFAULT_ROLE })
-      await internalAdapter.deleteUserSessions(admin.id)
-      demoted.push(admin.email)
-    }
-
-    const found = await internalAdapter.findUserByEmail(adminEmail)
-    const adminPromoted = found ? await promoteIfAdminAddress(internalAdapter, found.user, adminEmail) : false
-    return { adminEmail, adminExists: Boolean(found), adminPromoted, demoted }
+    const found = await internalAdapter.findUserByEmail(normalizedEmail(email))
+    if (!found) throw noAccount(email)
+    return found.user
   }
 
   /** Read from the database, so it holds for API keys as for sessions. */
@@ -607,28 +586,14 @@ export class AuthService {
   }
 
   /**
-   * Gives the account of ADMIN_EMAIL its role at startup, so that it need not
-   * sign in again after the variable changes, and says how to create it while
-   * it has none, or how to claim it while its address is unverified. Run
-   * once, once the auth database is connected.
+   * At startup, on an instance without any account: whoever signs up first
+   * becomes its administrator, so the operator is told to do it now. Run once
+   * the auth database is connected.
    */
-  public async promoteConfiguredAdmin(): Promise<void> {
-    if (!this.adminEmail) {
-      console.warn('ADMIN_EMAIL is not set: nobody becomes administrator of this instance.')
-      return
-    }
-    const { internalAdapter } = await this.instance.$context
-    const found = await internalAdapter.findUserByEmail(this.adminEmail)
-    if (!found) {
-      console.warn(`${this.adminEmail} has no account yet: create it with \`npm run admin:reset-password\`, or sign in with a single sign-on provider that vouches for the address.`)
-      return
-    }
-    const wasAdmin = hasAdminRole(found.user)
-    if (!(await promoteIfAdminAddress(internalAdapter, found.user, this.adminEmail))) {
-      console.warn(`The account of ${this.adminEmail} has an unverified address, so it is not made administrator: \`npm run admin:reset-password\` claims it.`)
-      return
-    }
-    if (!wasAdmin) console.log(`Admin role given to ${this.adminEmail} (ADMIN_EMAIL)`)
+  public async warnIfNoAccount(): Promise<void> {
+    if (!(await this.hasNoAccount())) return
+    const url = process.env.PUBLIC_APP_URL?.trim() || 'the app'
+    console.warn(`No account yet: the first to sign up at ${url} becomes the administrator. Do it now.`)
   }
 
   /**

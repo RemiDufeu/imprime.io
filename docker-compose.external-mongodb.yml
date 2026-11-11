@@ -21,7 +21,6 @@ services:
       MONGODB_URI: ${MONGODB_URI:?set MONGODB_URI to your MongoDB, e.g. mongodb+srv://user:password@cluster.example.net/imprime}
       PUBLIC_APP_URL: ${PUBLIC_APP_URL:?set PUBLIC_APP_URL to the address users open, e.g. https://imprime.example.com}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET, e.g. from openssl rand -base64 32}
-      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
       # One reverse proxy in front, as above.
       TRUST_PROXY: ${TRUST_PROXY:-1}
       CORS_ORIGIN: ${CORS_ORIGIN:-}

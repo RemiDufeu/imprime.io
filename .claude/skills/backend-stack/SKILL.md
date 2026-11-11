@@ -105,20 +105,21 @@ database** (`SettingsService`, passed in as `AuthSettings`):
   who may use it is `AuthSettings.passwordPolicy` (`disableSignUp` unless
   `'open'`);
 - **the access policy lives in `databaseHooks`**: `user.create.before` refuses
-  an address outside `allowedDomains` (a provider's must also be verified),
-  and the administrator's address unless a provider vouches for it — a
-  password sign-up with it is `ADMIN_ADDRESS_RESERVED`, only the server
-  (`resetAdminPassword`, no request context) creates it otherwise;
+  an address outside `allowedDomains` (a provider's must also be verified);
   `session.create.before` — which runs after the credentials were checked, so
-  it leaks nothing — promotes ADMIN_EMAIL **only once its address is
-  verified** (never marks it verified), exempts admins, refuses a password
+  it leaks nothing — exempts admins, refuses a password
   session under `'admins'` (only `/callback/:id` and `/sign-in/social` are
   single sign-on), and an unlisted or unverified address. A thrown `APIError`
   answers the request, or redirects a single sign-on to its `errorCallbackURL`
   with the code. Microsoft addresses are verified only on the optional claim
   `xms_edov` (`mapProfileToUser`, any tenant): its `email` claim is whatever
   the directory holds (nOAuth);
-- **onboarding**: `user.create.after` gives every new account (sign-up, first
+- **the first account is the administrator**: `user.create.after`
+  (`AuthService.accountCreated`) gives it the role when it is the only
+  account — two sign-ups at once on a new instance get none, and
+  `npm run admin grant` settles it. `/api/auth-providers` adds `firstAccount`
+  per request, and the startup log warns while there is no account;
+- **onboarding**: the same hook gives every new account (sign-up, first
   single sign-on, an admin's `/admin/create-user`) a copy of the tutorial,
   `OnboardingService.welcome` importing `src/assets/tutorial.imprime.json`.
   better-auth runs it after the transaction commits (after the writes, on a
@@ -219,12 +220,9 @@ server, address verification and the Google / GitHub / Microsoft applications
 are instance settings, set by an admin in the app and stored in
 `InstanceSettings` (SMTP password and client secrets encrypted with the auth
 secret, `AuthService.encrypt`; a stored SMTP password is kept only for the
-same host, port and user). `ADMIN_EMAIL` is what bootstraps that admin.
-Two server commands act on it: `npm run admin:reset-password`
-(`scripts/resetAdminPassword.ts`), which creates the account on a new
-instance and is the way back in — it revokes the account's sessions, API keys
-and MCP tokens — and `npm run admin:demote-others`, which takes the role from
-every other account after `ADMIN_EMAIL` changed.
+same host, port and user). The first account to sign up is that admin; one
+server command, `npm run admin grant|demote <email>` (`scripts/admin.ts`),
+gives and takes the role afterwards; `npm run admin reset-password <email>` gives a locked-out account a new password (address verified, sessions, API keys and MCP tokens revoked).
 
 ## Build
 

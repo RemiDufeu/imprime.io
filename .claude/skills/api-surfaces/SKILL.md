@@ -79,15 +79,15 @@ admins read the settings or change either, through `requireAdmin`
 (`middleware/requireAdmin.ts`), which answers **403 `ADMIN_REQUIRED`** — not
 404, since nothing about their existence is secret. The role is better-auth's
 (`admin` plugin, `user.role`) and is read from the database on each check, so
-it holds for API keys as for sessions. The account of `ADMIN_EMAIL` — one
-address — is promoted at startup and at every sign-in, by password or single
-sign-on (`AuthService.promoteConfiguredAdmin` and the `session.create` hook),
-**only once its address is verified**. It is created by
-`npm run admin:reset-password` (address verified: the operator vouches) or by
-a provider vouching for the address; a password sign-up with it is refused
-(`ADMIN_ADDRESS_RESERVED`), or the first to sign up would claim the role. The
-role stays in the database when `ADMIN_EMAIL` changes:
-`npm run admin:demote-others` takes it from every other account.
+it holds for API keys as for sessions. **The first account of an instance is
+made administrator** (`AuthService.accountCreated`, in `user.create.after`:
+only when it is the only account), and `GET /api/auth-providers` says
+`firstAccount` while none exists, so the sign-in page offers just that. After
+that the role is given and taken only on the server, by address:
+`npm run admin grant <email>` / `npm run admin demote <email>`, and a locked-out
+account gets a new password with `npm run admin reset-password <email>`
+(`scripts/admin.ts`, `AuthService.grantAdmin` / `demoteAdmin` / `resetPassword`). There is no
+configured administrator address and no reserved one.
 
 API keys and MCP tokens never meet the session hooks, so
 `resolveApiKeyOwner` / `resolveMcpBearerOwner` apply the domain list

@@ -3,6 +3,10 @@
   text-align: left;
 }
 
+.login-page-first-account {
+  text-align: left;
+}
+
 .login-page-admin-link {
   margin-top: var(--space-m);
   margin-bottom: 0;

@@ -16,6 +16,7 @@
     "build:frontend": "npm run build --workspace=@imprime/frontend",
     "build:backend": "npm run build --workspace=@imprime/backend",
     "build": "npm run build:common && npm run build:sdk && npm run build:backend && npm run build:frontend",
+    "admin": "npm run admin --workspace=@imprime/backend --",
     "lint": "npm run lint --workspaces",
     "clean": "rm -rf packages/*/node_modules packages/*/dist node_modules",
     "docker:build": "docker build -t imprime-app .",

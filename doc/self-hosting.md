@@ -42,7 +42,6 @@ replica set (Atlas is one) or a single MongoDB server both work: see
    ```bash
    PUBLIC_APP_URL=https://imprime.example.com   # the address users open
    BETTER_AUTH_SECRET=...                       # openssl rand -base64 32
-   ADMIN_EMAIL=you@example.com                  # the administrator's address
    # with docker-compose.external-mongodb.yml only:
    MONGODB_URI=mongodb+srv://user:password@cluster.example.net/imprime
    ```
@@ -94,24 +93,34 @@ for the container to reach it.
    its Docker network; the `127.0.0.1` port binding does not get in its way,
    and is not reachable from outside.
 3. In **Environment variables**, fill in `PUBLIC_APP_URL` (that same address,
-   without the port), `BETTER_AUTH_SECRET` and `ADMIN_EMAIL` — and
-   `MONGODB_URI` with the external file. Leave
+   without the port) and `BETTER_AUTH_SECRET` — and `MONGODB_URI` with the
+   external file. Leave
    `TRUST_PROXY` empty — `1`, for Coolify's proxy — unless another proxy
    stands in front of it, such as Cloudflare's: then `2`.
-4. Deploy, then [create the administrator](#the-administrator) from the app
-   container's **Terminal** in Coolify.
+4. Deploy, then [create the administrator](#the-administrator).
 
 ## The administrator
 
-The account with `ADMIN_EMAIL` manages the instance from **Administration** in
-the app: email, single sign-on, who may sign up, fonts. Create it once the
-server runs — this prints its password:
+**The first account created on a new instance is its administrator.** Open
+the app right after the first start: with no account yet, the sign-in page
+offers only *Create the administrator account*. Do it at once — until then,
+whoever opens the address first gets the role; the server's log says so at
+every start while no account exists.
+
+The administrator manages the instance from **Administration** in the app:
+email, single sign-on, who may sign up, fonts.
+
+After that, whoever runs the server gives or takes the role by address — the
+account must exist, so its owner signs up first:
 
 ```bash
-docker compose exec app npm run admin:reset-password --workspace=@imprime/backend
+docker compose exec app npm run admin grant you@example.com
+docker compose exec app npm run admin demote someone@example.com
+docker compose exec app npm run admin reset-password you@example.com
 ```
 
-The same command gives it a new password if it is ever locked out. More in
+In a terminal already inside the app's container — Coolify's **Terminal** on
+the app service — it is just `npm run admin grant you@example.com`. More in
 [Authentication and access](./authentication.md).
 
 ## Updating

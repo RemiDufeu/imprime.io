@@ -133,11 +133,12 @@ export default function AccessPage() {
         )}
         {policy === 'admins' && (
           <Typography.Paragraph type="secondary">
-            The administrator signs in through single sign-on, or with a
-            password behind "Administrator sign-in" on the sign-in page. If
-            they cannot get in any more, whoever runs the server can reset the
-            password of ADMIN_EMAIL with
-            <Typography.Text code>npm run admin:reset-password</Typography.Text>.
+            Administrators sign in through single sign-on, or with a password
+            behind "Administrator sign-in" on the sign-in page. If they cannot get
+            in any more, whoever runs the server gives them a new password with
+            <Typography.Text code>npm run admin reset-password &lt;email&gt;</Typography.Text>,
+            or the role to another account with
+            <Typography.Text code>npm run admin grant &lt;email&gt;</Typography.Text>.
           </Typography.Paragraph>
         )}
 

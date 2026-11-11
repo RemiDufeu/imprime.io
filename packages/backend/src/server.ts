@@ -196,8 +196,8 @@ app.get('/api/health', (req, res) => {
 })
 
 // Enabled auth providers (public, consumed by the login page)
-app.get('/api/auth-providers', (_req, res) => {
-  res.json(authService.enabledProviders)
+app.get('/api/auth-providers', async (_req, res) => {
+  res.json(await authService.authProviders())
 })
 
 // Protected API routes (session cookie or API key)
@@ -253,7 +253,7 @@ async function startServer() {
     await connectDatabase()
     await connectAuthDb()
     await settingsService.load()
-    await authService.promoteConfiguredAdmin()
+    await authService.warnIfNoAccount()
     onboardingService.checkTutorial()
     const httpServer = app.listen(PORT, () => {
       console.log(`Server running on http://localhost:${PORT}`)

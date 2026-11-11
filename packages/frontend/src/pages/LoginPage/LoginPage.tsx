@@ -16,7 +16,6 @@ const SIGN_IN_ERRORS: Record<string, string> = {
   EMAIL_DOMAIN_NOT_ALLOWED: "This address is not allowed on this instance. Sign in with your organisation's account.",
   ADDRESS_NOT_VERIFIED: 'Your address must be verified before you can sign in. Ask your administrator.',
   PASSWORD_SIGN_IN_DISABLED: "Sign in with your organisation's account: passwords are for administrators.",
-  ADMIN_ADDRESS_RESERVED: "This address is the administrator's: its account is created on the server, or through single sign-on.",
   // better-auth's own: the provider did not vouch for an address an existing
   // account already uses, or that account's address is not verified.
   ACCOUNT_NOT_LINKED: 'An account already uses this address: sign in the way you created it.',
@@ -77,7 +76,7 @@ export default function LoginPage() {
       .getAuthProviders()
       .then(setProviders)
       .catch(() =>
-        setProviders({ emailPassword: true, passwordPolicy: 'open', google: false, github: false, microsoft: false, requireEmailVerification: false, passwordReset: false }),
+        setProviders({ emailPassword: true, passwordPolicy: 'open', google: false, github: false, microsoft: false, requireEmailVerification: false, passwordReset: false, firstAccount: false }),
       )
   }, [])
 
@@ -184,7 +183,7 @@ export default function LoginPage() {
     </Form>
   )
 
-  const signUpForm = (
+  const signUpForm = (submitLabel: string) => (
     <Form<SignUpValues>
       layout="vertical"
       onFinish={handleEmailSignUp}
@@ -212,10 +211,28 @@ export default function LoginPage() {
         <Input.Password size="large" autoComplete="new-password" />
       </Form.Item>
       <Button type="primary" htmlType="submit" block size="large" loading={emailLoading}>
-        Create account
+        {submitLabel}
       </Button>
     </Form>
   )
+
+  // A new instance: the first account is its administrator (made so by the
+  // server when it signs up), and nobody can sign in before it exists.
+  if (providers.firstAccount) {
+    return (
+      <FullScreen>
+        <Card style={{ width: 380, textAlign: 'center' }}>
+          <Typography.Title level={3}>Imprime.io</Typography.Title>
+          <Typography.Title level={5}>Create the administrator account</Typography.Title>
+          <Typography.Paragraph type="secondary" className="login-page-first-account">
+            This instance has no account yet. The first one is its
+            administrator: it manages the instance from Administration.
+          </Typography.Paragraph>
+          {signUpForm('Create administrator account')}
+        </Card>
+      </FullScreen>
+    )
+  }
 
   return (
     <FullScreen>
@@ -239,7 +256,7 @@ export default function LoginPage() {
             centered
             items={[
               { key: 'signin', label: 'Sign in', children: signInForm },
-              { key: 'signup', label: 'Sign up', children: signUpForm },
+              { key: 'signup', label: 'Sign up', children: signUpForm('Create account') },
             ]}
           />
         ) : (

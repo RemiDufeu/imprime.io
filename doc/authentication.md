@@ -17,13 +17,14 @@ are easy to miss.
 
 | Setting | Where | Takes effect |
 |---|---|---|
-| `BETTER_AUTH_SECRET`, `PUBLIC_APP_URL`, `CORS_ORIGIN`, `ADMIN_EMAIL`, `MONGODB_URI`, `TRUST_PROXY` | Environment (`.env`, `docker-compose.yml`) | At startup |
+| `BETTER_AUTH_SECRET`, `PUBLIC_APP_URL`, `CORS_ORIGIN`, `MONGODB_URI`, `TRUST_PROXY` | Environment (`.env`, `docker-compose.yml`) | At startup |
 | SMTP server, email verification | **Administration → Email** | At once |
 | Google, GitHub, Microsoft | **Administration → Single sign-on** | At once |
 | Password policy, allowed domains | **Administration → Access** | At once |
 | API keys | **Settings → API Keys** | At once |
-| The administrator's password, when locked out | `npm run admin:reset-password`, on the server | At once |
-| Removing the role from former administrators | `npm run admin:demote-others`, on the server | At once |
+| The first administrator | The first account created on the instance | At its sign-up |
+| Giving or taking the admin role | `npm run admin grant <email>` / `npm run admin demote <email>`, on the server | At once |
+| A password, when locked out | `npm run admin reset-password <email>`, on the server | At once |
 
 The Administration pages are also available through the API, with an
 administrator's API key: see *Settings Methods* in the
@@ -35,92 +36,76 @@ administrator's API key: see *Settings Methods* in the
 |---|---|
 | `BETTER_AUTH_SECRET` | Required: production refuses to start without it. It signs session cookies and encrypts the SMTP password and the SSO client secrets stored in the database. Generate one with `openssl rand -base64 32`. See [Changing the secret](#changing-the-secret) before you change it. |
 | `PUBLIC_APP_URL` | Required in production: the server refuses to start without it. The address users open, e.g. `https://imprime.example.com`. SSO callback URLs and the links in emails are built from it. Without it they would be built from each request's `Host` header, which anyone can forge to have a reset link point at their own site. Use `https://`: with `http://`, session cookies lose the `Secure` flag, and the log warns about it. |
-| `CORS_ORIGIN` | Origins allowed to call the API, comma-separated. `*` is refused in production. |
-| `ADMIN_EMAIL` | The administrator's address: see [The administrator](#the-administrator). |
+| `CORS_ORIGIN` | Other origins allowed to call the API with a session, comma-separated. Unset: the app's own, `PUBLIC_APP_URL`. `*` is refused in production. |
 | `MONGODB_URI` | Where accounts, sessions and settings live. A replica set or a single server: see [MongoDB](#mongodb-a-replica-set-or-a-single-server). |
 | `TRUST_PROXY` | The reverse proxies in front of the server: how many (`1` behind a single nginx, Traefik or load balancer), or their addresses (`loopback`, `10.0.0.0/8`). The client's address, which the rate limits key on, is then read from `X-Forwarded-For` past them. Leave it unset when clients connect to the server directly: the header is then ignored, since anyone can write it. `true` is refused for the same reason. |
 
 ## Setting up a new instance
 
-1. Set the environment variables above. `ADMIN_EMAIL` is the address you will
-   sign in with. It can be the address of your Google account if you plan to
-   sign in with Google.
-2. Start the server. The log says
-   `admin@example.com has no account yet: create it with npm run admin:reset-password…`
-3. On the server, run [`admin:reset-password`](#server-commands). It creates
-   the account and prints its password once. Sign in with it: you are the
+1. Set the environment variables above, and start the server. While the
+   instance has no account, its log says
+   `No account yet: the first to sign up at https://… becomes the administrator.`
+2. Open the app at once. With no account yet, the sign-in page offers only
+   **Create the administrator account**: create yours. You are the
    administrator, and **Administration** appears in the avatar menu.
-4. In **Administration → Email**, enter the SMTP server, click
+3. In **Administration → Email**, enter the SMTP server, click
    **Send test email**, then save. Turn on email verification if you want it.
-   Then replace the printed password with "Forgot password?".
-5. In **Administration → Single sign-on**, register the providers you want.
-6. In **Administration → Access**, choose who may use a password, and from
+4. In **Administration → Single sign-on**, register the providers you want.
+5. In **Administration → Access**, choose who may use a password, and from
    which domains.
 
-Nobody can claim the administrator's address from the sign-in page: signing
-up with it is refused, and only the server command or a provider that vouches
-for the address can create its account.
+Until the first account exists, whoever opens the address first becomes the
+administrator: create it right after the first start, or keep the instance
+unreachable until you have.
 
 ## The administrator
 
-An instance has one configured administrator: the account whose address is
-`ADMIN_EMAIL`.
-
-- **Promoted once verified.** The account with that address is given the
-  admin role at every sign-in, with a password or through single sign-on, and
-  at every startup, provided its address is verified. An unverified one is
-  only someone's claim to the address and is never promoted; the startup log
-  says so, and `admin:reset-password` claims it.
-- **Created by the server or by a provider.** `admin:reset-password` creates
-  the account with a verified address, because the operator vouches for it.
-  A provider that confirms the address can create it too. Signing up with a
-  password is refused: "This address is the administrator's…".
-- **Through single sign-on.** `ADMIN_EMAIL` can be the address of a Google,
-  GitHub or Microsoft account. If the account was created by the server
-  command first, a later sign-in with the provider lands on the same account.
-- **Claims are refused.** A provider that does not confirm the address can
-  neither create the administrator's account nor attach itself to it. Google
-  always confirms. GitHub confirms an address that was verified on GitHub. For
-  Microsoft, see [Verified addresses](#verified-addresses-xms_edov).
-- **Exempt from the access rules.** The administrator keeps their password when
+- **The first account is the administrator.** The account that signs up on an
+  instance without any is given the admin role, and nobody else is. If two
+  sign up at the same instant on a new instance, neither is: give the role
+  with `npm run admin grant`.
+- **After that, the role is given and taken on the server**, by address — see
+  [Server commands](#server-commands). Any number of accounts can have it.
+- **Exempt from the access rules.** An administrator keeps their password when
   single sign-on is the only way in, and the domain list does not apply to
   them.
-- **Changing `ADMIN_EMAIL`.** The new address becomes administrator at its next
-  sign-in, or at startup if its account already exists. The former
-  administrator keeps the role, which is stored in the database: run
-  [`admin:demote-others`](#server-commands) to take it away.
 - There is no screen to make anyone else an administrator.
 
 ### Server commands
 
-Two commands act on the administrator from the server. They use its
-environment (`MONGODB_URI`, `BETTER_AUTH_SECRET`, `ADMIN_EMAIL`) and work
-whether or not the server is running.
-
-| Command | What it does | When |
-|---|---|---|
-| `admin:reset-password` | Gives the `ADMIN_EMAIL` account a new password and prints it once. It creates the account if there is none, gives it the admin role and a verified address, and revokes everything else that opened it: sessions, API keys and MCP tokens. | Setting up a new instance. The administrator cannot sign in any more: single sign-on is down, there is no SMTP server for "Forgot password?", or the password is forgotten. Someone else may have had access to the account. |
-| `admin:demote-others` | Leaves the `ADMIN_EMAIL` account as the only administrator. Every other account with the role loses it and is signed out, so the access rules apply to it from its next sign-in. Its API keys keep working. | After changing `ADMIN_EMAIL`, once the server runs with the new value. |
-
-Run them like this, here with `admin:reset-password`:
-
 ```bash
-# With Docker:
-docker compose exec app npm run admin:reset-password --workspace=@imprime/backend
-
-# Without Docker, from a build:
-npm run admin:reset-password --workspace=@imprime/backend
-
-# From the sources, without a build: add :dev
-npm run admin:reset-password:dev --workspace=@imprime/backend
+npm run admin grant you@example.com            # gives the role
+npm run admin demote someone@example.com       # takes it, and signs the account out
+npm run admin reset-password you@example.com   # a new password, printed once
 ```
 
-- There is no change-password screen yet. Replace the password that
-  `admin:reset-password` prints with "Forgot password?" once email works.
-- Before `admin:demote-others`, the new `ADMIN_EMAIL` does not need an
-  account. If it has none, or its address is unverified, nobody is
-  administrator until `admin:reset-password` runs, or the address signs in
-  through a provider that confirms it. The command says so.
+They use the server's environment (`MONGODB_URI`, `BETTER_AUTH_SECRET`) and
+work whether or not the server is running. The account must exist: its owner
+signs up first.
+
+- `demote` signs the account out, so the access rules apply to it from its
+  next sign-in; its API keys keep working, as a user's. It says when no
+  administrator is left — `grant` gives the role back.
+- `reset-password` is the way back in without email: a forgotten password,
+  single sign-on down. It prints a new password once, marks the address
+  verified — whoever runs the server vouches for it — and revokes everything
+  else that opened the account: sessions, API keys, MCP tokens, in case
+  someone else had access. An account made through single sign-on gets a
+  password too. Replace the printed one with "Forgot password?" once email
+  works.
+
+Where to run them:
+
+```bash
+# With Docker Compose:
+docker compose exec app npm run admin grant you@example.com
+
+# In a terminal inside the app's container (Coolify's Terminal), or from a build:
+npm run admin grant you@example.com
+
+# From the sources, without a build:
+npm run admin:dev --workspace=@imprime/backend -- grant you@example.com
+```
 
 ## Email: Administration → Email
 
@@ -160,7 +145,10 @@ SMTP server.
   provider's word. A new one whose address the provider did not confirm is sent
   a link, but it is not blocked meanwhile, unless the
   [domain list](#allowed-domains) requires a verified address.
-- The administrator's address always counts as verified.
+- Administrators are not signed out when it is turned on. One whose address
+  is unverified — the first account of an instance without email, say — is
+  sent a link at their next sign-in, like anyone: send yourself the test
+  email before turning it on.
 
 ### Password reset
 
@@ -335,7 +323,7 @@ themselves. A client's name is therefore whatever its author chose.
 | This address is not allowed on this instance… | The address is outside the domain list |
 | Your address must be verified before you can sign in… | Domain list on, address not verified |
 | Sign in with your organisation's account: passwords are for administrators. | *Single sign-on only* mode |
-| This address is the administrator's: its account is created on the server, or through single sign-on. | Someone signed up with `ADMIN_EMAIL`: see [The administrator](#the-administrator) |
+| Create the administrator account | The instance has no account yet: see [The administrator](#the-administrator) |
 | An account already uses this address: sign in the way you created it. | The provider's account could not be attached: see [Accounts and single sign-on](#accounts-and-single-sign-on) |
 | Sign-in failed. Try again, or ask your administrator. | Any other failure from a provider. The page only shows messages it knows, since anyone can craft a link to it |
 

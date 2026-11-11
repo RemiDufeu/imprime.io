@@ -41,9 +41,8 @@ src/
     errors.ts            AppError, NotFoundError, ValidationError, ConflictError
   scripts/
     runAdminCommand.ts     shared runner: connects the auth DB, builds AuthService, sets the exit code
-    resetAdminPassword.ts  break-glass: a new password for ADMIN_EMAIL
-    demoteOtherAdmins.ts   leaves ADMIN_EMAIL as the only administrator
-                           (each command an esbuild entry, bundled to dist/scripts/ beside the server)
+    admin.ts               `npm run admin grant|demote|reset-password <email>`: by address
+                           (an esbuild entry, bundled to dist/scripts/ beside the server)
   mcp/
     router.ts            Streamable HTTP transport + sessions
     tools/               one file per tool + index.ts + errors.ts
