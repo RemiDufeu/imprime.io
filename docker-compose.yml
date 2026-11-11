@@ -8,11 +8,11 @@ services:
       # This machine only, where the reverse proxy runs. To open it to the
       # network, remove "127.0.0.1:" — and empty TRUST_PROXY if no proxy is
       # left in front, or anyone could choose the address the sign-in rate
-      # limits count.
-      - "127.0.0.1:${HOST_PORT:-3023}:3023"
+      # limits count. PORT is the app's, in the container and on this machine.
+      - "127.0.0.1:${PORT:-3023}:${PORT:-3023}"
     environment:
       NODE_ENV: production
-      PORT: "3023"
+      PORT: ${PORT:-3023}
       MONGODB_URI: ${MONGODB_URI:-mongodb://mongodb:27017/imprime}
       PUBLIC_APP_URL: ${PUBLIC_APP_URL:?set PUBLIC_APP_URL to the address users open, e.g. https://imprime.example.com}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET, e.g. from openssl rand -base64 32}
@@ -30,8 +30,9 @@ services:
         condition: service_healthy
 
   # A single server: Imprime runs on it without transactions — see
-  # doc/authentication.md, MongoDB. Not published on any port: only the app
-  # reaches it, on the network Compose makes for the two.
+  # doc/authentication.md, MongoDB. Published on no port: only the app reaches
+  # it, on the network Compose makes for this stack. Another MongoDB on the
+  # machine, in its own container, never conflicts with it.
   mongodb:
     image: mongo:8
     restart: unless-stopped

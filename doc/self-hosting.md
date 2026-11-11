@@ -66,17 +66,31 @@ replica set (Atlas is one) or a single MongoDB server both work: see
 
 3. [Create the administrator](#the-administrator).
 
-A MongoDB on the same machine but outside Docker is
-`mongodb://host.docker.internal:27017/imprime` from the container; it must
-listen on more than `127.0.0.1` (its `bindIp`) for the container to reach it.
+### Ports, and several instances on one machine
+
+`PORT` (3023 by default) is the app's port, in its container and on
+`127.0.0.1`: the one the reverse proxy points at. It is the only port
+published on the machine — the only one two instances could fight over.
+
+The MongoDB of `docker-compose.yml` is published on no port: only the app
+reaches it, on the network Compose makes for the stack. Several stacks on one
+machine — two Imprime instances, or other apps with their own MongoDB — each
+get their own network and their own volume, named after the stack's folder,
+and never see each other. Run each from its own folder, with its own `.env`
+and its own `PORT`.
+
+With your own MongoDB, its port is part of `MONGODB_URI`. One on the same
+machine but outside Docker is `mongodb://host.docker.internal:27017/imprime`
+from the container; it must listen on more than `127.0.0.1` (its `bindIp`)
+for the container to reach it.
 
 ## Coolify
 
 1. **New resource → Docker Compose Empty**, and paste one of the two files.
    (Or deploy this repository with the *Docker Compose* build pack, and give
    it the file's path.)
-2. On the **app** service, set the domain with the container's port:
-   `https://imprime.example.com:3023`. Coolify's proxy reaches the app over
+2. On the **app** service, set the domain with the app's port — `PORT`,
+   3023 by default: `https://imprime.example.com:3023`. Coolify's proxy reaches the app over
    its Docker network; the `127.0.0.1` port binding does not get in its way,
    and is not reachable from outside.
 3. In **Environment variables**, fill in `PUBLIC_APP_URL` (that same address,
