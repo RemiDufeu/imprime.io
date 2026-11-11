@@ -5,8 +5,9 @@ import { ForbiddenError } from '../services/errors.js'
 
 /**
  * The REST routes an API key opens: listing and reading one's templates,
- * printing them, previewing them. Building a template — pages, variables,
- * images — and fonts, settings, template files take a session: the editor's.
+ * printing them, making a preview — whose `url` is the editor's page for it.
+ * Building a template — pages, variables, images — and fonts, settings,
+ * template files, the preview's own routes take a session: the editor's.
  *
  * Closed by default: a route added later is out of an API key's reach until
  * it is listed here. Matched as the routers match — any case, an optional
@@ -19,8 +20,6 @@ const API_KEY_ROUTES: ReadonlyArray<{ method: string; path: RegExp }> = [
   { method: 'POST', path: /^\/api\/export\/[^/]+\/pdf\/?$/i }, // exportPDF
   { method: 'POST', path: /^\/api\/export\/code\/[^/]+\/pdf\/?$/i }, // exportPDFByCode
   { method: 'POST', path: /^\/api\/templates\/[^/]+\/previews\/?$/i }, // createPreview
-  { method: 'GET', path: /^\/api\/previews\/[^/]+\/?$/i }, // getPreview
-  { method: 'POST', path: /^\/api\/previews\/[^/]+\/pdf\/?$/i }, // exportPreviewPDF
 ]
 
 function apiKeyMayCall(req: Request): boolean {

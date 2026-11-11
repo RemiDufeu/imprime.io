@@ -857,8 +857,9 @@ export class ImprimeClient {
   /**
    * Make a preview: the template drawn with these values, as its PDF would
    * be, kept for a day. Fails as `exportPDF` would with them.
-   * @returns Its `_id` — the editor shows it at `getPreviewPath(_id)` — when
-   *   it expires, and the PDF's page count and warnings
+   * @returns Its `url` — the editor's page for it, the link to hand over: it
+   *   opens for the template's owner, signed in, who prints the PDF from
+   *   there — its `_id`, when it expires, and the PDF's page count and warnings
    */
   async createPreview(
     templateId: string,
@@ -872,13 +873,17 @@ export class ImprimeClient {
 
   /**
    * A preview's pages, resolved against the template as it is now. 404
-   * `PREVIEW_NOT_FOUND` once it has expired.
+   * `PREVIEW_NOT_FOUND` once it has expired. The editor's: not open to an
+   * API key.
    */
   async getPreview(previewId: string): Promise<PreviewDTO.Response> {
     return this.request<PreviewDTO.Response>(`/previews/${previewId}`)
   }
 
-  /** The PDF a preview shows, with its warnings (see `exportPDF`). */
+  /**
+   * The PDF a preview shows, with its warnings (see `exportPDF`). The
+   * editor's: not open to an API key, which prints with `exportPDF`.
+   */
   async exportPreviewPDF(previewId: string): Promise<{ pdf: Blob; warnings: ExportDTO.Warning[] }> {
     return this.requestPdf(`/previews/${previewId}/pdf`, {})
   }

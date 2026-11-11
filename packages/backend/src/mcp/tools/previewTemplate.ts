@@ -1,22 +1,12 @@
 import { z } from 'zod/v3'
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
-import { getPreviewPath } from '@imprime/common'
 import { previewService } from '../../services/index.js'
 import { PREVIEW_TTL_SECONDS } from '../../services/PreviewService.js'
 import type { PageImage } from '../../services/pdfRaster.js'
 import { assertOwnsTemplate } from '../../middleware/requireOwnsTemplate.js'
 import { objectIdSchema, variableValuesSchema } from '../schemas.js'
 import { toolError, errorMessage } from './errors.js'
-
-// The address users open the app at: a preview is a page of it.
-function getAppUrl(): string {
-  const url = process.env.PUBLIC_APP_URL
-  if (!url || !/^https?:\/\//i.test(url)) {
-    throw new Error('PUBLIC_APP_URL must be set to an absolute http(s) URL')
-  }
-  return url.replace(/\/$/, '')
-}
 
 // What an agent looks at by default, and at most: a few pages are enough to
 // check a layout, and each image weighs on its context.
@@ -67,7 +57,7 @@ export function registerPreviewTemplate(server: McpServer, ownerId: string): voi
       try {
         await assertOwnsTemplate(templateId, ownerId)
         const preview = await previewService.create(templateId, ownerId, variableValues ?? {})
-        const previewUrl = `${getAppUrl()}${getPreviewPath(preview._id)}`
+        const previewUrl = preview.url
 
         // The images are a help, not the preview: one that cannot be drawn
         // leaves the link, and says so.

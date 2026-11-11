@@ -57,11 +57,12 @@ new ImprimeClient(options?: ImprimeClientOptions)
 - `apiKey?: string` - An API key from **Settings → API Keys**, sent in the `x-api-key` header. Leave it out in the browser, where the session cookie authenticates
 
 **What an API key opens.** With `apiKey`, only these methods work:
-`listTemplates`, `getTemplate`, `exportPDF`, `exportPDFByCode`, `exportToPDF`,
-`createPreview`, `getPreview` and `exportPreviewPDF`. Every other method —
+`listTemplates`, `getTemplate`, `exportPDF`, `exportPDFByCode`, `exportToPDF`
+and `createPreview`, whose `url` is the link to the editor's page for the
+preview — it opens for the template's owner, signed in. Every other method —
 building templates, pages, variables and images, fonts, settings, template
-files — fails with `403 API_KEY_NOT_ALLOWED`: it needs a signed-in session, as
-in the editor. To build templates from a script or an agent, use the MCP
+files, reading a preview or its PDF — fails with `403 API_KEY_NOT_ALLOWED`: it
+needs a signed-in session, as in the editor. To build templates from a script or an agent, use the MCP
 server, where an API key reaches every tool.
 
 ### Template Methods

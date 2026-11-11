@@ -60,7 +60,9 @@ Two mechanisms, both resolving to `req.user.id`:
   (SDK, Claude Code, scripts).
 
 **An API key opens only the routes of `API_KEY_ROUTES`** (`middleware/requireAuth.ts`):
-listing and reading templates, the two exports, and the preview routes. Any
+listing and reading templates, the two exports, and making a preview —
+whose `url` (`PreviewService`, PUBLIC_APP_URL + `getPreviewPath`) is the link
+to hand over; reading a preview or its PDF stays the editor's. Any
 other route answers it **403 `API_KEY_NOT_ALLOWED`** — the editor's session is
 the only way to build a template over REST. Closed by default: a new route is
 out of a key's reach until listed there, so listing it is a decision, made

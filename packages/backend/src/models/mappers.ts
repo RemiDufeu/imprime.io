@@ -203,10 +203,12 @@ export function previewCreateToModel(
 // `resolved` is what the export made of the template with the preview's values.
 export function previewToCreatedDTO(
   doc: PreviewDocument,
-  resolved: { pages: Page[]; warnings: ExportDTO.Warning[] }
+  resolved: { pages: Page[]; warnings: ExportDTO.Warning[] },
+  url: string
 ): PreviewDTO.Created {
   return {
     _id: doc._id.toString(),
+    url,
     expiresAt: doc.expiresAt,
     pageCount: resolved.pages.length,
     warnings: resolved.warnings,

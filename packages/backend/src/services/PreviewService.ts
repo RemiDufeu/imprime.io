@@ -6,7 +6,7 @@ import {
   previewValuesFromModel,
   toObjectId,
 } from '../models/mappers.js'
-import type { PreviewDTO, VariableValueType } from '@imprime/common'
+import { getPreviewPath, type PreviewDTO, type VariableValueType } from '@imprime/common'
 import type { TemplateService } from './TemplateService.js'
 import type { ExportResult, ExportService, PageImagesResult } from './ExportService.js'
 import type { RasterOptions } from './pdfRaster.js'
@@ -17,6 +17,17 @@ import { NotFoundError } from './errors.js'
 export const PREVIEW_TTL_SECONDS = 24 * 60 * 60
 
 export const previewNotFound = () => new NotFoundError('Preview not found, or expired', 'PREVIEW_NOT_FOUND')
+
+// The editor's page for a preview, absolute: the link an API client or an
+// agent hands over. Under PUBLIC_APP_URL, the address users open the app at —
+// production refuses to start without a valid one (`server.ts`).
+function getPreviewUrl(previewId: string): string {
+  const appUrl = process.env.PUBLIC_APP_URL?.trim()
+  if (!appUrl || !/^https?:\/\//i.test(appUrl)) {
+    throw new Error('PUBLIC_APP_URL must be set to an absolute http(s) URL')
+  }
+  return `${appUrl.replace(/\/+$/, '')}${getPreviewPath(previewId)}`
+}
 
 /**
  * Previews: a template drawn with a set of values, as its PDF would be. Only
@@ -42,7 +53,7 @@ export class PreviewService {
     const preview = await PreviewModel.create(
       previewCreateToModel(toObjectId(templateId), ownerId, variableValues, expiresAt)
     )
-    return previewToCreatedDTO(preview, resolved)
+    return previewToCreatedDTO(preview, resolved, getPreviewUrl(preview._id.toString()))
   }
 
   /**

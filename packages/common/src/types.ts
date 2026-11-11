@@ -732,6 +732,10 @@ export const EXPORT_WARNINGS_HEADER = 'X-Export-Warnings'
 export namespace PreviewDTO {
   export interface Created {
     _id: string
+    // The editor's page for it, absolute (PUBLIC_APP_URL + `getPreviewPath`):
+    // the link to hand over. It opens for the template's owner, signed in, who
+    // prints the PDF from there.
+    url: string
     expiresAt: Date
     // How many pages the PDF has, and what did not fit on them, with the
     // template as it is when the preview is made.
@@ -753,8 +757,8 @@ export namespace PreviewDTO {
   }
 }
 
-// Where the editor shows a preview, under the app's origin: what the MCP links
-// to, and the route the editor declares.
+// Where the editor shows a preview, under the app's origin: what a created
+// preview's `url` links to, and the route the editor declares.
 export function getPreviewPath(previewId: string): string {
   return `/preview/${encodeURIComponent(previewId)}`
 }
